@@ -69,7 +69,7 @@ pub fn incrementReferenceCount(anonymous_map: *AnonymousMap) void {
 /// Decrement the reference count.
 ///
 /// When called a write lock must be held, upon return the lock is unlocked.
-pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, deallocate_frame_list: *kernel.mem.phys.FrameList) void {
+pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, deallocate_page_list: *kernel.mem.PhysicalPage.List) void {
     if (core.is_debug) {
         std.debug.assert(anonymous_map.reference_count != 0);
         std.debug.assert(anonymous_map.lock.isWriteLocked());
@@ -80,7 +80,7 @@ pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, deallocate_frame_li
 
     if (reference_count == 1) {
         // reference count is now zero, destroy the anonymous map
-        anonymous_map.destroy(deallocate_frame_list);
+        anonymous_map.destroy(deallocate_page_list);
         return;
     }
 
@@ -97,7 +97,7 @@ pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, deallocate_frame_li
 /// Called `amap_wipeout` in OpenBSD uvm.
 fn destroy(
     anonymous_map: *AnonymousMap,
-    deallocate_frame_list: *kernel.mem.phys.FrameList,
+    deallocate_page_list: *kernel.mem.PhysicalPage.List,
 ) void {
     if (core.is_debug) {
         std.debug.assert(anonymous_map.lock.isWriteLocked());
@@ -110,7 +110,7 @@ fn destroy(
         for (chunk) |opt_page| {
             const page = opt_page orelse continue;
             page.lock.writeLock();
-            page.decrementReferenceCount(deallocate_frame_list);
+            page.decrementReferenceCount(deallocate_page_list);
         }
     }
     anonymous_map.anonymous_page_chunks.deinit();

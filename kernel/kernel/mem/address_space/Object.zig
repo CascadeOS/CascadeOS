@@ -19,10 +19,10 @@ const std = @import("std");
 const arch = @import("arch");
 const kernel = @import("kernel");
 const Task = kernel.Task;
-const Page = kernel.mem.Page;
+const PhysicalPage = kernel.mem.PhysicalPage;
 const core = @import("core");
 
-const PageChunkMap = @import("chunk_map.zig").ChunkMap(Page);
+const PhysicalPageChunkMap = @import("chunk_map.zig").ChunkMap(PhysicalPage);
 
 const log = kernel.debug.log.scoped(.address_space);
 
@@ -32,7 +32,7 @@ lock: kernel.sync.RwLock = .{},
 
 reference_count: u32 = 1,
 
-page_chunks: PageChunkMap = .{},
+physical_page_chunks: PhysicalPageChunkMap = .{},
 
 /// Increment the reference count.
 ///

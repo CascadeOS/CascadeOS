@@ -52,8 +52,8 @@ pub const functions: arch.Functions = .{
         .createPageTable = x64.paging.PageTable.create,
 
         .loadPageTable = struct {
-            fn loadPageTable(physical_frame: kernel.mem.phys.Frame) void {
-                x64.registers.Cr3.writeAddress(physical_frame.baseAddress());
+            fn loadPageTable(physical_page: kernel.mem.PhysicalPage.Index) void {
+                x64.registers.Cr3.writeAddress(physical_page.baseAddress());
             }
         }.loadPageTable,
 

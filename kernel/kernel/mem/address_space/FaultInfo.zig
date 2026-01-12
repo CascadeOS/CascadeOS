@@ -19,7 +19,7 @@ const std = @import("std");
 const arch = @import("arch");
 const kernel = @import("kernel");
 const Task = kernel.Task;
-const Page = kernel.mem.Page;
+const PhysicalPage = kernel.mem.PhysicalPage;
 const core = @import("core");
 
 const AddressSpace = @import("AddressSpace.zig");
@@ -214,7 +214,7 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo) error{ Restart, OutOfMemory
     );
 
     switch (object_page) {
-        .page => {
+        .physical_page => {
             @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L1414-L1416
         },
         .zero_fill => {},
@@ -226,7 +226,7 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo) error{ Restart, OutOfMemory
     if (core.is_debug) std.debug.assert(object_page != .need_io);
 
     var anonymous_page: *AnonymousPage = undefined;
-    var page: *Page = undefined;
+    var physical_page: PhysicalPage.Index = undefined;
 
     if (fault_info.promote_to_anonymous_map) {
         const anonymous_map = opt_anonymous_map.?;
@@ -254,12 +254,12 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo) error{ Restart, OutOfMemory
         try fault_info.promote(
             object_page,
             &anonymous_page,
-            &page,
+            &physical_page,
         );
 
         switch (object_page) {
             .zero_fill => {},
-            .page => @panic("NOT IMPLEMENTED"), // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L1473
+            .physical_page => @panic("NOT IMPLEMENTED"), // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L1473
             .need_io => unreachable,
         }
 
@@ -299,9 +299,9 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo) error{ Restart, OutOfMemory
         kernel.mem.mapSinglePage(
             fault_info.address_space.page_table,
             fault_info.faulting_address,
-            page.physical_frame,
+            physical_page,
             map_type,
-            kernel.mem.phys.allocator,
+            kernel.mem.PhysicalPage.allocator,
         ) catch {
             @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L1545-L1568
         };
@@ -356,7 +356,7 @@ fn promote(
     fault_info: *FaultInfo,
     object_page: ObjectPage,
     anonymous_page: **AnonymousPage,
-    page: **Page,
+    physical_page: *PhysicalPage.Index,
 ) error{ Restart, OutOfMemory }!void {
     log.verbose("promoting to an anonymous page", .{});
 
@@ -365,35 +365,35 @@ fn promote(
 
     const opt_object = switch (object_page) {
         .zero_fill => null,
-        .page => fault_info.entry.object_reference.object,
+        .physical_page => fault_info.entry.object_reference.object,
         .need_io => unreachable,
     };
     if (core.is_debug) std.debug.assert(opt_object == null or (opt_object.?.lock.isReadLocked() or opt_object.?.lock.isWriteLocked()));
 
-    const allocated_frame = kernel.mem.phys.allocator.allocate() catch {
+    const allocated_physical_page = kernel.mem.PhysicalPage.allocator.allocate() catch {
         @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L520
     };
-    page.* = allocated_frame.page().?;
+    physical_page.* = allocated_physical_page;
 
-    anonymous_page.* = AnonymousPage.create(page.*) catch {
+    anonymous_page.* = AnonymousPage.create(allocated_physical_page) catch {
         @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L520
         // MUST clean up `page` as well
     };
 
     log.verbose(
         "allocated anonymous page for {f} at {f}",
-        .{ fault_info.faulting_address, allocated_frame.baseAddress() },
+        .{ fault_info.faulting_address, allocated_physical_page.baseAddress() },
     );
 
     switch (object_page) {
         .zero_fill => {
             log.verbose("zero filling anonymous page", .{});
-            const mapped_frame = kernel.mem
-                .directMapFromPhysical(allocated_frame.baseAddress())
+            const mapped_page = kernel.mem
+                .directMapFromPhysical(allocated_physical_page.baseAddress())
                 .toPtr(*[arch.paging.standard_page_size.value]u8);
-            @memset(mapped_frame, 0);
+            @memset(mapped_page, 0);
         },
-        .page => @panic("NOT IMPLEMENTED"), // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L545
+        .physical_page => @panic("NOT IMPLEMENTED"), // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L545
         .need_io => unreachable,
     }
 }
@@ -488,5 +488,5 @@ fn unlockAll(
 const ObjectPage = union(enum) {
     need_io,
     zero_fill,
-    page: *Page,
+    physical_page: PhysicalPage.Index,
 };

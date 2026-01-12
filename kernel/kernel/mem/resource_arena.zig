@@ -121,23 +121,23 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                 .heap => |count| {
                     if (core.is_debug) std.debug.assert(count > 0);
 
-                    var frames: kernel.mem.phys.FrameList = .{};
+                    var pages: kernel.mem.PhysicalPage.List = .{};
 
                     var caches_created: usize = 0;
 
-                    const frames_to_allocate = arch.paging.standard_page_size.amountToCover(
+                    const pages_to_allocate = arch.paging.standard_page_size.amountToCover(
                         core.Size.of(RawCache).multiplyScalar(count),
                     );
 
-                    for (0..frames_to_allocate) |_| {
-                        const frame = kernel.mem.phys.allocator.allocate() catch
+                    for (0..pages_to_allocate) |_| {
+                        const page = kernel.mem.PhysicalPage.allocator.allocate() catch
                             @panic("heap quantum cache allocation failed");
-                        frames.push(frame);
+                        pages.push(page);
 
-                        const frame_caches = kernel.mem.directMapFromPhysical(frame.baseAddress())
-                            .toPtr(*[QUANTUM_CACHES_PER_FRAME]RawCache);
+                        const page_caches = kernel.mem.directMapFromPhysical(page.baseAddress())
+                            .toPtr(*[QUANTUM_CACHES_PER_PAGE]RawCache);
 
-                        for (frame_caches) |*cache| {
+                        for (page_caches) |*cache| {
                             caches_created += 1;
 
                             cache.init(.{
@@ -155,7 +155,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                         }
                     }
 
-                    arena.quantum_caches.allocation = frames;
+                    arena.quantum_caches.allocation = pages;
                     arena.quantum_caches.max_cached_size = count * options.quantum;
                 },
             }
@@ -909,7 +909,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
             const Allocation = switch (quantum_caching) {
                 .none => void,
                 .normal => []RawCache,
-                .heap => kernel.mem.phys.FrameList,
+                .heap => kernel.mem.PhysicalPage.List,
             };
         };
     };
@@ -1324,7 +1324,7 @@ inline fn smallestPossibleLenInFreelist(index: usize) usize {
 }
 
 const MAX_NUMBER_OF_QUANTUM_CACHES = 64;
-const QUANTUM_CACHES_PER_FRAME = arch.paging.standard_page_size.divide(core.Size.of(RawCache));
+const QUANTUM_CACHES_PER_PAGE = arch.paging.standard_page_size.divide(core.Size.of(RawCache));
 
 const NUMBER_OF_HASH_BUCKETS = 64;
 const HashIndex: type = std.math.Log2Int(std.meta.Int(.unsigned, NUMBER_OF_HASH_BUCKETS));

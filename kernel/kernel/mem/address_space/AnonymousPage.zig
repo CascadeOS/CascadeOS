@@ -20,7 +20,7 @@ const arch = @import("arch");
 const kernel = @import("kernel");
 const Task = kernel.Task;
 const Cache = kernel.mem.cache.Cache;
-const Page = kernel.mem.Page;
+const PhysicalPage = kernel.mem.PhysicalPage;
 const core = @import("core");
 
 const log = kernel.debug.log.scoped(.address_space);
@@ -31,12 +31,12 @@ lock: kernel.sync.RwLock = .{},
 
 reference_count: u32 = 1,
 
-page: *Page,
+physical_page: PhysicalPage.Index,
 
-pub fn create(page: *Page) !*AnonymousPage {
+pub fn create(physical_page: PhysicalPage.Index) !*AnonymousPage {
     const anonymous_page = try globals.anonymous_page_cache.allocate();
     anonymous_page.* = .{
-        .page = page,
+        .physical_page = physical_page,
     };
     return anonymous_page;
 }
@@ -58,7 +58,7 @@ pub fn incrementReferenceCount(anonymous_page: *AnonymousPage) void {
 /// When called the a write lock must be held, upon return the lock is unlocked.
 pub fn decrementReferenceCount(
     anonymous_page: *AnonymousPage,
-    deallocate_frame_list: *kernel.mem.phys.FrameList,
+    deallocate_page_list: *kernel.mem.PhysicalPage.List,
 ) void {
     if (core.is_debug) {
         std.debug.assert(anonymous_page.reference_count != 0);
@@ -70,7 +70,7 @@ pub fn decrementReferenceCount(
 
     if (reference_count == 1) {
         // reference count is now zero, destroy the anonymous page
-        anonymous_page.destroy(deallocate_frame_list);
+        anonymous_page.destroy(deallocate_page_list);
         return;
     }
 
@@ -84,14 +84,14 @@ pub fn decrementReferenceCount(
 /// Called `uvm_anfree` in OpenBSD uvm.
 fn destroy(
     anonymous_page: *AnonymousPage,
-    deallocate_frame_list: *kernel.mem.phys.FrameList,
+    deallocate_page_list: *kernel.mem.PhysicalPage.List,
 ) void {
     if (core.is_debug) {
         std.debug.assert(anonymous_page.lock.isWriteLocked());
         std.debug.assert(anonymous_page.reference_count == 0);
     }
 
-    deallocate_frame_list.push(anonymous_page.page.physical_frame);
+    deallocate_page_list.push(anonymous_page.physical_page);
 
     anonymous_page.lock.writeUnlock();
     globals.anonymous_page_cache.deallocate(anonymous_page);

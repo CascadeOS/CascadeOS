@@ -231,17 +231,17 @@ const globals = struct {
                     .address_space = undefined, // initialized below
                 };
 
-                const frame = kernel.mem.phys.allocator.allocate() catch |err| {
-                    log.warn("process constructor failed during frame allocation: {t}", .{err});
+                const page = kernel.mem.PhysicalPage.allocator.allocate() catch |err| {
+                    log.warn("process constructor failed during page allocation: {t}", .{err});
                     return error.ItemConstructionFailed;
                 };
                 errdefer {
-                    var frame_list: kernel.mem.phys.FrameList = .{};
-                    frame_list.push(frame);
-                    kernel.mem.phys.allocator.deallocate(frame_list);
+                    var page_list: kernel.mem.PhysicalPage.List = .{};
+                    page_list.push(page);
+                    kernel.mem.PhysicalPage.allocator.deallocate(page_list);
                 }
 
-                const page_table: arch.paging.PageTable = .create(frame);
+                const page_table: arch.paging.PageTable = .create(page);
                 kernel.mem.kernelPageTable().copyTopLevelInto(page_table);
 
                 process.address_space.init(.{
@@ -266,9 +266,9 @@ const globals = struct {
 
                 process.address_space.deinit();
 
-                var frame_list: kernel.mem.phys.FrameList = .{};
-                frame_list.push(page_table.physical_frame);
-                kernel.mem.phys.allocator.deallocate(frame_list);
+                var page_list: kernel.mem.PhysicalPage.List = .{};
+                page_list.push(page_table.physical_page);
+                kernel.mem.PhysicalPage.allocator.deallocate(page_list);
             }
         }.destructor,
     ) = undefined;

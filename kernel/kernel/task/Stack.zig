@@ -97,13 +97,13 @@ pub fn createStack() !Stack {
         globals.stack_page_table_mutex.lock();
         defer globals.stack_page_table_mutex.unlock();
 
-        kernel.mem.mapRangeAndBackWithPhysicalFrames(
+        kernel.mem.mapRangeAndBackWithPhysicalPages(
             kernel.mem.kernelPageTable(),
             usable_range,
             .{ .type = .kernel, .protection = .read_write },
             .kernel,
             .keep,
-            kernel.mem.phys.allocator,
+            kernel.mem.PhysicalPage.allocator,
         ) catch return error.ItemConstructionFailed;
     }
 
@@ -124,7 +124,7 @@ pub fn destroyStack(stack: Stack) void {
             .kernel,
             .free,
             .keep,
-            kernel.mem.phys.allocator,
+            kernel.mem.PhysicalPage.allocator,
         );
     }
 

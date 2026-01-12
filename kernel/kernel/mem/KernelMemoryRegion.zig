@@ -36,7 +36,7 @@ pub const Type = enum {
 pub const RegionMapInfo = union(enum) {
     top_level,
     full: struct { physical_range: core.PhysicalRange, map_type: MapType },
-    back_with_frames: MapType,
+    back_with_physical_pages: MapType,
 };
 
 pub fn mapInfo(kernel_memory_region: KernelMemoryRegion) RegionMapInfo {
@@ -83,7 +83,7 @@ pub fn mapInfo(kernel_memory_region: KernelMemoryRegion) RegionMapInfo {
 
         .kernel_heap, .kernel_stacks, .special_heap, .kernel_address_space => return .top_level,
 
-        .pages => return .{ .back_with_frames = .{
+        .pages => return .{ .back_with_physical_pages = .{
             .type = .kernel,
             .protection = .read_write,
         } },

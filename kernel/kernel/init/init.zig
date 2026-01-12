@@ -27,7 +27,7 @@ pub fn initStage1() !noreturn {
     // now that we have a executor and task we can panic in a meaningful way
     kernel.debug.setPanicMode(.single_executor_init_panic);
 
-    kernel.mem.phys.init.initializeBootstrapFrameAllocator();
+    kernel.mem.PhysicalPage.init.initializeBootstrapAllocator();
 
     // TODO: ensure all physical memory regions are mapped in the bootloader provided page table here, this would allow
     // us to switch to latter limine revisions and also allow us to support unusual systems with MMIO above 4GiB

@@ -918,7 +918,7 @@ pub fn unmap(address_space: *AddressSpace, range: core.VirtualRange) UnmapError!
                         .kernel => .keep,
                         .user => .free,
                     },
-                    kernel.mem.phys.allocator,
+                    kernel.mem.PhysicalPage.allocator,
                 );
 
                 unmap_batch.clear();
@@ -937,7 +937,7 @@ pub fn unmap(address_space: *AddressSpace, range: core.VirtualRange) UnmapError!
                     .kernel => .keep,
                     .user => .free,
                 },
-                kernel.mem.phys.allocator,
+                kernel.mem.PhysicalPage.allocator,
             );
         }
 
@@ -1035,7 +1035,7 @@ fn performUnmap(
         length -= 1;
     }
 
-    var deallocate_frame_list: kernel.mem.phys.FrameList = .{};
+    var deallocate_page_list: kernel.mem.PhysicalPage.List = .{};
 
     // iterate over entries in range in reverse order and remove them
     var index = first_entry_index + length;
@@ -1046,7 +1046,7 @@ fn performUnmap(
 
         if (entry.anonymous_map_reference.anonymous_map) |anonymous_map| {
             anonymous_map.lock.writeLock();
-            anonymous_map.decrementReferenceCount(&deallocate_frame_list);
+            anonymous_map.decrementReferenceCount(&deallocate_page_list);
         }
 
         if (entry.object_reference.object) |object| {
@@ -1058,7 +1058,7 @@ fn performUnmap(
         result.entries_removed += 1;
     }
 
-    kernel.mem.phys.allocator.deallocate(deallocate_frame_list);
+    kernel.mem.PhysicalPage.allocator.deallocate(deallocate_page_list);
 
     return result;
 }

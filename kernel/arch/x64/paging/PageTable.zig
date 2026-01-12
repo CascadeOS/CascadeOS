@@ -42,9 +42,9 @@ pub const PageTable = extern struct {
         return true;
     }
 
-    /// Create a page table in the given physical frame.
-    pub fn create(physical_frame: kernel.mem.phys.Frame) *PageTable {
-        const page_table = kernel.mem.directMapFromPhysical(physical_frame.baseAddress()).toPtr(*PageTable);
+    /// Create a page table in the given physical page.
+    pub fn create(physical_page: kernel.mem.PhysicalPage.Index) *PageTable {
+        const page_table = kernel.mem.directMapFromPhysical(physical_page.baseAddress()).toPtr(*PageTable);
         page_table.zero();
         return page_table;
     }
@@ -53,27 +53,27 @@ pub const PageTable = extern struct {
     pub fn map4KiB(
         level4_table: *PageTable,
         virtual_address: core.VirtualAddress,
-        physical_frame: kernel.mem.phys.Frame,
+        phys_page: kernel.mem.PhysicalPage.Index,
         map_type: MapType,
-        physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+        physical_page_allocator: kernel.mem.PhysicalPage.Allocator,
     ) kernel.mem.MapError!void {
         if (core.is_debug) std.debug.assert(virtual_address.isAligned(small_page_size));
 
-        var deallocate_frame_list: kernel.mem.phys.FrameList = .{};
-        errdefer physical_frame_allocator.deallocate(deallocate_frame_list);
+        var deallocate_page_list: kernel.mem.PhysicalPage.List = .{};
+        errdefer physical_page_allocator.deallocate(deallocate_page_list);
 
         const level4_index = p4Index(virtual_address);
 
         const level3_table, const created_level3_table = try ensureNextTable(
             &level4_table.entries[level4_index],
-            physical_frame_allocator,
+            physical_page_allocator,
         );
         errdefer {
             if (created_level3_table) {
                 var level4_entry = level4_table.entries[level4_index].load();
                 const address = level4_entry.getAddress4kib();
                 level4_table.entries[level4_index].zero();
-                deallocate_frame_list.push(.fromAddress(address));
+                deallocate_page_list.push(.fromAddress(address));
             }
         }
 
@@ -81,14 +81,14 @@ pub const PageTable = extern struct {
 
         const level2_table, const created_level2_table = try ensureNextTable(
             &level3_table.entries[level3_index],
-            physical_frame_allocator,
+            physical_page_allocator,
         );
         errdefer {
             if (created_level2_table) {
                 var level3_entry = level3_table.entries[level3_index].load();
                 const address = level3_entry.getAddress4kib();
                 level3_table.entries[level3_index].zero();
-                deallocate_frame_list.push(.fromAddress(address));
+                deallocate_page_list.push(.fromAddress(address));
             }
         }
 
@@ -96,20 +96,20 @@ pub const PageTable = extern struct {
 
         const level1_table, const created_level1_table = try ensureNextTable(
             &level2_table.entries[level2_index],
-            physical_frame_allocator,
+            physical_page_allocator,
         );
         errdefer {
             if (created_level1_table) {
                 var level2_entry = level2_table.entries[level2_index].load();
                 const address = level2_entry.getAddress4kib();
                 level2_table.entries[level2_index].zero();
-                deallocate_frame_list.push(.fromAddress(address));
+                deallocate_page_list.push(.fromAddress(address));
             }
         }
 
         try level1_table.setEntry(
             p1Index(virtual_address),
-            physical_frame.baseAddress(),
+            phys_page.baseAddress(),
             map_type,
             .small,
         );
@@ -129,7 +129,7 @@ pub const PageTable = extern struct {
         backing_page_decision: core.CleanupDecision,
         top_level_decision: core.CleanupDecision,
         flush_batch: *kernel.mem.VirtualRangeBatch,
-        deallocate_frame_list: *kernel.mem.phys.FrameList,
+        deallocate_page_list: *kernel.mem.PhysicalPage.List,
     ) void {
         if (core.is_debug) {
             std.debug.assert(virtual_range.address.isAligned(small_page_size));
@@ -169,7 +169,7 @@ pub const PageTable = extern struct {
 
             defer if (top_level_decision == .free and level3_table.isEmpty()) {
                 level4_table.entries[level4_index].zero();
-                deallocate_frame_list.push(.fromAddress(level4_entry.getAddress4kib()));
+                deallocate_page_list.push(.fromAddress(level4_entry.getAddress4kib()));
             };
 
             var level3_index = p3Index(current_virtual_address);
@@ -199,7 +199,7 @@ pub const PageTable = extern struct {
 
                 defer if (level2_table.isEmpty()) {
                     level3_table.entries[level3_index].zero();
-                    deallocate_frame_list.push(.fromAddress(level3_entry.getAddress4kib()));
+                    deallocate_page_list.push(.fromAddress(level3_entry.getAddress4kib()));
                 };
 
                 var level2_index = p2Index(current_virtual_address);
@@ -229,7 +229,7 @@ pub const PageTable = extern struct {
 
                     defer if (level1_table.isEmpty()) {
                         level2_table.entries[level2_index].zero();
-                        deallocate_frame_list.push(.fromAddress(level2_entry.getAddress4kib()));
+                        deallocate_page_list.push(.fromAddress(level2_entry.getAddress4kib()));
                     };
 
                     var level1_index = p1Index(current_virtual_address);
@@ -255,7 +255,7 @@ pub const PageTable = extern struct {
                         level1_table.entries[level1_index].zero();
 
                         if (backing_page_decision == .free) {
-                            deallocate_frame_list.push(.fromAddress(level1_entry.getAddress4kib()));
+                            deallocate_page_list.push(.fromAddress(level1_entry.getAddress4kib()));
                         }
 
                         if (opt_in_progress_range) |*in_progress_range| {
@@ -986,7 +986,7 @@ pub const PageTable = extern struct {
         pub fn fillTopLevel(
             page_table: *PageTable,
             range: core.VirtualRange,
-            physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+            physical_page_allocator: kernel.mem.PhysicalPage.Allocator,
         ) !void {
             const size_of_top_level_entry = arch.paging.init.sizeOfTopLevelEntry();
             if (core.is_debug) {
@@ -999,7 +999,7 @@ pub const PageTable = extern struct {
             const entry = raw_entry.load();
             if (entry.present.read()) return error.AlreadyMapped;
 
-            _ = try ensureNextTable(raw_entry, physical_frame_allocator);
+            _ = try ensureNextTable(raw_entry, physical_page_allocator);
         }
 
         /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
@@ -1019,7 +1019,7 @@ pub const PageTable = extern struct {
             virtual_range: core.VirtualRange,
             physical_range: core.PhysicalRange,
             map_type: MapType,
-            physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+            physical_page_allocator: kernel.mem.PhysicalPage.Allocator,
         ) !void {
             if (core.is_debug) {
                 std.debug.assert(virtual_range.address.isAligned(small_page_size));
@@ -1054,7 +1054,7 @@ pub const PageTable = extern struct {
             while (level4_index <= last_virtual_address_p4_index) : (level4_index += 1) {
                 const level3_table, _ = try ensureNextTable(
                     &level4_table.entries[level4_index],
-                    physical_frame_allocator,
+                    physical_page_allocator,
                 );
 
                 var level3_index = p3Index(current_virtual_address);
@@ -1087,7 +1087,7 @@ pub const PageTable = extern struct {
 
                     const level2_table, _ = try ensureNextTable(
                         &level3_table.entries[level3_index],
-                        physical_frame_allocator,
+                        physical_page_allocator,
                     );
 
                     var level2_index = p2Index(current_virtual_address);
@@ -1119,7 +1119,7 @@ pub const PageTable = extern struct {
 
                         const level1_table, _ = try ensureNextTable(
                             &level2_table.entries[level2_index],
-                            physical_frame_allocator,
+                            physical_page_allocator,
                         );
 
                         var level1_index = p1Index(current_virtual_address);
@@ -1165,7 +1165,7 @@ pub const PageTable = extern struct {
 /// Returns the next table and whether it had to be created by this function or not.
 fn ensureNextTable(
     raw_entry: *PageTable.Entry.Raw,
-    physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+    physical_page_allocator: kernel.mem.PhysicalPage.Allocator,
 ) !struct { *PageTable, bool } {
     var created_table = false;
 
@@ -1180,10 +1180,10 @@ fn ensureNextTable(
         if (core.is_debug) std.debug.assert(entry.isZero());
         created_table = true;
 
-        const physical_frame = try physical_frame_allocator.allocate();
+        const physical_page = try physical_page_allocator.allocate();
         errdefer comptime unreachable;
 
-        const physical_address = physical_frame.baseAddress();
+        const physical_address = physical_page.baseAddress();
         kernel.mem.directMapFromPhysical(physical_address).toPtr(*PageTable).zero();
 
         entry.setAddress4kib(physical_address);

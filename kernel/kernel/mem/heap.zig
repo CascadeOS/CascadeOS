@@ -65,7 +65,7 @@ pub fn allocateSpecial(
         map_type,
         .kernel,
         .keep,
-        kernel.mem.phys.allocator,
+        kernel.mem.PhysicalPage.allocator,
     );
 
     return virtual_range;
@@ -178,13 +178,13 @@ const allocator_impl = struct {
             globals.heap_page_table_mutex.lock();
             defer globals.heap_page_table_mutex.unlock();
 
-            kernel.mem.mapRangeAndBackWithPhysicalFrames(
+            kernel.mem.mapRangeAndBackWithPhysicalPages(
                 kernel.mem.kernelPageTable(),
                 virtual_range,
                 .{ .type = .kernel, .protection = .read_write },
                 .kernel,
                 .keep,
-                kernel.mem.phys.allocator,
+                kernel.mem.PhysicalPage.allocator,
             ) catch return resource_arena.AllocateError.RequestedLengthUnavailable;
         }
         errdefer comptime unreachable;
@@ -215,7 +215,7 @@ const allocator_impl = struct {
                 .kernel,
                 .free,
                 .keep,
-                kernel.mem.phys.allocator,
+                kernel.mem.PhysicalPage.allocator,
             );
         }
 

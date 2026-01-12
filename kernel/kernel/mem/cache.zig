@@ -419,10 +419,10 @@ pub const RawCache = struct {
                         break :slab_base_ptr @ptrFromInt(slab_allocation.base);
                     },
                     .pmm => slab_base_ptr: {
-                        const frame = kernel.mem.phys.allocator.allocate() catch
+                        const physical_page = kernel.mem.PhysicalPage.allocator.allocate() catch
                             return AllocateError.SlabAllocationFailed;
 
-                        const slab_base_ptr = kernel.mem.directMapFromPhysical(frame.baseAddress()).toPtr([*]u8);
+                        const slab_base_ptr = kernel.mem.directMapFromPhysical(physical_page.baseAddress()).toPtr([*]u8);
 
                         if (core.is_debug) @memset(slab_base_ptr[0..arch.paging.standard_page_size.value], undefined);
 
@@ -436,11 +436,11 @@ pub const RawCache = struct {
                         .len = arch.paging.standard_page_size.value,
                     }),
                     .pmm => {
-                        var deallocate_frame_list: kernel.mem.phys.FrameList = .{};
-                        deallocate_frame_list.push(.fromAddress(
+                        var deallocate_page_list: kernel.mem.PhysicalPage.List = .{};
+                        deallocate_page_list.push(.fromAddress(
                             kernel.mem.physicalFromDirectMap(.fromPtr(slab_base_ptr)) catch unreachable,
                         ));
-                        kernel.mem.phys.allocator.deallocate(deallocate_frame_list);
+                        kernel.mem.PhysicalPage.allocator.deallocate(deallocate_page_list);
                     },
                 };
 
@@ -668,11 +668,11 @@ pub const RawCache = struct {
                         },
                     ),
                     .pmm => {
-                        var deallocate_frame_list: kernel.mem.phys.FrameList = .{};
-                        deallocate_frame_list.push(.fromAddress(
+                        var deallocate_page_list: kernel.mem.PhysicalPage.List = .{};
+                        deallocate_page_list.push(.fromAddress(
                             kernel.mem.physicalFromDirectMap(.fromPtr(slab_base_ptr)) catch unreachable,
                         ));
-                        kernel.mem.phys.allocator.deallocate(deallocate_frame_list);
+                        kernel.mem.PhysicalPage.allocator.deallocate(deallocate_page_list);
                     },
                 }
 

@@ -15,8 +15,7 @@ pub const FlushRequest = @import("FlushRequest.zig");
 pub const heap = @import("heap.zig");
 pub const KernelMemoryRegion = @import("KernelMemoryRegion.zig");
 pub const MapType = @import("MapType.zig");
-pub const Page = @import("Page.zig");
-pub const phys = @import("phys.zig");
+pub const PhysicalPage = @import("PhysicalPage.zig");
 pub const resource_arena = @import("resource_arena.zig");
 
 const log = kernel.debug.log.scoped(.mem);
@@ -33,7 +32,7 @@ pub inline fn kernelAddressSpace() *AddressSpace {
     return &globals.kernel_address_space;
 }
 
-/// Maps a single page to a physical frame.
+/// Maps a single page to a physical page.
 ///
 /// **REQUIREMENTS**:
 /// - `virtual_address` must be aligned to `arch.paging.standard_page_size`
@@ -42,9 +41,9 @@ pub inline fn kernelAddressSpace() *AddressSpace {
 pub fn mapSinglePage(
     page_table: arch.paging.PageTable,
     virtual_address: core.VirtualAddress,
-    physical_frame: phys.Frame,
+    physical_page: PhysicalPage.Index,
     map_type: MapType,
-    physical_frame_allocator: phys.FrameAllocator,
+    physical_page_allocator: PhysicalPage.Allocator,
 ) MapError!void {
     if (core.is_debug) {
         std.debug.assert(map_type.protection != .none);
@@ -55,28 +54,28 @@ pub fn mapSinglePage(
 
     try page_table.mapSinglePage(
         virtual_address,
-        physical_frame,
+        physical_page,
         map_type,
-        physical_frame_allocator,
+        physical_page_allocator,
     );
 }
 
 /// Maps a virtual range using the standard page size.
 ///
-/// Physical frames are allocated for each page in the virtual range.
+/// Physical pages are allocated for each page in the virtual range.
 ///
 /// **REQUIREMENTS**:
 /// - `virtual_range.address` must be aligned to `arch.paging.standard_page_size`
 /// - `virtual_range.size` must be aligned to `arch.paging.standard_page_size`
 /// - `virtual_range` must not already be mapped
 /// - `map_type.protection` must not be `.none`
-pub fn mapRangeAndBackWithPhysicalFrames(
+pub fn mapRangeAndBackWithPhysicalPages(
     page_table: arch.paging.PageTable,
     virtual_range: core.VirtualRange,
     map_type: MapType,
     flush_target: kernel.Context,
     top_level_decision: core.CleanupDecision,
-    physical_frame_allocator: phys.FrameAllocator,
+    physical_page_allocator: PhysicalPage.Allocator,
 ) MapError!void {
     if (core.is_debug) {
         std.debug.assert(map_type.protection != .none);
@@ -102,27 +101,27 @@ pub fn mapRangeAndBackWithPhysicalFrames(
             flush_target,
             .free,
             top_level_decision,
-            physical_frame_allocator,
+            physical_page_allocator,
         );
     }
 
-    // TODO: this can be optimized by implementing `arch.paging.mapRangeAndBackWithPhysicalFrames`
+    // TODO: this can be optimized by implementing `arch.paging.mapRangeAndBackWithPhysicalPages`
     //       this one is not as obviously good as the other TODO optimizations in this file as every arch will have to do
-    //       the same physical frame allocation and errdefer deallocation
+    //       the same physical page allocation and errdefer deallocation
 
     while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
-        const physical_frame = try physical_frame_allocator.allocate();
+        const physical_page = try physical_page_allocator.allocate();
         errdefer {
-            var deallocate_frame_list: phys.FrameList = .{};
-            deallocate_frame_list.push(physical_frame);
-            physical_frame_allocator.deallocate(deallocate_frame_list);
+            var deallocate_page_list: PhysicalPage.List = .{};
+            deallocate_page_list.push(physical_page);
+            physical_page_allocator.deallocate(deallocate_page_list);
         }
 
         try page_table.mapSinglePage(
             current_virtual_address,
-            physical_frame,
+            physical_page,
             map_type,
-            physical_frame_allocator,
+            physical_page_allocator,
         );
 
         current_virtual_address.moveForwardInPlace(arch.paging.standard_page_size);
@@ -146,7 +145,7 @@ pub fn mapRangeToPhysicalRange(
     map_type: MapType,
     flush_target: kernel.Context,
     top_level_decision: core.CleanupDecision,
-    physical_frame_allocator: phys.FrameAllocator,
+    physical_page_allocator: PhysicalPage.Allocator,
 ) MapError!void {
     if (core.is_debug) {
         std.debug.assert(map_type.protection != .none);
@@ -175,7 +174,7 @@ pub fn mapRangeToPhysicalRange(
             flush_target,
             .keep,
             top_level_decision,
-            physical_frame_allocator,
+            physical_page_allocator,
         );
     }
 
@@ -188,7 +187,7 @@ pub fn mapRangeToPhysicalRange(
             current_virtual_address,
             .fromAddress(current_physical_address),
             map_type,
-            physical_frame_allocator,
+            physical_page_allocator,
         );
 
         current_virtual_address.moveForwardInPlace(arch.paging.standard_page_size);
@@ -205,9 +204,9 @@ pub fn unmap(
     flush_target: kernel.Context,
     backing_page_decision: core.CleanupDecision,
     top_level_decision: core.CleanupDecision,
-    physical_frame_allocator: phys.FrameAllocator,
+    physical_page_allocator: PhysicalPage.Allocator,
 ) void {
-    var deallocate_frame_list: phys.FrameList = .{};
+    var deallocate_page_list: PhysicalPage.List = .{};
     var flush_batch: VirtualRangeBatch = .{};
 
     for (unmap_batch.ranges.constSlice()) |range| {
@@ -216,7 +215,7 @@ pub fn unmap(
             backing_page_decision,
             top_level_decision,
             &flush_batch,
-            &deallocate_frame_list,
+            &deallocate_page_list,
         );
 
         if (flush_batch.full()) {
@@ -242,7 +241,7 @@ pub fn unmap(
         request.submitAndWait();
     }
 
-    physical_frame_allocator.deallocate(deallocate_frame_list);
+    physical_page_allocator.deallocate(deallocate_page_list);
 }
 
 /// Changes the protection of all the ranges in the given batch.
@@ -508,7 +507,7 @@ pub const MapError = error{
 
     /// This is used to surface errors from the underlying paging implementation that are architecture specific.
     MappingNotValid,
-} || phys.FrameAllocator.AllocateError;
+} || PhysicalPage.Allocator.AllocateError;
 
 pub fn kernelVirtualOffset() core.Size {
     return globals.kernel_virtual_offset;
@@ -789,29 +788,35 @@ pub const init = struct {
     }
 
     pub fn initializeMemorySystem() !void {
-        var memory_map: MemoryMap = .{};
-
-        const number_of_usable_pages, const number_of_usable_regions = try fillMemoryMap(&memory_map);
-
         const kernel_regions = &globals.regions;
 
+        const total_number_of_pages = blk: {
+            var memory_iter = boot.memoryMap(.forward) catch @panic("no memory map");
+
+            var last_page: core.PhysicalAddress = .zero;
+
+            init_log.debug("bootloader provided memory map:", .{});
+
+            while (memory_iter.next()) |entry| {
+                init_log.debug("\t{f}", .{entry});
+
+                last_page = entry.range.last();
+            }
+
+            break :blk @intFromEnum(PhysicalPage.Index.fromAddress(last_page)) + 1;
+        };
+
         init_log.debug("building kernel memory layout", .{});
-        buildMemoryLayout(
-            number_of_usable_pages,
-            number_of_usable_regions,
-            kernel_regions,
-        );
+        buildMemoryLayout(total_number_of_pages, kernel_regions);
         globals.non_cached_direct_map = kernel_regions.find(.non_cached_direct_map).?.range;
 
         init_log.debug("building kernel page table", .{});
         globals.kernel_page_table = buildAndLoadKernelPageTable(kernel_regions);
 
         init_log.debug("initializing physical memory", .{});
-        phys.init.initializePhysicalMemory(
-            number_of_usable_pages,
-            number_of_usable_regions,
+        PhysicalPage.init.initializePhysicalMemory(
+            total_number_of_pages,
             kernel_regions.find(.pages).?.range,
-            memory_map.constSlice(),
         );
 
         init_log.debug("initializing caches", .{});
@@ -835,49 +840,14 @@ pub const init = struct {
         );
     }
 
-    fn fillMemoryMap(memory_map: *MemoryMap) !struct { usize, usize } {
-        var memory_iter = boot.memoryMap(.forward) catch @panic("no memory map");
-
-        var number_of_usable_pages: usize = 0;
-        var number_of_usable_regions: usize = 0;
-
-        init_log.debug("bootloader provided memory map:", .{});
-
-        while (memory_iter.next()) |entry| {
-            init_log.debug("\t{f}", .{entry});
-
-            try memory_map.append(entry);
-
-            if (!entry.type.isUsable()) continue;
-            if (entry.range.size.value == 0) continue;
-
-            number_of_usable_regions += 1;
-
-            number_of_usable_pages += std.math.divExact(
-                usize,
-                entry.range.size.value,
-                arch.paging.standard_page_size.value,
-            ) catch std.debug.panic(
-                "memory map entry size is not a multiple of page size: {f}",
-                .{entry},
-            );
-        }
-
-        init_log.debug("usable pages in memory map: {d}", .{number_of_usable_pages});
-        init_log.debug("usable regions in memory map: {d}", .{number_of_usable_regions});
-
-        return .{ number_of_usable_pages, number_of_usable_regions };
-    }
-
     fn buildMemoryLayout(
-        number_of_usable_pages: usize,
-        number_of_usable_regions: usize,
+        total_number_of_pages: usize,
         kernel_regions: *KernelMemoryRegion.List,
     ) void {
         registerKernelSections(kernel_regions);
         registerDirectMaps(kernel_regions);
         registerHeaps(kernel_regions);
-        registerPages(kernel_regions, number_of_usable_pages, number_of_usable_regions);
+        registerPages(kernel_regions, total_number_of_pages);
 
         kernel_regions.sort();
 
@@ -1034,25 +1004,12 @@ pub const init = struct {
 
     fn registerPages(
         kernel_regions: *KernelMemoryRegion.List,
-        number_of_usable_pages: usize,
-        number_of_usable_regions: usize,
+        total_number_of_pages: usize,
     ) void {
-        if (core.is_debug) std.debug.assert(@alignOf(Page.Region) <= arch.paging.standard_page_size.value);
-
-        const size_of_regions = core.Size.of(Page.Region)
-            .multiplyScalar(number_of_usable_regions);
-
-        const size_of_pages = core.Size.of(Page)
-            .multiplyScalar(number_of_usable_pages);
-
-        const range_size =
-            size_of_regions
-                .alignForward(.from(@alignOf(Page), .byte))
-                .add(size_of_pages)
-                .alignForward(arch.paging.standard_page_size);
-
         const pages_range = kernel_regions.findFreeRange(
-            range_size,
+            core.Size.of(PhysicalPage)
+                .multiplyScalar(total_number_of_pages)
+                .alignForward(arch.paging.standard_page_size),
             arch.paging.standard_page_size,
         ) orelse @panic("no space in kernel memory layout for the pages array");
 
@@ -1066,7 +1023,7 @@ pub const init = struct {
         kernel_regions: *KernelMemoryRegion.List,
     ) arch.paging.PageTable {
         const kernel_page_table: arch.paging.PageTable = .create(
-            phys.init.bootstrap_allocator.allocate() catch unreachable,
+            PhysicalPage.init.bootstrap_allocator.allocate() catch unreachable,
         );
 
         for (kernel_regions.constSlice()) |region| {
@@ -1078,7 +1035,7 @@ pub const init = struct {
                 .top_level => arch.paging.init.fillTopLevel(
                     kernel_page_table,
                     region.range,
-                    phys.init.bootstrap_allocator,
+                    PhysicalPage.init.bootstrap_allocator,
                 ) catch |err| {
                     std.debug.panic("failed to fill top level for {f}: {t}", .{ region, err });
                 },
@@ -1087,20 +1044,20 @@ pub const init = struct {
                     region.range,
                     full.physical_range,
                     full.map_type,
-                    phys.init.bootstrap_allocator,
+                    PhysicalPage.init.bootstrap_allocator,
                 ) catch |err| {
                     std.debug.panic("failed to full map {f}: {t}", .{ region, err });
                 },
-                .back_with_frames => |map_type| {
-                    mapRangeAndBackWithPhysicalFrames(
+                .back_with_physical_pages => |map_type| {
+                    mapRangeAndBackWithPhysicalPages(
                         kernel_page_table,
                         region.range,
                         map_type,
                         .kernel,
                         .keep,
-                        phys.init.bootstrap_allocator,
+                        PhysicalPage.init.bootstrap_allocator,
                     ) catch |err| {
-                        std.debug.panic("failed to back with frames {f}: {t}", .{ region, err });
+                        std.debug.panic("failed to back with pages {f}: {t}", .{ region, err });
                     };
                 },
             }
@@ -1115,11 +1072,6 @@ pub const init = struct {
     pub fn kernelPhysicalToVirtualOffset() core.Size {
         return init_globals.kernel_physical_to_virtual_offset;
     }
-
-    const MemoryMap = core.containers.BoundedArray(
-        boot.MemoryMap.Entry,
-        kernel.config.mem.maximum_number_of_memory_map_entries,
-    );
 
     const init_globals = struct {
         /// Offset from the virtual address of kernel sections to the physical address of the section.

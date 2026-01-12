@@ -213,17 +213,17 @@ pub const paging = struct {
     pub const higher_half_start: core.VirtualAddress = current_decls.paging.higher_half_start;
 
     pub const PageTable = struct {
-        physical_frame: kernel.mem.phys.Frame,
+        physical_page: kernel.mem.PhysicalPage.Index,
         arch_specific: *current_decls.paging.PageTable,
 
-        /// Create a page table in the given physical frame.
-        pub fn create(physical_frame: kernel.mem.phys.Frame) callconv(core.inline_in_non_debug) PageTable {
+        /// Create a page table in the given physical page.
+        pub fn create(physical_page: kernel.mem.PhysicalPage.Index) callconv(core.inline_in_non_debug) PageTable {
             return .{
-                .physical_frame = physical_frame,
+                .physical_page = physical_page,
                 .arch_specific = getFunction(
                     current_functions.paging,
                     "createPageTable",
-                )(physical_frame),
+                )(physical_page),
             };
         }
 
@@ -231,7 +231,7 @@ pub const paging = struct {
             getFunction(
                 current_functions.paging,
                 "loadPageTable",
-            )(page_table.physical_frame);
+            )(page_table.physical_page);
         }
 
         /// Copies the top level of `page_table` into `target_page_table`.
@@ -245,7 +245,7 @@ pub const paging = struct {
             )(page_table.arch_specific, target_page_table.arch_specific);
         }
 
-        /// Maps `virtual_address` to `physical_frame` with mapping type `map_type`.
+        /// Maps `virtual_address` to `physical_page` with mapping type `map_type`.
         ///
         /// Caller must ensure:
         ///  - the virtual address is aligned to the standard page size
@@ -257,9 +257,9 @@ pub const paging = struct {
         pub fn mapSinglePage(
             page_table: PageTable,
             virtual_address: core.VirtualAddress,
-            physical_frame: kernel.mem.phys.Frame,
+            physical_page: kernel.mem.PhysicalPage.Index,
             map_type: kernel.mem.MapType,
-            physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+            physical_page_allocator: kernel.mem.PhysicalPage.Allocator,
         ) callconv(core.inline_in_non_debug) kernel.mem.MapError!void {
             return getFunction(
                 current_functions.paging,
@@ -267,9 +267,9 @@ pub const paging = struct {
             )(
                 page_table.arch_specific,
                 virtual_address,
-                physical_frame,
+                physical_page,
                 map_type,
-                physical_frame_allocator,
+                physical_page_allocator,
             );
         }
 
@@ -286,7 +286,7 @@ pub const paging = struct {
             backing_page_decision: core.CleanupDecision,
             top_level_decision: core.CleanupDecision,
             flush_batch: *kernel.mem.VirtualRangeBatch,
-            deallocate_frame_list: *kernel.mem.phys.FrameList,
+            deallocate_page_list: *kernel.mem.PhysicalPage.List,
         ) callconv(core.inline_in_non_debug) void {
             getFunction(
                 current_functions.paging,
@@ -297,7 +297,7 @@ pub const paging = struct {
                 backing_page_decision,
                 top_level_decision,
                 flush_batch,
-                deallocate_frame_list,
+                deallocate_page_list,
             );
         }
 
@@ -374,12 +374,12 @@ pub const paging = struct {
         pub fn fillTopLevel(
             page_table: PageTable,
             range: core.VirtualRange,
-            physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+            physical_page_allocator: kernel.mem.PhysicalPage.Allocator,
         ) callconv(core.inline_in_non_debug) anyerror!void {
             return getFunction(
                 current_functions.paging.init,
                 "fillTopLevel",
-            )(page_table.arch_specific, range, physical_frame_allocator);
+            )(page_table.arch_specific, range, physical_page_allocator);
         }
 
         /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
@@ -399,12 +399,12 @@ pub const paging = struct {
             virtual_range: core.VirtualRange,
             physical_range: core.PhysicalRange,
             map_type: kernel.mem.MapType,
-            physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+            physical_page_allocator: kernel.mem.PhysicalPage.Allocator,
         ) callconv(core.inline_in_non_debug) anyerror!void {
             return getFunction(
                 current_functions.paging.init,
                 "mapToPhysicalRangeAllPageSizes",
-            )(page_table.arch_specific, virtual_range, physical_range, map_type, physical_frame_allocator);
+            )(page_table.arch_specific, virtual_range, physical_range, map_type, physical_page_allocator);
         }
     };
 };
@@ -897,10 +897,10 @@ pub const Functions = struct {
     },
 
     paging: struct {
-        /// Create a page table in the given physical frame.
-        createPageTable: ?fn (physical_frame: kernel.mem.phys.Frame) *current_decls.paging.PageTable = null,
+        /// Create a page table in the given physical page.
+        createPageTable: ?fn (physical_page: kernel.mem.PhysicalPage.Index) *current_decls.paging.PageTable = null,
 
-        loadPageTable: ?fn (physical_frame: kernel.mem.phys.Frame) void = null,
+        loadPageTable: ?fn (physical_page: kernel.mem.PhysicalPage.Index) void = null,
 
         /// Copies the top level of `page_table` into `target_page_table`.
         copyTopLevelIntoPageTable: ?fn (
@@ -908,7 +908,7 @@ pub const Functions = struct {
             target_page_table: *current_decls.paging.PageTable,
         ) void = null,
 
-        /// Maps `virtual_address` to `physical_frame` with mapping type `map_type`.
+        /// Maps `virtual_address` to `physical_page` with mapping type `map_type`.
         ///
         /// Caller must ensure:
         ///  - the virtual address is aligned to the standard page size
@@ -920,9 +920,9 @@ pub const Functions = struct {
         mapSinglePage: ?fn (
             page_table: *current_decls.paging.PageTable,
             virtual_address: core.VirtualAddress,
-            physical_frame: kernel.mem.phys.Frame,
+            physical_page: kernel.mem.PhysicalPage.Index,
             map_type: kernel.mem.MapType,
-            physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+            physical_page_allocator: kernel.mem.PhysicalPage.Allocator,
         ) kernel.mem.MapError!void = null,
 
         /// Unmaps the given virtual range.
@@ -938,7 +938,7 @@ pub const Functions = struct {
             backing_page_decision: core.CleanupDecision,
             top_level_decision: core.CleanupDecision,
             flush_batch: *kernel.mem.VirtualRangeBatch,
-            deallocate_frame_list: *kernel.mem.phys.FrameList,
+            deallocate_page_list: *kernel.mem.PhysicalPage.List,
         ) void = null,
 
         /// Changes the protection of the given virtual range.
@@ -988,7 +988,7 @@ pub const Functions = struct {
             fillTopLevel: ?fn (
                 page_table: *current_decls.paging.PageTable,
                 range: core.VirtualRange,
-                physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+                physical_page_allocator: kernel.mem.PhysicalPage.Allocator,
             ) anyerror!void = null,
 
             /// Maps the `virtual_range` to the `physical_range` with mapping type given by `map_type`.
@@ -1008,7 +1008,7 @@ pub const Functions = struct {
                 virtual_range: core.VirtualRange,
                 physical_range: core.PhysicalRange,
                 map_type: kernel.mem.MapType,
-                physical_frame_allocator: kernel.mem.phys.FrameAllocator,
+                physical_page_allocator: kernel.mem.PhysicalPage.Allocator,
             ) anyerror!void = null,
         },
     },
