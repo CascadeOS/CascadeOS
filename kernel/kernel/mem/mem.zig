@@ -788,36 +788,23 @@ pub const init = struct {
     }
 
     pub fn initializeMemorySystem() !void {
-        const kernel_regions = &globals.regions;
-
-        const total_number_of_pages = blk: {
+        if (init_log.levelEnabled(.debug)) {
             var memory_iter = boot.memoryMap(.forward) catch @panic("no memory map");
-
-            var last_page: core.PhysicalAddress = .zero;
-
             init_log.debug("bootloader provided memory map:", .{});
-
             while (memory_iter.next()) |entry| {
                 init_log.debug("\t{f}", .{entry});
-
-                last_page = entry.range.last();
             }
-
-            break :blk @intFromEnum(PhysicalPage.Index.fromAddress(last_page)) + 1;
-        };
+        }
 
         init_log.debug("building kernel memory layout", .{});
-        buildMemoryLayout(total_number_of_pages, kernel_regions);
-        globals.non_cached_direct_map = kernel_regions.find(.non_cached_direct_map).?.range;
+        buildMemoryLayout();
+        globals.non_cached_direct_map = globals.regions.find(.non_cached_direct_map).?.range;
 
         init_log.debug("building kernel page table", .{});
-        globals.kernel_page_table = buildAndLoadKernelPageTable(kernel_regions);
+        globals.kernel_page_table = buildAndLoadKernelPageTable();
 
         init_log.debug("initializing physical memory", .{});
-        PhysicalPage.init.initializePhysicalMemory(
-            total_number_of_pages,
-            kernel_regions.find(.pages).?.range,
-        );
+        PhysicalPage.init.initializePhysicalMemory(globals.regions.find(.pages).?.range);
 
         init_log.debug("initializing caches", .{});
         try cache.init.initializeCaches();
@@ -827,27 +814,26 @@ pub const init = struct {
         try AddressSpace.Entry.init.initializeCaches();
 
         init_log.debug("initializing kernel and special heap", .{});
-        try heap.init.initializeHeaps(kernel_regions);
+        try heap.init.initializeHeaps(&globals.regions);
 
         init_log.debug("initializing kernel address space", .{});
         try globals.kernel_address_space.init(
             .{
                 .name = try .fromSlice("kernel"),
-                .range = kernel_regions.find(.kernel_address_space).?.range,
+                .range = globals.regions.find(.kernel_address_space).?.range,
                 .page_table = globals.kernel_page_table,
                 .context = .kernel,
             },
         );
     }
 
-    fn buildMemoryLayout(
-        total_number_of_pages: usize,
-        kernel_regions: *KernelMemoryRegion.List,
-    ) void {
+    fn buildMemoryLayout() void {
+        const kernel_regions = &globals.regions;
+
         registerKernelSections(kernel_regions);
         registerDirectMaps(kernel_regions);
         registerHeaps(kernel_regions);
-        registerPages(kernel_regions, total_number_of_pages);
+        registerPages(kernel_regions);
 
         kernel_regions.sort();
 
@@ -1002,10 +988,19 @@ pub const init = struct {
         });
     }
 
-    fn registerPages(
-        kernel_regions: *KernelMemoryRegion.List,
-        total_number_of_pages: usize,
-    ) void {
+    fn registerPages(kernel_regions: *KernelMemoryRegion.List) void {
+        const total_number_of_pages = blk: {
+            var memory_iter = boot.memoryMap(.forward) catch @panic("no memory map");
+
+            var last_page: core.PhysicalAddress = .zero;
+
+            while (memory_iter.next()) |entry| {
+                last_page = entry.range.last();
+            }
+
+            break :blk @intFromEnum(PhysicalPage.Index.fromAddress(last_page)) + 1;
+        };
+
         const pages_range = kernel_regions.findFreeRange(
             core.Size.of(PhysicalPage)
                 .multiplyScalar(total_number_of_pages)
@@ -1019,14 +1014,12 @@ pub const init = struct {
         });
     }
 
-    fn buildAndLoadKernelPageTable(
-        kernel_regions: *KernelMemoryRegion.List,
-    ) arch.paging.PageTable {
+    fn buildAndLoadKernelPageTable() arch.paging.PageTable {
         const kernel_page_table: arch.paging.PageTable = .create(
             PhysicalPage.init.bootstrap_allocator.allocate() catch unreachable,
         );
 
-        for (kernel_regions.constSlice()) |region| {
+        for (globals.regions.constSlice()) |region| {
             init_log.debug("mapping '{t}' into the kernel page table", .{region.type});
 
             const map_info = region.mapInfo();

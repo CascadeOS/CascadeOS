@@ -211,13 +211,11 @@ pub const init = struct {
     /// Initializes the normal physical page allocator and the pages array.
     ///
     /// Pulls all memory out of the bootstrap physical page allocator and uses it to populate the normal allocator.
-    pub fn initializePhysicalMemory(
-        total_number_of_pages: usize,
-        pages_range: core.VirtualRange,
-    ) void {
+    pub fn initializePhysicalMemory(pages_range: core.VirtualRange) void {
         const pages: []PhysicalPage = blk: {
-            const page_ptr: [*]PhysicalPage = pages_range.address.toPtr([*]PhysicalPage);
-            break :blk page_ptr[0..total_number_of_pages];
+            var byte_slice = pages_range.toByteSlice();
+            byte_slice.len = std.mem.alignBackward(usize, byte_slice.len, std.mem.Alignment.of(PhysicalPage).toByteUnits());
+            break :blk @alignCast(std.mem.bytesAsSlice(PhysicalPage, byte_slice));
         };
         globals.pages = pages;
 
