@@ -18,6 +18,8 @@ pub inline fn fromNode(node: *std.SinglyLinkedList.Node) *PhysicalPage {
 }
 
 pub const Index = enum(u32) {
+    none = 0,
+
     _,
 
     /// Returns the physical page that contains the given physical address.
@@ -193,12 +195,23 @@ pub const init = struct {
         while (memory_map.next()) |entry| {
             if (entry.type != .free) continue;
 
+            const range: core.PhysicalRange = if (entry.range.address.equal(.zero)) blk: {
+                // the zero page is reserved for `Index.none`
+
+                if (entry.range.size.lessThanOrEqual(arch.paging.standard_page_size)) continue;
+
+                break :blk .fromAddr(
+                    entry.range.address.moveForward(arch.paging.standard_page_size),
+                    entry.range.size.subtract(arch.paging.standard_page_size),
+                );
+            } else entry.range;
+
             init_globals.bootstrap_physical_regions.append(.{
-                .start_physical_page = .fromAddress(entry.range.address),
+                .start_physical_page = .fromAddress(range.address),
                 .first_free_page_index = 0,
                 .page_count = @intCast(std.math.divExact(
                     usize,
-                    entry.range.size.value,
+                    range.size.value,
                     arch.paging.standard_page_size.value,
                 ) catch std.debug.panic(
                     "memory map entry size is not a multiple of page size: {f}",
@@ -214,7 +227,11 @@ pub const init = struct {
     pub fn initializePhysicalMemory(pages_range: core.VirtualRange) void {
         const pages: []PhysicalPage = blk: {
             var byte_slice = pages_range.toByteSlice();
-            byte_slice.len = std.mem.alignBackward(usize, byte_slice.len, std.mem.Alignment.of(PhysicalPage).toByteUnits());
+            byte_slice.len = std.mem.alignBackward(
+                usize,
+                byte_slice.len,
+                std.mem.Alignment.of(PhysicalPage).toByteUnits(),
+            );
             break :blk @alignCast(std.mem.bytesAsSlice(PhysicalPage, byte_slice));
         };
         globals.pages = pages;
@@ -260,6 +277,8 @@ pub const init = struct {
         var free_page_list: std.SinglyLinkedList = .{};
 
         for (init_globals.bootstrap_physical_regions.constSlice()) |bootstrap_region| {
+            std.debug.assert(bootstrap_region.start_physical_page != .none);
+
             const in_use_pages = bootstrap_region.first_free_page_index;
             const free_pages = bootstrap_region.page_count - in_use_pages;
 
