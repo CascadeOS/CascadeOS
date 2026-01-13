@@ -17,6 +17,10 @@ pub inline fn fromNode(node: *std.SinglyLinkedList.Node) *PhysicalPage {
     return @fieldParentPtr("node", node);
 }
 
+pub inline fn fromIndex(index: Index) *PhysicalPage {
+    return &globals.pages[@intFromEnum(index)];
+}
+
 pub const Index = enum(u32) {
     none = 0,
 
@@ -93,18 +97,19 @@ pub const List = struct {
     last_node: ?*std.SinglyLinkedList.Node = null,
     count: usize = 0,
 
-    pub fn push(list: *List, i: Index) void {
-        const page = &globals.pages[@intFromEnum(i)];
+    pub fn prepend(list: *List, index: Index) void {
+        const page: *PhysicalPage = .fromIndex(index);
         const node = &page.node;
 
-        node.next = null;
-
-        list.last_node = node;
-        if (list.first_node) |first_node| {
-            first_node.next = node;
-        } else {
-            list.first_node = node;
+        node.next = list.first_node;
+        list.first_node = node;
+        if (list.last_node == null) {
+            @branchHint(.unlikely);
+            list.last_node = node;
         }
+        list.count += 1;
+    }
+};
 
         list.count += 1;
     }

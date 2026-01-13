@@ -267,7 +267,7 @@ const globals = struct {
                 process.address_space.deinit();
 
                 var page_list: kernel.mem.PhysicalPage.List = .{};
-                page_list.push(page_table.physical_page);
+                page_list.prepend(page_table.physical_page);
                 kernel.mem.PhysicalPage.allocator.deallocate(page_list);
             }
         }.destructor,

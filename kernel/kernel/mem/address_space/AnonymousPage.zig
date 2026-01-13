@@ -91,7 +91,7 @@ fn destroy(
         std.debug.assert(anonymous_page.reference_count == 0);
     }
 
-    deallocate_page_list.push(anonymous_page.physical_page);
+    deallocate_page_list.prepend(anonymous_page.physical_page);
 
     anonymous_page.lock.writeUnlock();
     globals.anonymous_page_cache.deallocate(anonymous_page);

@@ -437,7 +437,7 @@ pub const RawCache = struct {
                     }),
                     .pmm => {
                         var deallocate_page_list: kernel.mem.PhysicalPage.List = .{};
-                        deallocate_page_list.push(.fromAddress(
+                        deallocate_page_list.prepend(.fromAddress(
                             kernel.mem.physicalFromDirectMap(.fromPtr(slab_base_ptr)) catch unreachable,
                         ));
                         kernel.mem.PhysicalPage.allocator.deallocate(deallocate_page_list);
@@ -669,7 +669,7 @@ pub const RawCache = struct {
                     ),
                     .pmm => {
                         var deallocate_page_list: kernel.mem.PhysicalPage.List = .{};
-                        deallocate_page_list.push(.fromAddress(
+                        deallocate_page_list.prepend(.fromAddress(
                             kernel.mem.physicalFromDirectMap(.fromPtr(slab_base_ptr)) catch unreachable,
                         ));
                         kernel.mem.PhysicalPage.allocator.deallocate(deallocate_page_list);

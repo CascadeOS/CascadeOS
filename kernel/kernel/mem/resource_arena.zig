@@ -132,7 +132,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                     for (0..pages_to_allocate) |_| {
                         const page = kernel.mem.PhysicalPage.allocator.allocate() catch
                             @panic("heap quantum cache allocation failed");
-                        pages.push(page);
+                        pages.prepend(page);
 
                         const page_caches = kernel.mem.directMapFromPhysical(page.baseAddress())
                             .toPtr(*[QUANTUM_CACHES_PER_PAGE]RawCache);

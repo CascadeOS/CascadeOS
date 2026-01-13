@@ -73,7 +73,7 @@ pub const PageTable = extern struct {
                 var level4_entry = level4_table.entries[level4_index].load();
                 const address = level4_entry.getAddress4kib();
                 level4_table.entries[level4_index].zero();
-                deallocate_page_list.push(.fromAddress(address));
+                deallocate_page_list.prepend(.fromAddress(address));
             }
         }
 
@@ -88,7 +88,7 @@ pub const PageTable = extern struct {
                 var level3_entry = level3_table.entries[level3_index].load();
                 const address = level3_entry.getAddress4kib();
                 level3_table.entries[level3_index].zero();
-                deallocate_page_list.push(.fromAddress(address));
+                deallocate_page_list.prepend(.fromAddress(address));
             }
         }
 
@@ -103,7 +103,7 @@ pub const PageTable = extern struct {
                 var level2_entry = level2_table.entries[level2_index].load();
                 const address = level2_entry.getAddress4kib();
                 level2_table.entries[level2_index].zero();
-                deallocate_page_list.push(.fromAddress(address));
+                deallocate_page_list.prepend(.fromAddress(address));
             }
         }
 
@@ -169,7 +169,7 @@ pub const PageTable = extern struct {
 
             defer if (top_level_decision == .free and level3_table.isEmpty()) {
                 level4_table.entries[level4_index].zero();
-                deallocate_page_list.push(.fromAddress(level4_entry.getAddress4kib()));
+                deallocate_page_list.prepend(.fromAddress(level4_entry.getAddress4kib()));
             };
 
             var level3_index = p3Index(current_virtual_address);
@@ -199,7 +199,7 @@ pub const PageTable = extern struct {
 
                 defer if (level2_table.isEmpty()) {
                     level3_table.entries[level3_index].zero();
-                    deallocate_page_list.push(.fromAddress(level3_entry.getAddress4kib()));
+                    deallocate_page_list.prepend(.fromAddress(level3_entry.getAddress4kib()));
                 };
 
                 var level2_index = p2Index(current_virtual_address);
@@ -229,7 +229,7 @@ pub const PageTable = extern struct {
 
                     defer if (level1_table.isEmpty()) {
                         level2_table.entries[level2_index].zero();
-                        deallocate_page_list.push(.fromAddress(level2_entry.getAddress4kib()));
+                        deallocate_page_list.prepend(.fromAddress(level2_entry.getAddress4kib()));
                     };
 
                     var level1_index = p1Index(current_virtual_address);
@@ -255,7 +255,7 @@ pub const PageTable = extern struct {
                         level1_table.entries[level1_index].zero();
 
                         if (backing_page_decision == .free) {
-                            deallocate_page_list.push(.fromAddress(level1_entry.getAddress4kib()));
+                            deallocate_page_list.prepend(.fromAddress(level1_entry.getAddress4kib()));
                         }
 
                         if (opt_in_progress_range) |*in_progress_range| {

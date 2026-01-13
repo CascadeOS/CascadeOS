@@ -113,7 +113,7 @@ pub fn mapRangeAndBackWithPhysicalPages(
         const physical_page = try physical_page_allocator.allocate();
         errdefer {
             var deallocate_page_list: PhysicalPage.List = .{};
-            deallocate_page_list.push(physical_page);
+            deallocate_page_list.prepend(physical_page);
             physical_page_allocator.deallocate(deallocate_page_list);
         }
 
