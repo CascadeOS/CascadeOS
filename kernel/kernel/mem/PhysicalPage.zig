@@ -10,14 +10,10 @@ const core = @import("core");
 
 const PhysicalPage = @This();
 
-// TODO: replace this with one using `Index` directly rather than pointers
-node: std.SinglyLinkedList.Node = .{},
-
-pub inline fn fromNode(node: *std.SinglyLinkedList.Node) *PhysicalPage {
-    return @fieldParentPtr("node", node);
-}
+node: List.Node = .{},
 
 pub inline fn fromIndex(index: Index) *PhysicalPage {
+    if (core.is_debug) std.debug.assert(index != .none);
     return &globals.pages[@intFromEnum(index)];
 }
 
@@ -34,10 +30,6 @@ pub const Index = enum(u32) {
     /// Returns the base address of the given physical page.
     pub fn baseAddress(index: Index) core.PhysicalAddress {
         return .fromInt(@intFromEnum(index) * arch.paging.standard_page_size.value);
-    }
-
-    pub fn fromPage(physical_page: *const PhysicalPage) Index {
-        return @enumFromInt(physical_page - &globals.pages[0]);
     }
 };
 
@@ -57,14 +49,12 @@ pub const Allocator = struct {
 };
 
 fn allocate() Allocator.AllocateError!Index {
-    const node = globals.free_page_list.popFirst() orelse return error.PagesExhausted;
+    const index = globals.free_page_list.popFirst() orelse return error.PagesExhausted;
 
     _ = globals.free_memory.fetchSub(
         arch.paging.standard_page_size.value,
         .release,
     );
-
-    const index: Index = .fromPage(.fromNode(node));
 
     if (core.is_debug) {
         const virtual_range: core.VirtualRange = .fromAddr(
@@ -89,37 +79,106 @@ fn deallocate(list: List) void {
         .release,
     );
 
-    globals.free_page_list.prependList(list.first_node.?, list.last_node.?);
+    globals.free_page_list.prependList(list);
 }
 
+/// A non-atomic singly linked list of physical pages.
+///
+/// Tracks both first and last index to allow `List.Atomic` to atomically prepend the whole list.
+///
+/// Tracks the count to allow `deallocate` to atomically update the amount of free memory.
 pub const List = struct {
-    first_node: ?*std.SinglyLinkedList.Node = null,
-    last_node: ?*std.SinglyLinkedList.Node = null,
-    count: usize = 0,
+    first_index: Index = .none,
+    last_index: Index = .none,
+    count: u32 = 0,
+
+    pub const Node = struct {
+        next: Index = .none,
+    };
 
     pub fn prepend(list: *List, index: Index) void {
         const page: *PhysicalPage = .fromIndex(index);
-        const node = &page.node;
 
-        node.next = list.first_node;
-        list.first_node = node;
-        if (list.last_node == null) {
+        page.node.next = list.first_index;
+        list.first_index = index;
+        if (list.last_index == .none) {
             @branchHint(.unlikely);
-            list.last_node = node;
+            list.last_index = index;
         }
         list.count += 1;
     }
-};
 
-        list.count += 1;
-    }
+    pub const Atomic = struct {
+        first_index: std.atomic.Value(Index) = .init(.none),
+
+        /// Removes the first index from the list and returns it.
+        pub fn popFirst(atomic_list: *Atomic) ?Index {
+            var first = atomic_list.first_index.load(.monotonic);
+
+            while (first != .none) {
+                const page: *PhysicalPage = .fromIndex(first);
+                const node = &page.node;
+
+                if (atomic_list.first_index.cmpxchgWeak(
+                    first,
+                    node.next,
+                    .acq_rel,
+                    .monotonic,
+                )) |new_first| {
+                    first = new_first;
+                    continue;
+                }
+
+                node.* = .{};
+                return first;
+            }
+
+            return null;
+        }
+
+        /// Prepend a linked list to the front of the list.
+        ///
+        /// The provided list is expected to be already linked correctly.
+        ///
+        /// `first_index` and `last_index` can be the same index.
+        ///
+        /// Asserts that `first_index` and `last_index` are not `.none`.
+        pub fn prependList(atomic_list: *Atomic, list: List) void {
+            if (core.is_debug) {
+                std.debug.assert(list.first_index != .none);
+                std.debug.assert(list.last_index != .none);
+            }
+
+            const last_page: *PhysicalPage = .fromIndex(list.last_index);
+            const last_node = &last_page.node;
+            const new_first_index = list.first_index;
+
+            var first = atomic_list.first_index.load(.monotonic);
+
+            while (true) {
+                last_node.next = first;
+
+                if (atomic_list.first_index.cmpxchgWeak(
+                    first,
+                    new_first_index,
+                    .acq_rel,
+                    .monotonic,
+                )) |new_first| {
+                    first = new_first;
+                    continue;
+                }
+
+                return;
+            }
+        }
+    };
 };
 
 const globals = struct {
     /// The list of free pages.
     ///
     /// Initialized during `init.initializePhysicalMemory`.
-    var free_page_list: core.containers.AtomicSinglyLinkedList = .{};
+    var free_page_list: List.Atomic = .{};
 
     /// The free physical memory.
     ///
@@ -279,7 +338,7 @@ pub const init = struct {
         }
 
         var free_memory: core.Size = .zero;
-        var free_page_list: std.SinglyLinkedList = .{};
+        var free_page_list: List = .{};
 
         for (init_globals.bootstrap_physical_regions.constSlice()) |bootstrap_region| {
             std.debug.assert(bootstrap_region.start_physical_page != .none);
@@ -323,11 +382,12 @@ pub const init = struct {
             const last_free_index: u32 = @intFromEnum(bootstrap_region.start_physical_page) + bootstrap_region.page_count - 1;
 
             while (current_free_index <= last_free_index) : (current_free_index += 1) {
-                free_page_list.prepend(&pages[current_free_index].node);
+                free_page_list.prepend(@enumFromInt(current_free_index));
             }
         }
+        init_globals.bootstrap_physical_regions = undefined;
 
-        globals.free_page_list.first.store(free_page_list.first, .release);
+        globals.free_page_list.prependList(free_page_list);
         globals.free_memory.store(free_memory.value, .release);
         globals.total_memory = total_memory;
         globals.reserved_memory = reserved_memory;
@@ -346,8 +406,6 @@ pub const init = struct {
         init_log.debug("  reserved memory:    {f}", .{reserved_memory});
         init_log.debug("  reclaimable memory: {f}", .{reclaimable_memory});
         init_log.debug("  unavailable memory: {f}", .{unavailable_memory});
-
-        init_globals.bootstrap_physical_regions = .{};
     }
 
     const FreePhysicalRegion = struct {
