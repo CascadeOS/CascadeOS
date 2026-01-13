@@ -87,14 +87,6 @@ pub fn initStage1() !noreturn {
     const executors, const new_executor = try createExecutors();
     kernel.Executor.init.setExecutors(executors);
 
-    // ensure the executor is re-loaded before we change panic and log modes
-    arch.init.initExecutor(new_executor);
-    new_executor.setCurrentTask(new_executor._current_task);
-
-    // TODO: non-bootstrap executors have not yet had a chance to set their current tasks, so this is too early to switch panic mode
-    kernel.debug.setPanicMode(.init_panic);
-    kernel.debug.log.setLogMode(.init_log);
-
     if (executors.len > 1) {
         log.debug("booting non-bootstrap executors", .{});
         try bootNonBootstrapExecutors();
@@ -110,11 +102,22 @@ pub fn initStage1() !noreturn {
 ///
 /// All executors are using the bootloader provided stack.
 fn initStage2(executor: *kernel.Executor) !noreturn {
+    const static = struct {
+        var stage2_barrier: StageBarrier = .{};
+    };
+
     arch.interrupts.disable(); // some executors don't have interrupts disabled on load
 
     kernel.mem.kernelPageTable().load();
     arch.init.initExecutor(executor);
     executor.setCurrentTask(executor._current_task);
+
+    if (static.stage2_barrier.start()) {
+        kernel.debug.setPanicMode(.init_panic);
+        kernel.debug.log.setLogMode(.init_log);
+
+        static.stage2_barrier.complete();
+    }
 
     log.debug("configuring per-executor system features on {f}", .{executor.id});
     arch.init.configurePerExecutorSystemFeatures();
@@ -141,7 +144,11 @@ fn initStage2(executor: *kernel.Executor) !noreturn {
 ///
 /// All executors are using their init task's stack.
 fn initStage3() !noreturn {
-    if (Stage3Barrier.start()) {
+    const static = struct {
+        var stage3_barrier: StageBarrier = .{};
+    };
+
+    if (static.stage3_barrier.start()) {
         log.debug("loading standard interrupt handlers", .{});
         arch.interrupts.init.loadStandardInterruptHandlers();
 
@@ -160,7 +167,7 @@ fn initStage3() !noreturn {
             scheduler_handle.queueTask(init_stage4_task);
         }
 
-        Stage3Barrier.complete();
+        static.stage3_barrier.complete();
     }
 
     const scheduler_handle: Task.SchedulerHandle = .get();
@@ -278,35 +285,36 @@ fn bootNonBootstrapExecutors() !void {
     }
 }
 
-const Stage3Barrier = struct {
-    var number_of_executors_ready: std.atomic.Value(usize) = .init(0);
-    var stage3_complete = std.atomic.Value(bool).init(false);
+const StageBarrier = struct {
+    number_of_executors_ready: std.atomic.Value(usize) = .init(0),
+    stage_complete: std.atomic.Value(bool) = .init(false),
 
-    /// Returns true is the current executor is selected to run stage 3.
+    /// Returns true if the current executor is selected to run the stage.
     ///
-    /// All other executors are blocked until the stage 3 executor signals that it has completed.
-    fn start() bool {
-        const stage3_executor = number_of_executors_ready.fetchAdd(1, .acq_rel) == 0;
+    /// All other executors are blocked until the stage executor signals that it has completed.
+    fn start(barrier: *StageBarrier) bool {
+        const stage_executor = barrier.number_of_executors_ready.fetchAdd(1, .acq_rel) == 0;
 
-        if (stage3_executor) {
-            // wait for all executors to signal that they are ready for stage 3 to occur
-            while (number_of_executors_ready.load(.acquire) != (kernel.Executor.executors().len)) {
+        if (stage_executor) {
+            // wait for all executors to signal that they are ready for the stage to occur
+            const number_of_executors = kernel.Executor.executors().len;
+            while (barrier.number_of_executors_ready.load(.acquire) != number_of_executors) {
                 arch.spinLoopHint();
             }
         } else {
-            // wait for the stage 3 executor to signal that init stage 3 has completed.
-            while (!stage3_complete.load(.acquire)) {
+            // wait for the stage executor to signal that the stage has completed
+            while (!barrier.stage_complete.load(.acquire)) {
                 arch.spinLoopHint();
             }
         }
 
-        return stage3_executor;
+        return stage_executor;
     }
 
-    /// Signal that init stage 3 has completed.
+    /// Signal that the stage has completed.
     ///
-    /// Called by the stage 3 executor only.
-    fn complete() void {
-        _ = stage3_complete.store(true, .release);
+    /// Called by the stage executor only.
+    fn complete(barrier: *StageBarrier) void {
+        _ = barrier.stage_complete.store(true, .release);
     }
 };
