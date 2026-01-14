@@ -349,31 +349,53 @@ export fn syscallDispatch(syscall_frame: *SyscallFrame) callconv(.c) void {
 
 pub fn syscallEntry() callconv(.naked) noreturn {
     asm volatile (std.fmt.comptimePrint(
+            \\.cfi_sections .debug_frame
+            \\
+            \\.cfi_undefined %rip
+            \\.cfi_undefined %rsp
+            \\
             \\swapgs
             \\
             \\mov %rsp, %gs:{[user_rsp_scratch_offset]}      // save the user rsp
             \\mov %gs:{[kernel_stack_pointer_offset]}, %rsp  // load the kernel rsp
+            \\.cfi_def_cfa %rsp, 0
             \\
             \\sub $8, %rsp                                   // reserve space for the user rsp
+            \\.cfi_adjust_cfa_offset 8
             \\push %rcx                                      // user rip
+            \\.cfi_adjust_cfa_offset 8
             \\push %r11                                      // user rflags
+            \\.cfi_adjust_cfa_offset 8
             \\
             \\mov %gs:{[user_rsp_scratch_offset]}, %r11
             \\mov %r11, 16(%rsp)                             // store the user rsp in reserved space
             \\
             \\push %rax
+            \\.cfi_adjust_cfa_offset 8
             \\push %rbx
+            \\.cfi_adjust_cfa_offset 8
             \\push %rdx
+            \\.cfi_adjust_cfa_offset 8
             \\push %rbp
+            \\.cfi_adjust_cfa_offset 8
             \\push %rsi
+            \\.cfi_adjust_cfa_offset 8
             \\push %rdi
+            \\.cfi_adjust_cfa_offset 8
             \\push %r8
+            \\.cfi_adjust_cfa_offset 8
             \\push %r9
+            \\.cfi_adjust_cfa_offset 8
             \\push %r10
+            \\.cfi_adjust_cfa_offset 8
             \\push %r12
+            \\.cfi_adjust_cfa_offset 8
             \\push %r13
+            \\.cfi_adjust_cfa_offset 8
             \\push %r14
+            \\.cfi_adjust_cfa_offset 8
             \\push %r15
+            \\.cfi_adjust_cfa_offset 8
             \\
             \\cld
             \\xor %ebp, %ebp
@@ -381,22 +403,38 @@ pub fn syscallEntry() callconv(.naked) noreturn {
             \\call syscallDispatch
             \\
             \\pop %r15
+            \\.cfi_adjust_cfa_offset -8
             \\pop %r14
+            \\.cfi_adjust_cfa_offset -8
             \\pop %r13
+            \\.cfi_adjust_cfa_offset -8
             \\pop %r12
+            \\.cfi_adjust_cfa_offset -8
             \\pop %r10
+            \\.cfi_adjust_cfa_offset -8
             \\pop %r9
+            \\.cfi_adjust_cfa_offset -8
             \\pop %r8
+            \\.cfi_adjust_cfa_offset -8
             \\pop %rdi
+            \\.cfi_adjust_cfa_offset -8
             \\pop %rsi
+            \\.cfi_adjust_cfa_offset -8
             \\pop %rbp
+            \\.cfi_adjust_cfa_offset -8
             \\pop %rdx
+            \\.cfi_adjust_cfa_offset -8
             \\pop %rbx
+            \\.cfi_adjust_cfa_offset -8
             \\pop %rax
+            \\.cfi_adjust_cfa_offset -8
             \\
             \\pop %r11 // user rflags
+            \\.cfi_adjust_cfa_offset -8
             \\pop %rcx // user rip
+            \\.cfi_adjust_cfa_offset -8
             \\pop %rsp // user rsp
+            \\.cfi_undefined %rsp
             \\
             \\swapgs
             \\sysretq
