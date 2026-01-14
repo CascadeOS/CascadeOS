@@ -136,6 +136,17 @@ pub const List = struct {
             return null;
         }
 
+        /// Prepend a single index to the front of the list.
+        ///
+        /// Asserts that `index` is not `.none`.
+        pub fn prepend(atomic_list: *Atomic, index: Index) void {
+            atomic_list.prependList(.{
+                .first_index = index,
+                .last_index = index,
+                .count = 1,
+            });
+        }
+
         /// Prepend a linked list to the front of the list.
         ///
         /// The provided list is expected to be already linked correctly.
@@ -301,7 +312,6 @@ pub const init = struct {
         globals.pages = pages;
 
         var total_memory: core.Size = .zero;
-
         var reserved_memory: core.Size = .zero;
         var reclaimable_memory: core.Size = .zero;
         var unavailable_memory: core.Size = .zero;
@@ -311,23 +321,14 @@ pub const init = struct {
         while (memory_iter.next()) |entry| {
             total_memory.addInPlace(entry.range.size);
 
-            const populate_pages_in_range = blk: switch (entry.type) {
-                .free, .in_use => true,
-                .reserved => {
-                    reserved_memory.addInPlace(entry.range.size);
-                    break :blk false;
-                },
-                .bootloader_reclaimable, .acpi_reclaimable => {
-                    reclaimable_memory.addInPlace(entry.range.size);
-                    break :blk true;
-                },
-                .unusable, .unknown => {
-                    unavailable_memory.addInPlace(entry.range.size);
-                    break :blk false;
-                },
-            };
+            switch (entry.type) {
+                .free, .in_use => {},
+                .reserved => reserved_memory.addInPlace(entry.range.size),
+                .bootloader_reclaimable, .acpi_reclaimable => reclaimable_memory.addInPlace(entry.range.size),
+                .unusable, .unknown => unavailable_memory.addInPlace(entry.range.size),
+            }
 
-            if (populate_pages_in_range) {
+            if (entry.type.isUsable()) {
                 const first_page_index: usize = @intFromEnum(PhysicalPage.Index.fromAddress(entry.range.address));
                 const last_page_index: usize = @intFromEnum(PhysicalPage.Index.fromAddress(entry.range.last()));
 
@@ -338,9 +339,11 @@ pub const init = struct {
         }
 
         var free_memory: core.Size = .zero;
-        var free_page_list: List = .{};
 
-        for (init_globals.bootstrap_physical_regions.constSlice()) |bootstrap_region| {
+        const bootstrap_regions = init_globals.bootstrap_physical_regions;
+        init_globals.bootstrap_physical_regions = undefined;
+
+        for (bootstrap_regions.constSlice()) |bootstrap_region| {
             std.debug.assert(bootstrap_region.start_physical_page != .none);
 
             const in_use_pages = bootstrap_region.first_free_page_index;
@@ -382,12 +385,10 @@ pub const init = struct {
             const last_free_index: u32 = @intFromEnum(bootstrap_region.start_physical_page) + bootstrap_region.page_count - 1;
 
             while (current_free_index <= last_free_index) : (current_free_index += 1) {
-                free_page_list.prepend(@enumFromInt(current_free_index));
+                globals.free_page_list.prepend(@enumFromInt(current_free_index));
             }
         }
-        init_globals.bootstrap_physical_regions = undefined;
 
-        globals.free_page_list.prependList(free_page_list);
         globals.free_memory.store(free_memory.value, .release);
         globals.total_memory = total_memory;
         globals.reserved_memory = reserved_memory;
