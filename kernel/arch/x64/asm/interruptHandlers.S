@@ -15,123 +15,42 @@
 _interrupt_handler_\number:
 	.cfi_startproc simple
 	.cfi_signal_frame
-    .cfi_undefined rip
+
+    .cfi_undefined %rip
 	.cfi_def_cfa %rsp, 0
-	.cfi_offset %rip, 0
-	.cfi_offset %rsp, 24
 
 .if \type != .HasError
     push $0
-.endif
     .cfi_adjust_cfa_offset 8
+.endif
 
     push $\number
     .cfi_adjust_cfa_offset 8
 
     // if we interrupted userspace then swapgs
-    testl $3, 0x18(%rsp)
+    testl $3, 24(%rsp)
     jz 1f
     swapgs
 1:
-    push %rax
-    .cfi_adjust_cfa_offset 8
-	.cfi_rel_offset %rax, 0
-    push %rbx
-    .cfi_adjust_cfa_offset 8
-	.cfi_rel_offset %rbx, 0
-    push %rcx
-    .cfi_adjust_cfa_offset 8
-	.cfi_rel_offset %rcx, 0
-    push %rdx
-    .cfi_adjust_cfa_offset 8
-	.cfi_rel_offset %rdx, 0
-    push %rbp
-    .cfi_adjust_cfa_offset 8
-	.cfi_rel_offset %rbp, 0
-    push %rsi
-    .cfi_adjust_cfa_offset 8
-	.cfi_rel_offset %rsi, 0
-    push %rdi
-    .cfi_adjust_cfa_offset 8
-	.cfi_rel_offset %rdi, 0
-    push %r8
-    .cfi_adjust_cfa_offset 8
-	.cfi_rel_offset %r8, 0
-    push %r9
-    .cfi_adjust_cfa_offset 8
-	.cfi_rel_offset %r9, 0
-    push %r10
-    .cfi_adjust_cfa_offset 8
-	.cfi_rel_offset %r10, 0
-    push %r11
-    .cfi_adjust_cfa_offset 8
-	.cfi_rel_offset %r11, 0
-    push %r12
-    .cfi_adjust_cfa_offset 8
-	.cfi_rel_offset %r12, 0
-    push %r13
-    .cfi_adjust_cfa_offset 8
-	.cfi_rel_offset %r13, 0
-    push %r14
-    .cfi_adjust_cfa_offset 8
-	.cfi_rel_offset %r14, 0
-    push %r15
-    .cfi_adjust_cfa_offset 8
-	.cfi_rel_offset %r15, 0
+    .irp reg, rax, rbx, rcx, rdx, rbp, rsi, rdi, r8, r9, r10, r11, r12, r13, r14, r15
+        push %\reg
+        .cfi_adjust_cfa_offset 8
+        .cfi_rel_offset %\reg, 0
+    .endr
 
     cld
     xor %ebp, %ebp
     mov %rsp, %rdi
     call interruptDispatch
 
-    pop %r15
-    .cfi_adjust_cfa_offset -8
-	.cfi_restore %r15
-    pop %r14
-    .cfi_adjust_cfa_offset -8
-	.cfi_restore %r14
-    pop %r13
-    .cfi_adjust_cfa_offset -8
-	.cfi_restore %r13
-    pop %r12
-    .cfi_adjust_cfa_offset -8
-	.cfi_restore %r12
-    pop %r11
-    .cfi_adjust_cfa_offset -8
-	.cfi_restore %r11
-    pop %r10
-    .cfi_adjust_cfa_offset -8
-	.cfi_restore %r10
-    pop %r9
-    .cfi_adjust_cfa_offset -8
-	.cfi_restore %r9
-    pop %r8
-    .cfi_adjust_cfa_offset -8
-	.cfi_restore %r8
-    pop %rdi
-    .cfi_adjust_cfa_offset -8
-	.cfi_restore %rdi
-    pop %rsi
-    .cfi_adjust_cfa_offset -8
-	.cfi_restore %rsi
-    pop %rbp
-    .cfi_adjust_cfa_offset -8
-	.cfi_restore %rbp
-    pop %rdx
-    .cfi_adjust_cfa_offset -8
-	.cfi_restore %rdx
-    pop %rcx
-    .cfi_adjust_cfa_offset -8
-	.cfi_restore %rcx
-    pop %rbx
-    .cfi_adjust_cfa_offset -8
-	.cfi_restore %rbx
-    pop %rax
-    .cfi_adjust_cfa_offset -8
-	.cfi_restore %rax
+    .irp reg, r15, r14, r13, r12, r11, r10, r9, r8, rdi, rsi, rbp, rdx, rcx, rbx, rax
+        pop %\reg
+        .cfi_restore %\reg
+        .cfi_adjust_cfa_offset -8
+    .endr
 
 	// if returning to userspace swapgs
-	testl $3, 0x18(%rsp)
+	testl $3, 24(%rsp)
 	jz 1f
 	swapgs
 1:
