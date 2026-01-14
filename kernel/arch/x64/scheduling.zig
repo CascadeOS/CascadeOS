@@ -23,13 +23,16 @@ pub fn prepareTaskForScheduling(
     const impl = struct {
         fn taskEntryTrampoline() callconv(.naked) void {
             asm volatile (
+                \\.cfi_sections .debug_frame
+                \\.cfi_undefined rip
+                \\
+                \\xor %ebp, %ebp
                 \\pop %rdi       // type_erased_call.typeErased
                 \\pop %rsi       // type_erased_call.args[0]
                 \\pop %rdx       // type_erased_call.args[1]
                 \\pop %rcx       // type_erased_call.args[2]
                 \\pop %r8        // type_erased_call.args[3]
                 \\pop %r9        // type_erased_call.args[4]
-                \\xor %ebp, %ebp
                 \\ret            // the address of `Task.internal.taskEntry` is on the stack
             );
         }
@@ -87,7 +90,7 @@ pub fn beforeSwitchTask(transition: Task.Transition) void {
 
 /// Switches to `new_task`.
 ///
-/// If `old_task` is not null its state is saved to allow it to be resumed later.
+/// The state of `old_task` is saved to allow it to be resumed later.
 ///
 /// **Note**: It is the caller's responsibility to call `beforeSwitchTask` before calling this function.
 pub inline fn switchTask(
@@ -95,13 +98,22 @@ pub inline fn switchTask(
     new_task: *Task,
 ) void {
     asm volatile (
+        \\.cfi_sections .debug_frame
+        \\.cfi_def_cfa_register %rsp
+        \\
         \\lea 1f(%rip), %rax
         \\push %rax
+        \\.cfi_adjust_cfa_offset 8
+        \\
         \\mov %rsp, (%[old_stack_pointer])
         \\mov %[new_stack_pointer], %rsp
+        \\
         \\pop %rax
+        \\.cfi_adjust_cfa_offset -8
         \\jmp *%rax
+        \\
         \\1:
+        \\.cfi_def_cfa_register %rbp
         :
         : [old_stack_pointer] "{r10}" (&old_task.stack.stack_pointer),
           [new_stack_pointer] "{r11}" (new_task.stack.stack_pointer),
@@ -139,6 +151,9 @@ pub inline fn switchTaskNoSave(
 ) noreturn {
     // no clobbers are listed as the calling context is abandoned
     asm volatile (
+        \\.cfi_sections .debug_frame
+        \\.cfi_undefined rip
+        \\
         \\mov %[new_stack_pointer], %rsp
         \\pop %rax
         \\jmp *%rax
@@ -155,13 +170,24 @@ pub inline fn call(
     type_erased_call: core.TypeErasedCall,
 ) void {
     asm volatile (
+        \\.cfi_sections .debug_frame
+        \\.cfi_def_cfa_register %rsp
+        \\
         \\lea 1f(%rip), %rax
         \\push %rax
+        \\.cfi_adjust_cfa_offset 8
+        \\
         \\mov %rsp, (%[old_stack_pointer])
-        \\mov %[new_stack_pointer], %rsp
         \\xor %ebp, %ebp
+        \\mov %[new_stack_pointer], %rsp
+        \\.cfi_undefined rip
+        \\
         \\jmp *%[typeErased]
+        \\
         \\1:
+        \\.cfi_restore rip
+        \\.cfi_adjust_cfa_offset -8
+        \\.cfi_def_cfa_register %rbp
         :
         : [arg0] "{rdi}" (type_erased_call.args[0]),
           [arg1] "{rsi}" (type_erased_call.args[1]),
@@ -204,8 +230,11 @@ pub inline fn callNoSave(
 ) noreturn {
     // no clobbers are listed as the calling context is abandoned
     asm volatile (
-        \\mov %[new_stack_pointer], %rsp
+        \\.cfi_sections .debug_frame
+        \\.cfi_undefined rip
+        \\
         \\xor %ebp, %ebp
+        \\mov %[new_stack_pointer], %rsp
         \\jmp *%[typeErased]
         :
         : [arg0] "{rdi}" (type_erased_call.args[0]),
