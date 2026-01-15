@@ -252,6 +252,12 @@ pub fn deviceTreeBlob() ?core.VirtualAddress {
 }
 
 fn limineEntryPoint() callconv(.c) noreturn {
+    switch (arch.current_arch) {
+        .arm => asm volatile (".cfi_undefined lr"),
+        .riscv => asm volatile (".cfi_undefined ra"),
+        .x64 => asm volatile (".cfi_undefined %%rip"),
+    }
+
     boot.bootloader_api = .limine;
 
     limine_revison = requests.limine_base_revison.loadedRevision() orelse {
