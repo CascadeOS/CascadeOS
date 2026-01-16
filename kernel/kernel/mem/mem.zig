@@ -1022,37 +1022,72 @@ pub const init = struct {
         for (globals.regions.constSlice()) |region| {
             init_log.debug("mapping '{t}' into the kernel page table", .{region.type});
 
-            const map_info = region.mapInfo();
+            switch (region.type) {
+                .direct_map,
+                .non_cached_direct_map,
+                => arch.paging.init.mapToPhysicalRangeAllPageSizes(
+                    kernel_page_table,
+                    region.range,
+                    .fromAddr(.zero, region.range.size),
+                    switch (region.type) {
+                        .direct_map => .{
+                            .type = .kernel,
+                            .protection = .read_write,
+                        },
+                        .non_cached_direct_map => .{
+                            .type = .kernel,
+                            .protection = .read_write,
+                            .cache = .uncached,
+                        },
+                        else => unreachable,
+                    },
+                    PhysicalPage.init.bootstrap_allocator,
+                ) catch |err| std.debug.panic("failed to map {f}: {t}", .{ region, err }),
 
-            switch (map_info) {
-                .top_level => arch.paging.init.fillTopLevel(
+                .writeable_section,
+                .readonly_section,
+                .executable_section,
+                .sdf_section,
+                => arch.paging.init.mapToPhysicalRangeAllPageSizes(
+                    kernel_page_table,
+                    region.range,
+                    .fromAddr(
+                        .fromInt(
+                            region.range.address.value - kernel.mem.init.kernelPhysicalToVirtualOffset().value,
+                        ),
+                        region.range.size,
+                    ),
+                    switch (region.type) {
+                        .executable_section => .{ .type = .kernel, .protection = .execute },
+                        .readonly_section, .sdf_section => .{ .type = .kernel, .protection = .read },
+                        .writeable_section => .{ .type = .kernel, .protection = .read_write },
+                        else => unreachable,
+                    },
+                    PhysicalPage.init.bootstrap_allocator,
+                ) catch |err| std.debug.panic("failed to map {f}: {t}", .{ region, err }),
+
+                .kernel_heap,
+                .kernel_stacks,
+                .special_heap,
+                .kernel_address_space,
+                => arch.paging.init.fillTopLevel(
                     kernel_page_table,
                     region.range,
                     PhysicalPage.init.bootstrap_allocator,
-                ) catch |err| {
-                    std.debug.panic("failed to fill top level for {f}: {t}", .{ region, err });
-                },
-                .full => |full| arch.paging.init.mapToPhysicalRangeAllPageSizes(
+                ) catch |err| std.debug.panic("failed to map {f}: {t}", .{ region, err }),
+
+                .pages,
+                => mapRangeAndBackWithPhysicalPages(
                     kernel_page_table,
                     region.range,
-                    full.physical_range,
-                    full.map_type,
+                    .{
+                        .type = .kernel,
+                        .protection = .read_write,
+                    },
+                    .kernel,
+                    .keep,
                     PhysicalPage.init.bootstrap_allocator,
-                ) catch |err| {
-                    std.debug.panic("failed to full map {f}: {t}", .{ region, err });
-                },
-                .back_with_physical_pages => |map_type| {
-                    mapRangeAndBackWithPhysicalPages(
-                        kernel_page_table,
-                        region.range,
-                        map_type,
-                        .kernel,
-                        .keep,
-                        PhysicalPage.init.bootstrap_allocator,
-                    ) catch |err| {
-                        std.debug.panic("failed to back with pages {f}: {t}", .{ region, err });
-                    };
-                },
+                ) catch |err| std.debug.panic("failed to map {f}: {t}", .{ region, err }),
             }
         }
 

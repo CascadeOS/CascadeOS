@@ -33,63 +33,6 @@ pub const Type = enum {
     kernel_address_space,
 };
 
-pub const RegionMapInfo = union(enum) {
-    top_level,
-    full: struct { physical_range: core.PhysicalRange, map_type: MapType },
-    back_with_physical_pages: MapType,
-};
-
-pub fn mapInfo(kernel_memory_region: KernelMemoryRegion) RegionMapInfo {
-    switch (kernel_memory_region.type) {
-        .direct_map, .non_cached_direct_map => {
-            const physical_range = core.PhysicalRange.fromAddr(
-                core.PhysicalAddress.zero,
-                kernel_memory_region.range.size,
-            );
-
-            const map_type: MapType = switch (kernel_memory_region.type) {
-                .direct_map => .{ .type = .kernel, .protection = .read_write },
-                .non_cached_direct_map => .{
-                    .type = .kernel,
-                    .protection = .read_write,
-                    .cache = .uncached,
-                },
-                else => unreachable,
-            };
-
-            return .{ .full = .{
-                .physical_range = physical_range,
-                .map_type = map_type,
-            } };
-        },
-
-        .writeable_section, .readonly_section, .executable_section, .sdf_section => {
-            const physical_range = core.PhysicalRange.fromAddr(
-                core.PhysicalAddress.fromInt(
-                    kernel_memory_region.range.address.value - kernel.mem.init.kernelPhysicalToVirtualOffset().value,
-                ),
-                kernel_memory_region.range.size,
-            );
-
-            const map_type: MapType = switch (kernel_memory_region.type) {
-                .executable_section => .{ .type = .kernel, .protection = .execute },
-                .readonly_section, .sdf_section => .{ .type = .kernel, .protection = .read },
-                .writeable_section => .{ .type = .kernel, .protection = .read_write },
-                else => unreachable,
-            };
-
-            return .{ .full = .{ .physical_range = physical_range, .map_type = map_type } };
-        },
-
-        .kernel_heap, .kernel_stacks, .special_heap, .kernel_address_space => return .top_level,
-
-        .pages => return .{ .back_with_physical_pages = .{
-            .type = .kernel,
-            .protection = .read_write,
-        } },
-    }
-}
-
 pub inline fn format(
     region: KernelMemoryRegion,
     writer: *std.Io.Writer,
