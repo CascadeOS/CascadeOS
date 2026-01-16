@@ -300,15 +300,10 @@ pub const init = struct {
     ///
     /// Pulls all memory out of the bootstrap physical page allocator and uses it to populate the normal allocator.
     pub fn initializePhysicalMemory(pages_range: core.VirtualRange) void {
-        const pages: []PhysicalPage = blk: {
-            var byte_slice = pages_range.toByteSlice();
-            byte_slice.len = std.mem.alignBackward(
-                usize,
-                byte_slice.len,
-                std.mem.Alignment.of(PhysicalPage).toByteUnits(),
-            );
-            break :blk @alignCast(std.mem.bytesAsSlice(PhysicalPage, byte_slice));
-        };
+        const pages: []PhysicalPage = @alignCast(std.mem.bytesAsSlice(
+            PhysicalPage,
+            pages_range.toByteSlice(),
+        ));
         globals.pages = pages;
 
         var total_memory: core.Size = .zero;
