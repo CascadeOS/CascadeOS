@@ -325,9 +325,9 @@ pub const init = struct {
 
             if (entry.type.isUsable()) {
                 const first_page_index: usize = @intFromEnum(PhysicalPage.Index.fromAddress(entry.range.address));
-                const last_page_index: usize = @intFromEnum(PhysicalPage.Index.fromAddress(entry.range.last()));
+                const length = entry.range.size.divide(arch.paging.standard_page_size) + 1;
 
-                const slice = pages[first_page_index..(first_page_index + last_page_index)];
+                const slice = pages[first_page_index..][0..length];
 
                 @memset(slice, .{});
             }
