@@ -1077,16 +1077,9 @@ pub const init = struct {
                 ) catch |err| std.debug.panic("failed to map {f}: {t}", .{ region, err }),
 
                 .pages,
-                => mapRangeAndBackWithPhysicalPages(
+                => PhysicalPage.init.mapPagesArray(
                     kernel_page_table,
                     region.range,
-                    .{
-                        .type = .kernel,
-                        .protection = .read_write,
-                    },
-                    .kernel,
-                    .keep,
-                    PhysicalPage.init.bootstrap_allocator,
                 ) catch |err| std.debug.panic("failed to map {f}: {t}", .{ region, err }),
             }
         }

@@ -296,6 +296,81 @@ pub const init = struct {
         }
     }
 
+    /// Maps the pages array sparsely, only backing regions corresponding to usable physical memory.
+    pub fn mapPagesArray(
+        kernel_page_table: arch.paging.PageTable,
+        pages_array_range: core.VirtualRange,
+    ) !void {
+        const pages_array_base = pages_array_range.address;
+
+        var current_range_start: ?usize = null;
+        var current_range_end: usize = 0;
+
+        var memory_iter = boot.memoryMap(.forward) catch @panic("no memory map");
+
+        while (memory_iter.next()) |entry| {
+            if (!entry.type.isUsable()) continue;
+
+            const entry_range_start = std.mem.alignBackward(
+                usize,
+                @intFromEnum(Index.fromAddress(
+                    entry.range.address,
+                )) * @sizeOf(PhysicalPage),
+                arch.paging.standard_page_size.value,
+            );
+
+            const entry_range_end = std.mem.alignForward(
+                usize,
+                (@intFromEnum(Index.fromAddress(
+                    entry.range.last(),
+                )) + 1) * @sizeOf(PhysicalPage),
+                arch.paging.standard_page_size.value,
+            );
+
+            if (current_range_start) |range_start| {
+                if (entry_range_start <= current_range_end) {
+                    // extend the current range
+                    current_range_end = @max(current_range_end, entry_range_end);
+                } else {
+                    // map the current range and start a new one
+
+                    try kernel.mem.mapRangeAndBackWithPhysicalPages(
+                        kernel_page_table,
+                        .fromAddr(
+                            pages_array_base.moveForward(.from(range_start, .byte)),
+                            .from(current_range_end - range_start, .byte),
+                        ),
+                        .{ .protection = .read_write, .type = .kernel },
+                        .kernel,
+                        .keep,
+                        bootstrap_allocator,
+                    );
+
+                    current_range_start = entry_range_start;
+                    current_range_end = entry_range_end;
+                }
+            } else {
+                current_range_start = entry_range_start;
+                current_range_end = entry_range_end;
+            }
+        }
+
+        if (current_range_start) |range_start| {
+            // handle the last range
+            try kernel.mem.mapRangeAndBackWithPhysicalPages(
+                kernel_page_table,
+                .fromAddr(
+                    pages_array_base.moveForward(.from(range_start, .byte)),
+                    .from(current_range_end - range_start, .byte),
+                ),
+                .{ .protection = .read_write, .type = .kernel },
+                .kernel,
+                .keep,
+                bootstrap_allocator,
+            );
+        }
+    }
+
     /// Initializes the normal physical page allocator and the pages array.
     ///
     /// Pulls all memory out of the bootstrap physical page allocator and uses it to populate the normal allocator.
