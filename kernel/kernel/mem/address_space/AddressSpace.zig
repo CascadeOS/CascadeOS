@@ -198,6 +198,9 @@ pub const MapError = error{
 
     /// The request would result in the protection of an entry in the range exceeding its maximum protection.
     MaxProtectionExceeded,
+
+    /// The request would result in the maximum protection of an entry in the range being set to `.none`.
+    MaxProtectionNone,
 };
 
 /// Map a range into the address space.
@@ -233,7 +236,11 @@ pub fn map(
     }
 
     if (options.max_protection) |max_protection| {
-        if (core.is_debug) std.debug.assert(max_protection != .none);
+        if (max_protection == .none) {
+            @branchHint(.cold);
+            return error.MaxProtectionNone;
+        }
+
         if (@intFromEnum(options.protection) > @intFromEnum(max_protection)) {
             @branchHint(.cold);
             return error.MaxProtectionExceeded;
@@ -509,6 +516,9 @@ pub const ChangeProtectionError = error{
     /// The requested change would result in the protection of an entry in the range exceeding its maximum protection.
     MaxProtectionExceeded,
 
+    /// The requested change would result in the maximum protection of an entry in the range being set to `.none`.
+    MaxProtectionNone,
+
     /// No memory available.
     OutOfMemory,
 };
@@ -517,7 +527,6 @@ pub const ChangeProtectionError = error{
 ///
 /// Caller must ensure:
 ///  - the size and address of the range are aligned to the standard page size
-///  - the `max_protection` if provided is not `.none`
 pub fn changeProtection(
     address_space: *AddressSpace,
     range: core.VirtualRange,
@@ -532,9 +541,12 @@ pub fn changeProtection(
     if (core.is_debug) {
         std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
         std.debug.assert(range.size.isAligned(arch.paging.standard_page_size));
-
-        if (request.max_protection) |max_protection| std.debug.assert(max_protection != .none);
     }
+
+    if (request.max_protection) |max_protection| if (max_protection == .none) {
+        @branchHint(.cold);
+        return error.MaxProtectionNone;
+    };
 
     const result: ChangeProtectionResult = blk: {
         if (range.size.equal(.zero)) {
@@ -643,9 +655,6 @@ const ValidateChangeProtection = struct {
     update_page_table: bool,
 };
 
-/// Validates the change protection request.
-///
-/// Returns false if the change protection request is a no-op.
 fn validateChangeProtection(
     address_space: *AddressSpace,
     entry_range: EntryRange,

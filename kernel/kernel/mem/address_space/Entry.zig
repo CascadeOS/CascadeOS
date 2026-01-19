@@ -75,7 +75,7 @@ pub fn anyOverlap(entry: *const Entry, other: *const Entry) bool {
 
 /// Determine if `second_entry` can be merged into `first_entry`.
 ///
-/// This must be observed to be `true` before `merge` is can be called on the entries.
+/// This must be observed to be `true` before `merge` is called on the entries.
 ///
 /// Can only be `true` when `second_entry` immediately follows `first_entry` in the address space.
 pub fn canMerge(first_entry: *const Entry, second_entry: *const Entry) bool {
