@@ -159,14 +159,11 @@ pub fn enterUserspace(options: arch.user.EnterUserspaceOptions) noreturn {
 
     asm volatile (
         \\.cfi_sections .debug_frame
+        \\
+        \\mov %[frame], %rsp
         \\.cfi_undefined rip
         \\
         \\xor %ebp, %ebp
-        \\.cfi_undefined rbp
-        \\
-        \\mov %[frame], %rsp
-        \\.cfi_def_cfa %rsp, 0
-        \\
         \\xor %eax, %eax
         \\xor %ebx, %ebx
         \\xor %ecx, %ecx
