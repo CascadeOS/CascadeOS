@@ -178,10 +178,10 @@ pub inline fn call(
         \\.cfi_adjust_cfa_offset 8
         \\
         \\mov %rsp, (%[old_stack_pointer])
-        \\xor %ebp, %ebp
         \\mov %[new_stack_pointer], %rsp
         \\.cfi_undefined rip
         \\
+        \\xor %ebp, %ebp
         \\jmp *%[typeErased]
         \\
         \\1:
@@ -231,10 +231,11 @@ pub inline fn callNoSave(
     // no clobbers are listed as the calling context is abandoned
     asm volatile (
         \\.cfi_sections .debug_frame
+        \\
+        \\mov %[new_stack_pointer], %rsp
         \\.cfi_undefined rip
         \\
         \\xor %ebp, %ebp
-        \\mov %[new_stack_pointer], %rsp
         \\jmp *%[typeErased]
         :
         : [arg0] "{rdi}" (type_erased_call.args[0]),
