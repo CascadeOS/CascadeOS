@@ -242,6 +242,7 @@ pub fn exportEntryPoints() void {
         /// No bootloader is ever expected to call `_start` and instead should use bootloader specific entry points;
         /// meaning this function is not expected to ever be called.
         pub fn unknownBootloaderEntryPoint() callconv(.naked) noreturn {
+            asm volatile (arch.scheduling.cfi_prevent_unwinding);
             @call(.always_inline, arch.interrupts.disableAndHalt, .{});
             unreachable;
         }
