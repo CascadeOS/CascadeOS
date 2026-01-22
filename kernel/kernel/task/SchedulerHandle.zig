@@ -191,7 +191,7 @@ fn switchToIdleDeferredAction(
                 std.debug.assert(scheduler_task.spinlocks_held == 1);
             }
             idle();
-            @panic("idle returned");
+            unreachable;
         }
     };
 
@@ -247,7 +247,7 @@ fn switchToTaskFromIdleYield(scheduler_task: *Task, new_task: *Task) void {
     scheduler_task.interrupt_disable_count = 1;
 
     arch.scheduling.switchTaskNoSave(new_task);
-    @panic("task returned");
+    unreachable;
 }
 
 fn switchToTaskFromTaskYield(
@@ -302,7 +302,7 @@ fn switchToTaskFromTaskDeferredAction(
             scheduler_task.state = .ready;
 
             arch.scheduling.switchTaskNoSave(inner_new_task);
-            @panic("task returned");
+            unreachable;
         }
     };
 
