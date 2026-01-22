@@ -525,6 +525,11 @@ pub const scheduling = struct {
             type_erased_call,
         );
     }
+
+    /// A string to be used in inline assembly to prevent unwinding.
+    ///
+    /// Add `asm volatile (arch.scheduling.cfi_prevent_unwinding);` to the beginning of a function to prevent unwinding past it.
+    pub const cfi_prevent_unwinding = current_decls.scheduling.cfi_prevent_unwinding;
 };
 
 pub const user = struct {
@@ -1217,6 +1222,11 @@ pub const Decls = struct {
     scheduling: struct {
         /// Architecture specific per-task data.
         PerTask: type,
+
+        /// A string to be used in inline assembly to prevent unwinding.
+        ///
+        /// E.g. `asm volatile (arch.scheduling.cfi_prevent_unwinding);`
+        cfi_prevent_unwinding: []const u8,
     },
 
     user: struct {

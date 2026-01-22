@@ -172,6 +172,11 @@ pub const decls: arch.Decls = .{
 
     .scheduling = .{
         .PerTask = x64.PerTask,
+        .cfi_prevent_unwinding =
+        \\.cfi_sections .debug_frame
+        \\.cfi_undefined rip
+        \\
+        ,
     },
 
     .user = .{
