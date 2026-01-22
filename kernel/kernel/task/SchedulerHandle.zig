@@ -120,6 +120,7 @@ pub fn drop(scheduler_handle: SchedulerHandle) noreturn {
             }
         }.action,
         .arg = undefined,
+        .abandoning_previous_task = true,
     });
     @panic("dropped task returned");
 }
@@ -134,6 +135,11 @@ pub const DeferredAction = struct {
     action: Action,
 
     arg: usize,
+
+    /// If `true` then the old task will be left in an invalid state to be scheduled again.
+    ///
+    /// This allows usage of `callNoSave` which is more efficient.
+    abandoning_previous_task: bool = false,
 
     pub const Action = *const fn (
         old_task: *Task,
@@ -205,18 +211,21 @@ fn switchToIdleDeferredAction(
     scheduler_task.known_executor = executor;
     executor.setCurrentTask(scheduler_task);
 
-    arch.scheduling.call(
-        old_task,
-        &scheduler_task.stack,
-        .prepare(
-            static.idleEntryDeferredAction,
-            .{
-                old_task,
-                deferred_action.action,
-                deferred_action.arg,
-            },
-        ),
+    const type_erased_call: core.TypeErasedCall = .prepare(
+        static.idleEntryDeferredAction,
+        .{
+            old_task,
+            deferred_action.action,
+            deferred_action.arg,
+        },
     );
+
+    if (deferred_action.abandoning_previous_task) {
+        arch.scheduling.callNoSave(&scheduler_task.stack, type_erased_call);
+        unreachable;
+    }
+
+    arch.scheduling.call(old_task, &scheduler_task.stack, type_erased_call);
 
     // returning to the old task
     if (core.is_debug) std.debug.assert(old_task.known_executor == old_task.state.running);
@@ -316,19 +325,22 @@ fn switchToTaskFromTaskDeferredAction(
     scheduler_task.known_executor = executor;
     executor.setCurrentTask(scheduler_task);
 
-    arch.scheduling.call(
-        old_task,
-        &scheduler_task.stack,
-        .prepare(
-            static.switchToTaskDeferredAction,
-            .{
-                old_task,
-                new_task,
-                deferred_action.action,
-                deferred_action.arg,
-            },
-        ),
+    const type_erased_call: core.TypeErasedCall = .prepare(
+        static.switchToTaskDeferredAction,
+        .{
+            old_task,
+            new_task,
+            deferred_action.action,
+            deferred_action.arg,
+        },
     );
+
+    if (deferred_action.abandoning_previous_task) {
+        arch.scheduling.callNoSave(&scheduler_task.stack, type_erased_call);
+        unreachable;
+    }
+
+    arch.scheduling.call(old_task, &scheduler_task.stack, type_erased_call);
 
     // returning to the old task
     if (core.is_debug) std.debug.assert(old_task.known_executor == old_task.state.running);
