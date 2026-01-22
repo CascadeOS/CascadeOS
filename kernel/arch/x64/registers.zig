@@ -464,47 +464,19 @@ pub const XCr0 = packed struct(u64) {
         );
     }
 
-    pub fn print(xcr0: XCr0, writer: *std.Io.Writer, indent: usize) !void {
-        const new_indent = indent + 2;
-
-        try writer.writeAll("XCr0{\n");
-
-        try writer.splatByteAll(' ', new_indent);
-        try writer.print("x87: {},\n", .{xcr0.x87});
-
-        try writer.splatByteAll(' ', new_indent);
-        try writer.print("sse: {},\n", .{xcr0.sse});
-
-        try writer.splatByteAll(' ', new_indent);
-        try writer.print("avx: {},\n", .{xcr0.avx});
-
-        try writer.splatByteAll(' ', new_indent);
-        try writer.print("mpx: {t},\n", .{xcr0.mpx});
-
-        try writer.splatByteAll(' ', new_indent);
-        try writer.print("avx512: {t},\n", .{xcr0.avx512});
-
-        try writer.splatByteAll(' ', new_indent);
-        try writer.print("pt: {},\n", .{xcr0.pt});
-
-        try writer.splatByteAll(' ', new_indent);
-        try writer.print("pkru: {},\n", .{xcr0.pkru});
-
-        try writer.splatByteAll(' ', new_indent);
-        try writer.print("amx: {t},\n", .{xcr0.amx});
-
-        try writer.splatByteAll(' ', new_indent);
-        try writer.print("lwp: {},\n", .{xcr0.lwp});
-
-        try writer.splatByteAll(' ', indent);
-        try writer.writeAll("}");
-    }
-
-    pub inline fn format(
+    pub fn format(
         xcr0: XCr0,
         writer: *std.Io.Writer,
     ) !void {
-        return print(xcr0, writer, 0);
+        try writer.writeAll(if (xcr0.x87) "XCr0{ x87: true, " else "XCr0{ x87: false, ");
+        try writer.writeAll(if (xcr0.sse) "sse: true, " else "sse: false, ");
+        try writer.writeAll(if (xcr0.avx) "avx: true, " else "avx: false, ");
+        try writer.writeAll(if (xcr0.mpx == .true) "mpx: true, " else "mpx: false, ");
+        try writer.writeAll(if (xcr0.avx512 == .true) "avx512: true, " else "avx512: false, ");
+        try writer.writeAll(if (xcr0.pt) "pt: true, " else "pt: false, ");
+        try writer.writeAll(if (xcr0.pkru) "pkru: true, " else "pkru: false, ");
+        try writer.writeAll(if (xcr0.amx == .true) "amx: true, " else "amx: false, ");
+        try writer.writeAll(if (xcr0.lwp) "lwp: true }" else "lwp: false }");
     }
 
     comptime {
