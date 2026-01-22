@@ -26,39 +26,43 @@ pub fn prepareTaskForScheduling(
                 \\.cfi_sections .debug_frame
                 \\.cfi_undefined rip
                 \\
-                \\xor %ebp, %ebp
                 \\pop %rdi       // type_erased_call.typeErased
                 \\pop %rsi       // type_erased_call.args[0]
                 \\pop %rdx       // type_erased_call.args[1]
                 \\pop %rcx       // type_erased_call.args[2]
                 \\pop %r8        // type_erased_call.args[3]
                 \\pop %r9        // type_erased_call.args[4]
-                \\ret            // the address of `Task.internal.taskEntry` is on the stack
+                \\pop %rax       // Task.internal.taskEntry
+                \\jmp *%rax
             );
         }
     };
 
     if (core.is_debug) std.debug.assert(
-        task.stack.spaceFor(1 + // task entry return address
-            1 + // taskEntry
+        task.stack.spaceFor(1 + // Task.internal.taskEntry
             5 + // args
             1 + // type_erased_call.typeErased
-            1 // taskEntryTrampoline
+            1 + // taskEntryTrampoline
+            1 // rbp
         ),
     );
 
-    task.stack.push(0) catch unreachable; // task entry return address
-
+    // used as the jump target in `taskEntryTrampoline`
     task.stack.push(@intFromPtr(&Task.internal.taskEntry)) catch unreachable;
 
+    // task args
     task.stack.push(type_erased_call.args[4]) catch unreachable;
     task.stack.push(type_erased_call.args[3]) catch unreachable;
     task.stack.push(type_erased_call.args[2]) catch unreachable;
     task.stack.push(type_erased_call.args[1]) catch unreachable;
     task.stack.push(type_erased_call.args[0]) catch unreachable;
+
+    // task function
     task.stack.push(@intFromPtr(type_erased_call.typeErased)) catch unreachable;
 
-    task.stack.push(@intFromPtr(&impl.taskEntryTrampoline)) catch unreachable;
+    // use as jump target and rbp in `switchToTask[NoSave]`
+    task.stack.push(@intFromPtr(&impl.taskEntryTrampoline)) catch unreachable; // jump target
+    task.stack.push(0) catch unreachable; // rbp
 }
 
 /// Called before `transition.old_task` is switched to `transition.new_task`.
@@ -99,21 +103,23 @@ pub inline fn switchTask(
 ) void {
     asm volatile (
         \\.cfi_sections .debug_frame
-        \\.cfi_def_cfa_register %rsp
         \\
         \\lea 1f(%rip), %rax
         \\push %rax
-        \\.cfi_adjust_cfa_offset 8
+        \\
+        \\push %rbp
         \\
         \\mov %rsp, (%[old_stack_pointer])
         \\mov %[new_stack_pointer], %rsp
+        \\.cfi_undefined rip
+        \\
+        \\pop %rbp
+        \\.cfi_restore rip
         \\
         \\pop %rax
-        \\.cfi_adjust_cfa_offset -8
         \\jmp *%rax
         \\
         \\1:
-        \\.cfi_def_cfa_register %rbp
         :
         : [old_stack_pointer] "{r10}" (&old_task.stack.stack_pointer),
           [new_stack_pointer] "{r11}" (new_task.stack.stack_pointer),
@@ -152,9 +158,13 @@ pub inline fn switchTaskNoSave(
     // no clobbers are listed as the calling context is abandoned
     asm volatile (
         \\.cfi_sections .debug_frame
-        \\.cfi_undefined rip
         \\
         \\mov %[new_stack_pointer], %rsp
+        \\.cfi_undefined rip
+        \\
+        \\pop %rbp
+        \\.cfi_restore rip
+        \\
         \\pop %rax
         \\jmp *%rax
         :
@@ -171,11 +181,11 @@ pub inline fn call(
 ) void {
     asm volatile (
         \\.cfi_sections .debug_frame
-        \\.cfi_def_cfa_register %rsp
         \\
         \\lea 1f(%rip), %rax
         \\push %rax
-        \\.cfi_adjust_cfa_offset 8
+        \\
+        \\push %rbp
         \\
         \\mov %rsp, (%[old_stack_pointer])
         \\mov %[new_stack_pointer], %rsp
@@ -185,9 +195,6 @@ pub inline fn call(
         \\jmp *%[typeErased]
         \\
         \\1:
-        \\.cfi_restore rip
-        \\.cfi_adjust_cfa_offset -8
-        \\.cfi_def_cfa_register %rbp
         :
         : [arg0] "{rdi}" (type_erased_call.args[0]),
           [arg1] "{rsi}" (type_erased_call.args[1]),
