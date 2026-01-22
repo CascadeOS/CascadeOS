@@ -18,7 +18,7 @@ pub inline fn fromIndex(index: Index) *PhysicalPage {
 }
 
 pub const Index = enum(u32) {
-    none = 0,
+    none = std.math.maxInt(u32),
 
     _,
 
@@ -270,15 +270,22 @@ pub const init = struct {
         while (memory_map.next()) |entry| {
             if (entry.type != .free) continue;
 
-            const range: core.PhysicalRange = if (entry.range.address.equal(.zero)) blk: {
-                // the zero page is reserved for `Index.none`
+            const range: core.PhysicalRange = if (entry.range.containsAddress(Index.baseAddress(.none))) blk: {
+                // trim the range to ensure the `.none` page is not counted as a free page
 
-                if (entry.range.size.lessThanOrEqual(arch.paging.standard_page_size)) continue;
+                // TODO: this discards all memory above the `.none` page, but only in the range that contains it
+                //       instead once that page is encountered we should stop trying to find more free regions here
+                //       then in `initializePhysicalMemory` we should print a warning if there is memory above or equal to the `.none` page
+                //       if that ever happens then `Index` would need to be changed to use a larger type
 
-                break :blk .fromAddr(
-                    entry.range.address.moveForward(arch.paging.standard_page_size),
-                    entry.range.size.subtract(arch.paging.standard_page_size),
-                );
+                init_log.warn("memory map entry contains `PhysicalPage.Index.none`: {f}", .{entry});
+
+                const new_size: core.Size = .from(Index.baseAddress(.none).value - entry.range.address.value, .byte);
+                std.debug.assert(new_size.isAligned(arch.paging.standard_page_size));
+
+                if (new_size.equal(.zero)) continue;
+
+                break :blk .fromAddr(entry.range.address, new_size);
             } else entry.range;
 
             init_globals.bootstrap_physical_regions.append(.{
@@ -418,7 +425,9 @@ pub const init = struct {
         init_globals.bootstrap_physical_regions = undefined;
 
         for (bootstrap_regions.constSlice()) |bootstrap_region| {
-            std.debug.assert(bootstrap_region.start_physical_page != .none);
+            std.debug.assert(
+                (@intFromEnum(bootstrap_region.start_physical_page) + bootstrap_region.page_count - 1) < @intFromEnum(Index.none),
+            );
 
             const in_use_pages = bootstrap_region.first_free_page_index;
             const free_pages = bootstrap_region.page_count - in_use_pages;
