@@ -342,6 +342,8 @@ pub const internal = struct {
         arg3: usize,
         arg4: usize,
     ) callconv(.c) noreturn {
+        asm volatile (arch.scheduling.cfi_prevent_unwinding);
+
         SchedulerHandle.internal.unsafeUnlock();
         target_function(arg0, arg1, arg2, arg3, arg4);
 
