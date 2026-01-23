@@ -55,7 +55,7 @@ pub const user = struct {
 
     pub const user_address_space_range: core.VirtualRange = .{
         // don't allow the zero page to be mapped
-        .address = .fromInt(arch.paging.standard_page_size.value),
+        .address = core.VirtualAddress.zero.moveForward(arch.paging.standard_page_size),
         .size = arch.paging.lower_half_size.subtract(arch.paging.standard_page_size),
     };
 
