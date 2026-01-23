@@ -267,7 +267,7 @@ pub const Framebuffer = extern struct {
         _video_modes: [*]const *const VideoMode,
 
         pub fn edid(limine_framebuffer: *const LimineFramebuffer) ?[]const u8 {
-            if (limine_framebuffer._edid.value == 0) return null;
+            if (limine_framebuffer._edid.equal(.zero)) return null;
 
             return core.VirtualRange.fromAddr(
                 limine_framebuffer._edid,

@@ -500,7 +500,10 @@ pub const FADT = extern struct {
 
     /// Physical address of the DSDT.
     pub fn getDSDT(fadt: *const FADT) core.PhysicalAddress {
-        return if (fadt._X_DSDT.value != 0) fadt._X_DSDT else core.PhysicalAddress.fromInt(fadt._DSDT);
+        return if (fadt._X_DSDT.notEqual(.zero))
+            fadt._X_DSDT
+        else
+            .fromInt(fadt._DSDT);
     }
 
     /// Address of the PM1a Control Register Block.
