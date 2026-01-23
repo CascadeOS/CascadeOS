@@ -26,7 +26,9 @@ arch_specific: arch.PerExecutor,
 flush_requests: core.containers.AtomicSinglyLinkedList = .{},
 
 // used during `kernel.debug.interruptSourcePanic`
-interrupt_source_panic_buffer: [kernel.config.executor.interrupt_source_panic_buffer_size.value + interrupt_source_panic_truncated.len]u8 = undefined,
+interrupt_source_panic_buffer: [
+    kernel.config.executor.interrupt_source_panic_buffer_size.value + interrupt_source_panic_truncated.len
+]u8 = undefined,
 const interrupt_source_panic_truncated = " (msg truncated)";
 
 pub fn setCurrentTask(executor: *Executor, task: *Task) void {
@@ -42,7 +44,7 @@ pub fn renderInterruptSourcePanicMessage(
     comptime fmt: []const u8,
     args: anytype,
 ) []const u8 {
-    // TODO: this treatment should be given to all panics
+    // TODO: this treatment should be given to all panics, maybe we generalize this buffer with truncation message
 
     const full_buffer = current_executor.interrupt_source_panic_buffer[0..];
 
