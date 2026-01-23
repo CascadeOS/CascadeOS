@@ -846,7 +846,11 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
         fn indexOfNonEmptyFreelistInstantFit(arena: *const @This(), len: usize) ?UsizeShiftInt {
             const pow2_len = std.math.ceilPowerOfTwoAssert(usize, len);
             const index = @ctz(arena.freelist_bitmap.value & ~(pow2_len - 1));
-            return if (index == NUMBER_OF_FREELISTS) null else @intCast(index);
+            if (index == NUMBER_OF_FREELISTS) {
+                @branchHint(.unlikely);
+                return null;
+            }
+            return @intCast(index);
         }
 
         pub const CreateSourceOptions = struct {
