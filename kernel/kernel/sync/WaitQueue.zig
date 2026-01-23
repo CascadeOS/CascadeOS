@@ -75,18 +75,21 @@ pub fn wait(
     const scheduler_handle: Task.SchedulerHandle = .get();
     defer scheduler_handle.unlock();
 
-    scheduler_handle.dropWithDeferredAction(.{
-        .action = struct {
-            fn action(old_task: *Task, arg: usize) void {
-                const inner_spinlock: *kernel.sync.TicketSpinLock = @ptrFromInt(arg);
+    scheduler_handle.dropWithDeferredAction(
+        .{
+            .action = struct {
+                fn action(old_task: *Task, arg: usize) void {
+                    const inner_spinlock: *kernel.sync.TicketSpinLock = @ptrFromInt(arg);
 
-                old_task.state = .blocked;
-                old_task.spinlocks_held -= 1;
-                old_task.interrupt_disable_count -= 1;
+                    old_task.state = .blocked;
+                    old_task.spinlocks_held -= 1;
+                    old_task.interrupt_disable_count -= 1;
 
-                inner_spinlock.unsafeUnlock();
-            }
-        }.action,
-        .arg = @intFromPtr(spinlock),
-    });
+                    inner_spinlock.unsafeUnlock();
+                }
+            }.action,
+            .arg = @intFromPtr(spinlock),
+        },
+        false,
+    );
 }

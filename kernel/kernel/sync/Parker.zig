@@ -59,21 +59,24 @@ pub fn park(parker: *Parker) void {
         return;
     }
 
-    scheduler_handle.dropWithDeferredAction(.{
-        .action = struct {
-            fn action(old_task: *Task, arg: usize) void {
-                const inner_parker: *Parker = @ptrFromInt(arg);
+    scheduler_handle.dropWithDeferredAction(
+        .{
+            .action = struct {
+                fn action(old_task: *Task, arg: usize) void {
+                    const inner_parker: *Parker = @ptrFromInt(arg);
 
-                old_task.state = .blocked;
-                old_task.spinlocks_held -= 1;
-                old_task.interrupt_disable_count -= 1;
+                    old_task.state = .blocked;
+                    old_task.spinlocks_held -= 1;
+                    old_task.interrupt_disable_count -= 1;
 
-                inner_parker.parked_task = old_task;
-                inner_parker.lock.unsafeUnlock();
-            }
-        }.action,
-        .arg = @intFromPtr(parker),
-    });
+                    inner_parker.parked_task = old_task;
+                    inner_parker.lock.unsafeUnlock();
+                }
+            }.action,
+            .arg = @intFromPtr(parker),
+        },
+        false,
+    );
 
     parker.unpark_attempts.store(0, .release);
 }

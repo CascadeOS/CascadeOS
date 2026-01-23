@@ -112,16 +112,18 @@ pub fn drop(scheduler_handle: SchedulerHandle) noreturn {
         std.debug.assert(Task.Current.get().task.spinlocks_held == 1); // only the scheduler lock is held
     }
 
-    scheduler_handle.dropWithDeferredAction(.{
-        .action = struct {
-            fn action(old_task: *Task, _: usize) void {
-                old_task.state = .{ .dropped = .{} };
-                old_task.decrementReferenceCount();
-            }
-        }.action,
-        .arg = undefined,
-        .abandoning_previous_task = true,
-    });
+    scheduler_handle.dropWithDeferredAction(
+        .{
+            .action = struct {
+                fn action(old_task: *Task, _: usize) void {
+                    old_task.state = .{ .dropped = .{} };
+                    old_task.decrementReferenceCount();
+                }
+            }.action,
+            .arg = undefined,
+        },
+        true,
+    );
     @panic("dropped task returned");
 }
 
@@ -136,11 +138,6 @@ pub const DeferredAction = struct {
 
     arg: usize,
 
-    /// If `true` then the old task will be left in an invalid state to be scheduled again.
-    ///
-    /// This allows usage of `callNoSave` which is more efficient.
-    abandoning_previous_task: bool = false,
-
     pub const Action = *const fn (
         old_task: *Task,
         arg: usize,
@@ -152,7 +149,14 @@ pub const DeferredAction = struct {
 /// Intended to be used when blocking or dropping a task.
 ///
 /// The provided `DeferredAction` will be executed after the task has been switched away from.
-pub fn dropWithDeferredAction(scheduler_handle: SchedulerHandle, deferred_action: DeferredAction) void {
+///
+/// If `abandoning_previous_task` is `true` then the old task will be left in an invalid state and cannot be scheduled again.
+/// This allows usage of `callNoSave` which is more efficient.
+pub fn dropWithDeferredAction(
+    scheduler_handle: SchedulerHandle,
+    deferred_action: DeferredAction,
+    comptime abandoning_previous_task: bool,
+) void {
     const old_task = Task.Current.get().task;
 
     if (core.is_debug) {
@@ -163,7 +167,7 @@ pub fn dropWithDeferredAction(scheduler_handle: SchedulerHandle, deferred_action
 
     const new_task = scheduler_handle.scheduler.getNextTask() orelse {
         log.verbose("switching from {f} to idle with a deferred action", .{old_task});
-        switchToIdleDeferredAction(old_task, deferred_action);
+        switchToIdleDeferredAction(old_task, deferred_action, abandoning_previous_task);
         return;
     };
     if (core.is_debug) {
@@ -176,12 +180,13 @@ pub fn dropWithDeferredAction(scheduler_handle: SchedulerHandle, deferred_action
 
     log.verbose("switching from {f} to {f} with a deferred action", .{ old_task, new_task });
 
-    switchToTaskFromTaskDeferredAction(old_task, new_task, deferred_action);
+    switchToTaskFromTaskDeferredAction(old_task, new_task, deferred_action, abandoning_previous_task);
 }
 
 fn switchToIdleDeferredAction(
     old_task: *Task,
     deferred_action: DeferredAction,
+    comptime abandoning_previous_task: bool,
 ) void {
     const static = struct {
         fn idleEntryDeferredAction(
@@ -220,7 +225,7 @@ fn switchToIdleDeferredAction(
         },
     );
 
-    if (deferred_action.abandoning_previous_task) {
+    if (abandoning_previous_task) {
         arch.scheduling.callNoSave(&scheduler_task.stack, type_erased_call);
         unreachable;
     }
@@ -285,6 +290,7 @@ fn switchToTaskFromTaskDeferredAction(
     old_task: *Task,
     new_task: *Task,
     deferred_action: DeferredAction,
+    comptime abandoning_previous_task: bool,
 ) void {
     const static = struct {
         fn switchToTaskDeferredAction(
@@ -335,7 +341,7 @@ fn switchToTaskFromTaskDeferredAction(
         },
     );
 
-    if (deferred_action.abandoning_previous_task) {
+    if (abandoning_previous_task) {
         arch.scheduling.callNoSave(&scheduler_task.stack, type_erased_call);
         unreachable;
     }
