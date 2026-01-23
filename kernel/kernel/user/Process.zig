@@ -69,8 +69,6 @@ pub const CreateThreadOptions = struct {
 /// Creates a thread in the given process.
 ///
 /// The thread is in the `ready` state and is not scheduled.
-///
-/// `Thread.setThreadEntry` *must* be called before the thread is scheduled.
 pub fn createThread(
     process: *Process,
     options: CreateThreadOptions,
