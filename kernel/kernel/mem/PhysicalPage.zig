@@ -270,30 +270,16 @@ pub const init = struct {
         while (memory_map.next()) |entry| {
             if (entry.type != .free) continue;
 
-            const range: core.PhysicalRange = if (entry.range.containsAddress(Index.baseAddress(.none))) blk: {
-                // trim the range to ensure the `.none` page is not counted as a free page
-
-                // TODO: this discards all memory above the `.none` page, but only in the range that contains it
-                //       instead once that page is encountered we should stop trying to find more free regions here
-                //       then in `initializePhysicalMemory` we should print a warning if there is memory above or equal to the `.none` page
-                //       if that ever happens then `Index` would need to be changed to use a larger type
-
-                init_log.warn("memory map entry contains `PhysicalPage.Index.none`: {f}", .{entry});
-
-                const new_size: core.Size = .from(Index.baseAddress(.none).value - entry.range.address.value, .byte);
-                std.debug.assert(new_size.isAligned(arch.paging.standard_page_size));
-
-                if (new_size.equal(.zero)) continue;
-
-                break :blk .fromAddr(entry.range.address, new_size);
-            } else entry.range;
+            // TODO: if the last page of the entry is greater or equal to `std.math.maxInt(u32)` those pages cannot be represented by
+            //       `Index`, we should break out of the loop and print a warning later in the boot process
+            //       this unaccessible pages will need to be marked as unavailable in `initializePhysicalMemory`
 
             init_globals.bootstrap_physical_regions.append(.{
-                .start_physical_page = .fromAddress(range.address),
+                .start_physical_page = .fromAddress(entry.range.address),
                 .first_free_page_index = 0,
                 .page_count = @intCast(std.math.divExact(
                     usize,
-                    range.size.value,
+                    entry.range.size.value,
                     arch.paging.standard_page_size.value,
                 ) catch std.debug.panic(
                     "memory map entry size is not a multiple of page size: {f}",
@@ -320,17 +306,13 @@ pub const init = struct {
 
             const entry_range_start = std.mem.alignBackward(
                 usize,
-                @intFromEnum(Index.fromAddress(
-                    entry.range.address,
-                )) * @sizeOf(PhysicalPage),
+                @intFromEnum(Index.fromAddress(entry.range.address)) * @sizeOf(PhysicalPage),
                 arch.paging.standard_page_size.value,
             );
 
             const entry_range_end = std.mem.alignForward(
                 usize,
-                (@intFromEnum(Index.fromAddress(
-                    entry.range.last(),
-                )) + 1) * @sizeOf(PhysicalPage),
+                (@intFromEnum(Index.fromAddress(entry.range.last())) + 1) * @sizeOf(PhysicalPage),
                 arch.paging.standard_page_size.value,
             );
 
