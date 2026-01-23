@@ -132,7 +132,7 @@ pub inline fn switchTask(
           .rsi = true,
           .rdi = true,
           //.rsp = true, from the perspective of a task the stack pointer is unmodified
-          //.rbp = true, ensured by `omit_frame_pointer == false`; checked below
+          //.rbp = true, rbp is handled explicitly
           .r8 = true,
           .r9 = true,
           .r10 = true,
@@ -213,7 +213,7 @@ pub inline fn call(
           .rsi = true,
           .rdi = true,
           //.rsp = true, from the perspective of a task the stack pointer is unmodified
-          //.rbp = true, ensured by `omit_frame_pointer == false`; checked below
+          //.rbp = true, rbp is handled explicitly
           .r8 = true,
           .r9 = true,
           .r10 = true,
