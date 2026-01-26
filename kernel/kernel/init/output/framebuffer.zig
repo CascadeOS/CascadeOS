@@ -15,12 +15,26 @@ const core = @import("core");
 pub fn tryGetFramebufferOutput() ?kernel.init.Output {
     const framebuffer = boot.framebuffer() orelse return null;
 
+    if (framebuffer.red_mask_size != 8 or
+        framebuffer.red_mask_shift != 16 or
+        framebuffer.green_mask_size != 8 or
+        framebuffer.green_mask_shift != 8 or
+        framebuffer.blue_mask_size != 8 or
+        framebuffer.blue_mask_shift != 0)
+    {
+        kernel.debug.log.scoped(.init_output).warn(
+            "framebuffer masks not supported: {}",
+            .{framebuffer},
+        );
+        return null;
+    }
+
     c.ssfn_src = @constCast(font);
     c.ssfn_dst = .{
         .ptr = @ptrCast(@volatileCast(framebuffer.ptr)),
         .w = @intCast(framebuffer.width),
         .h = @intCast(framebuffer.height),
-        .p = @intCast(framebuffer.pixels_per_row * @sizeOf(u32)),
+        .p = @intCast(framebuffer.pitch),
         .x = 0,
         .y = 0,
         .fg = 0x00FFFFFF,
@@ -100,7 +114,7 @@ fn remapFramebuffer(_: *anyopaque) !void {
     const physical_address: core.PhysicalAddress = try kernel.mem.physicalFromDirectMap(.fromPtr(@volatileCast(framebuffer.ptr)));
     if (!physical_address.isAligned(arch.paging.standard_page_size)) @panic("framebuffer is not aligned");
 
-    const framebuffer_size: core.Size = .from(framebuffer.height * @sizeOf(u32) * framebuffer.pixels_per_row, .byte);
+    const framebuffer_size: core.Size = .from(framebuffer.height * framebuffer.pitch, .byte);
 
     const virtual_range = try kernel.mem.heap.allocateSpecial(
         framebuffer_size,

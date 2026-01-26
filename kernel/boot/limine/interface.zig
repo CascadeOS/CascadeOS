@@ -230,18 +230,18 @@ pub fn framebuffer() ?boot.Framebuffer {
 
     std.debug.assert(buffer.bpp == 32);
     std.debug.assert(buffer.memory_model == .rgb);
-    std.debug.assert(buffer.red_mask_size == 8);
-    std.debug.assert(buffer.red_mask_shift == 16);
-    std.debug.assert(buffer.green_mask_size == 8);
-    std.debug.assert(buffer.green_mask_shift == 8);
-    std.debug.assert(buffer.blue_mask_size == 8);
-    std.debug.assert(buffer.blue_mask_shift == 0);
 
     return .{
         .ptr = buffer.address.toPtr([*]volatile u32),
         .width = buffer.width,
         .height = buffer.height,
-        .pixels_per_row = buffer.pitch / @sizeOf(u32),
+        .pitch = buffer.pitch,
+        .red_mask_size = buffer.red_mask_size,
+        .red_mask_shift = buffer.red_mask_shift,
+        .green_mask_size = buffer.green_mask_size,
+        .green_mask_shift = buffer.green_mask_shift,
+        .blue_mask_size = buffer.blue_mask_size,
+        .blue_mask_shift = buffer.blue_mask_shift,
     };
 }
 
