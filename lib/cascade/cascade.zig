@@ -6,7 +6,7 @@ const std = @import("std");
 pub const Syscall = @import("syscall.zig").Syscall;
 
 const entry = @import("entry.zig");
-pub const getEntryPoint = entry.getEntryPoint;
+pub const _cascade_start = entry._cascade_start;
 
 pub fn exitThread() noreturn {
     _ = Syscall.call0(.exit_thread);

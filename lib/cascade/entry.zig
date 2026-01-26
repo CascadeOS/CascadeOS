@@ -5,69 +5,51 @@ const std = @import("std");
 const builtin = @import("builtin");
 const cascade = @import("cascade");
 
-/// Get an entry point, this must be exposed from the root file like `pub export const _start = cascade.getEntryPoint();`
-///
-/// This entry point will arrange for the `root.main` function to be called.
-pub fn getEntryPoint() (fn () callconv(.naked) noreturn) {
-    return switch (builtin.cpu.arch) {
-        .aarch64 => _start_aarch64,
-        .riscv64 => _start_riscv64,
-        .x86_64 => _start_x86_64,
-        else => |t| @compileError("unsupported architecture " ++ @tagName(t)),
-    };
-}
-
-fn _start_aarch64() callconv(.naked) noreturn {
+/// This entry point must be exposed from the root file like `pub export const _start = cascade._cascade_start;`
+pub fn _cascade_start() callconv(.naked) noreturn {
     if (builtin.unwind_tables != .none or !builtin.strip_debug_info) {
-        asm volatile (".cfi_undefined lr");
+        switch (builtin.cpu.arch) {
+            .aarch64 => asm volatile (".cfi_undefined lr"),
+            .riscv64 => if (builtin.zig_backend != .stage2_riscv64) asm volatile (".cfi_undefined ra"),
+            .x86_64 => asm volatile (".cfi_undefined %%rip"),
+            else => |t| @compileError("unsupported architecture " ++ @tagName(t)),
+        }
     }
 
-    asm volatile (
-        \\mov fp, #0
-        \\mov lr, #0
-        \\mov x0, sp
-        \\and sp, x0, #-16
-        \\b %[callMainAndExit]
-        :
-        : [callMainAndExit] "X" (&callMainAndExit),
-    );
-}
-
-fn _start_riscv64() callconv(.naked) noreturn {
-    if (builtin.unwind_tables != .none or !builtin.strip_debug_info) {
-        if (builtin.zig_backend != .stage2_riscv64) asm volatile (".cfi_undefined ra");
+    if (builtin.cpu.arch == .riscv64 and builtin.zig_backend != .stage2_riscv64) {
+        asm volatile (
+            \\ .weak __global_pointer$
+            \\ .hidden __global_pointer$
+            \\ .option push
+            \\ .option norelax
+            \\ lla gp, __global_pointer$
+            \\ .option pop
+        );
     }
 
-    if (builtin.zig_backend != .stage2_riscv64) asm volatile (
-        \\ .weak __global_pointer$
-        \\ .hidden __global_pointer$
-        \\ .option push
-        \\ .option norelax
-        \\ lla gp, __global_pointer$
-        \\ .option pop
-    );
-
-    asm volatile (
-        \\li fp, 0
-        \\li ra, 0
-        \\mv a0, sp
-        \\andi sp, sp, -16
-        \\tail %[callMainAndExit]@plt
-        :
-        : [callMainAndExit] "X" (&callMainAndExit),
-    );
-}
-
-fn _start_x86_64() callconv(.naked) noreturn {
-    if (builtin.unwind_tables != .none or !builtin.strip_debug_info) {
-        asm volatile (".cfi_undefined %%rip");
-    }
-
-    asm volatile (
-        \\xor %%ebp, %%ebp
-        \\mov %%rsp, %%rdi
-        \\and $-16, %%rsp
-        \\call %[callMainAndExit:P]
+    asm volatile (switch (builtin.cpu.arch) {
+            .aarch64 =>
+            \\mov fp, #0
+            \\mov lr, #0
+            \\mov x0, sp
+            \\and sp, x0, #-16
+            \\b %[callMainAndExit]
+            ,
+            .riscv64 =>
+            \\li fp, 0
+            \\li ra, 0
+            \\mv a0, sp
+            \\andi sp, sp, -16
+            \\tail %[callMainAndExit]@plt
+            ,
+            .x86_64 =>
+            \\xor %%ebp, %%ebp
+            \\mov %%rsp, %%rdi
+            \\and $-16, %%rsp
+            \\call %[callMainAndExit:P]
+            ,
+            else => |t| @compileError("unsupported architecture " ++ @tagName(t)),
+        }
         :
         : [callMainAndExit] "X" (&callMainAndExit),
     );
@@ -80,7 +62,7 @@ fn callMainAndExit(entry_stack_pointer: [*]usize) callconv(.c) noreturn {
     @disableInstrumentation();
 
     // TODO: perform relocation `std.pie.relocate`
-    if (builtin.position_independent_executable) {
+    if (builtin.link_mode == .static and builtin.position_independent_executable) {
         @panic("position independent executables not supported");
     }
 
