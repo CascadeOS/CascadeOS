@@ -20,6 +20,11 @@
             .hash = "N-V-__8AAMA_FA22n-EsCE8npEEzpmAILlINp65C06JVDGe5",
         },
 
+        .flanterm = .{
+            .url = "git+https://codeberg.org/Mintsuki/Flanterm.git#cc71c677566453be4d1e821ede227a101868638c",
+            .hash = "N-V-__8AAHfoAQD5hUA9nCAvrgDTqjLHWv9V8SYkJmgLD3ez",
+        },
+
         .libdwarf = .{
             .url = "git+https://github.com/CascadeOS/libdwarf-code.git?ref=v2.2.0#2e088b983562860f497b4fd789a3e61524eb857c",
             .hash = "N-V-__8AABAvqgD5rGwE6KX-nPkKFemUeV59s0cLfl38j-ML",
@@ -30,14 +35,14 @@
             .hash = "N-V-__8AAG4hSgCcprwzUlVytiB5SqVVqGHesIVdAwbsDHty",
         },
 
-        .uacpi = .{
-            .url = "git+https://github.com/CascadeOS/uACPI.git?ref=3.2.0#e5e5deea6f4dea0ea81237db39ca061ead048e60",
-            .hash = "N-V-__8AAMLaEwDIwjhEVFtWrRLfo8eucDlSLf4yXx_yHJc8",
-        },
-
         .sbi = .{
             .url = "git+https://github.com/CascadeOS/zig-sbi.git?ref=master#610993bf1c9d4ff5e6fd710495bea58ac7176980",
             .hash = "sbi-6.0.1-Muvb-mnvAQBph7J2NjhdU3NGhar9S1t6KD-g-n6wp3NP",
+        },
+
+        .uacpi = .{
+            .url = "git+https://github.com/CascadeOS/uACPI.git?ref=3.2.0#e5e5deea6f4dea0ea81237db39ca061ead048e60",
+            .hash = "N-V-__8AAMLaEwDIwjhEVFtWrRLfo8eucDlSLf4yXx_yHJc8",
         },
     },
 

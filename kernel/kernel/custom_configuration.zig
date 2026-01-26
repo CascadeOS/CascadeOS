@@ -70,13 +70,16 @@ pub fn customConfiguration(
     // devicetree
     module.addImport("DeviceTree", b.dependency("devicetree", .{}).module("DeviceTree"));
 
-    // ssfn
+    // flanterm
     {
-        module.addCSourceFile(.{
-            .file = b.path("kernel/kernel/init/output/ssfn.h"),
-            .flags = &.{"-DSSFN_CONSOLEBITMAP_TRUECOLOR=1"},
-            .language = .c,
+        const flanterm_src = b.dependency("flanterm", .{}).path("src");
+        module.addIncludePath(flanterm_src);
+        module.addCSourceFiles(.{
+            .root = flanterm_src,
+            .files = &.{
+                "flanterm.c",
+                "flanterm_backends/fb.c",
+            },
         });
-        module.addIncludePath(b.path(("kernel/kernel/init/output")));
     }
 }

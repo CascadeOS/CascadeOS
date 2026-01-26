@@ -9,106 +9,65 @@ const kernel = @import("kernel");
 const Task = kernel.Task;
 const core = @import("core");
 
-// Does not scroll instead wraps to the top of the screen.
-// Due to this is needs to clear the entire line with when a new line is started.
+const c = @cImport({
+    @cDefine("FLANTERM_IN_FLANTERM", "1"); // needed to enable including 'fb_private.h'
+    @cInclude("flanterm.h");
+    @cInclude("flanterm_backends/fb.h");
+    @cInclude("flanterm_backends/fb_private.h"); // needed to reach into the context and remap the framebuffer
+});
 
 pub fn tryGetFramebufferOutput() ?kernel.init.Output {
     const framebuffer = boot.framebuffer() orelse return null;
 
-    if (framebuffer.red_mask_size != 8 or
-        framebuffer.red_mask_shift != 16 or
-        framebuffer.green_mask_size != 8 or
-        framebuffer.green_mask_shift != 8 or
-        framebuffer.blue_mask_size != 8 or
-        framebuffer.blue_mask_shift != 0)
-    {
-        kernel.debug.log.scoped(.init_output).warn(
-            "framebuffer masks not supported: {}",
-            .{framebuffer},
-        );
-        return null;
-    }
-
-    c.ssfn_src = @constCast(font);
-    c.ssfn_dst = .{
-        .ptr = @ptrCast(@volatileCast(framebuffer.ptr)),
-        .w = @intCast(framebuffer.width),
-        .h = @intCast(framebuffer.height),
-        .p = @intCast(framebuffer.pitch),
-        .x = 0,
-        .y = 0,
-        .fg = 0x00FFFFFF,
-        .bg = 0xFF000000,
-    };
+    const flanterm_context = c.flanterm_fb_init(
+        null,
+        null,
+        @volatileCast(framebuffer.ptr),
+        framebuffer.width,
+        framebuffer.height,
+        framebuffer.pitch,
+        framebuffer.red_mask_size,
+        framebuffer.red_mask_shift,
+        framebuffer.green_mask_size,
+        framebuffer.green_mask_shift,
+        framebuffer.blue_mask_size,
+        framebuffer.blue_mask_shift,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        null,
+        @constCast(font),
+        8,
+        16,
+        1,
+        1,
+        1,
+        0,
+        0,
+    ) orelse return null;
 
     return .{
         .writeFn = struct {
-            fn writeFn(_: *anyopaque, str: []const u8) void {
-                writeSlice(str);
+            fn writeFn(con: *anyopaque, str: []const u8) void {
+                c.flanterm_write(@ptrCast(@alignCast(con)), str.ptr, str.len);
             }
         }.writeFn,
         .splatFn = struct {
-            fn splatFn(_: *anyopaque, str: []const u8, splat: usize) void {
-                for (0..splat) |_| writeSlice(str);
+            fn splatFn(con: *anyopaque, str: []const u8, splat: usize) void {
+                const context: *c.flanterm_context = @ptrCast(@alignCast(con));
+                for (0..splat) |_| c.flanterm_write(context, str.ptr, str.len);
             }
         }.splatFn,
         .remapFn = remapFramebuffer,
-        .state = undefined,
+        .state = flanterm_context,
     };
-}
-
-/// Writes the given string to the framebuffer using the SSFN console bitmap font.
-fn writeSlice(str: []const u8) void {
-    var iter: std.unicode.Utf8Iterator = .{
-        .bytes = str,
-        .i = 0,
-    };
-
-    while (iter.nextCodepoint()) |codepoint| {
-        switch (codepoint) {
-            '\r' => c.ssfn_dst.x = 0,
-            '\n' => newLine(),
-            '\t' => {
-                for (0..4) |_| {
-                    if (c.ssfn_putc(' ') != c.SSFN_OK) return;
-                }
-                maybeNewLine();
-            },
-            else => {
-                if (c.ssfn_putc(codepoint) != c.SSFN_OK) return;
-                maybeNewLine();
-            },
-        }
-    }
-}
-
-inline fn maybeNewLine() void {
-    if (c.ssfn_dst.x >= c.ssfn_dst.w) {
-        newLine();
-    }
-}
-
-fn newLine() void {
-    c.ssfn_dst.x = 0;
-    c.ssfn_dst.y += font.height;
-    if (c.ssfn_dst.y + font.height >= c.ssfn_dst.h) {
-        c.ssfn_dst.y = 0;
-    }
-
-    const y: usize = @intCast(c.ssfn_dst.y);
-    const height: usize = @intCast(font.height);
-
-    const offset = (y * c.ssfn_dst.p) / @sizeOf(u32);
-    const len = (height * c.ssfn_dst.p) / @sizeOf(u32);
-
-    const ptr: [*]volatile u32 = @ptrCast(@alignCast(c.ssfn_dst.ptr));
-    const slice: []volatile u32 = ptr[offset..][0..len];
-
-    @memset(slice, 0);
 }
 
 /// Map the framebuffer into the special heap as write combining.
-fn remapFramebuffer(_: *anyopaque) !void {
+fn remapFramebuffer(con: *anyopaque) !void {
     const framebuffer = boot.framebuffer().?;
 
     const physical_address: core.PhysicalAddress = try kernel.mem.physicalFromDirectMap(.fromPtr(@volatileCast(framebuffer.ptr)));
@@ -129,13 +88,8 @@ fn remapFramebuffer(_: *anyopaque) !void {
         },
     );
 
-    c.ssfn_dst.ptr = virtual_range.address.toPtr([*]u8);
+    const fb_context: *c.flanterm_fb_context = @ptrCast(@alignCast(con));
+    fb_context.framebuffer = virtual_range.address.toPtr([*]u32);
 }
 
-const font: *const c.ssfn_font_t = blk: {
-    break :blk @ptrCast(@embedFile("ter-v14n.sfn"));
-};
-
-const c = @cImport({
-    @cInclude("ssfn.h");
-});
+const font = @embedFile("simple.font");
