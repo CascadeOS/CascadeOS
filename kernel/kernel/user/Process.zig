@@ -135,7 +135,8 @@ pub inline fn fromConst(task: *const Task) *const Process {
 }
 
 pub fn format(process: *const Process, writer: *std.Io.Writer) !void {
-    try writer.print("Process('{s}')", .{process.name.constSlice()});
+    // TODO: this is a user controlled string
+    try writer.print("Process<{s}>", .{process.name.constSlice()});
 }
 
 pub const Name = core.containers.BoundedArray(u8, kernel.config.user.process_name_length);

@@ -32,7 +32,12 @@ pub inline fn fromConst(task: *const Task) *const Thread {
 }
 
 pub fn format(thread: *const Thread, writer: *std.Io.Writer) !void {
-    return thread.task.format(writer);
+    // TODO: these are user controlled strings
+
+    try writer.print(
+        "Thread<{s} - {s}>",
+        .{ thread.process.name.constSlice(), thread.task.name.constSlice() },
+    );
 }
 
 pub const internal = struct {

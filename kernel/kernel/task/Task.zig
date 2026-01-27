@@ -134,13 +134,7 @@ pub fn format(
             "Kernel<{s}>",
             .{task.name.constSlice()},
         ),
-        .user => {
-            const process: *const Process = .fromConst(task);
-            try writer.print(
-                "User<{s} - {s}>",
-                .{ process.name.constSlice(), task.name.constSlice() },
-            );
-        },
+        .user => return Thread.fromConst(task).format(writer),
     }
 }
 
