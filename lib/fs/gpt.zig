@@ -216,7 +216,7 @@ pub const Header = extern struct {
     }
 
     comptime {
-        core.testing.expectSize(Header, 92);
+        core.testing.expectSize(Header, .from(92, .byte));
     }
 };
 
@@ -287,7 +287,7 @@ pub const PartitionEntry = extern struct {
     pub const size: core.Size = core.Size.of(PartitionEntry);
 
     comptime {
-        core.testing.expectSize(PartitionEntry, 128);
+        core.testing.expectSize(PartitionEntry, .from(128, .byte));
     }
 };
 

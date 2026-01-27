@@ -647,7 +647,7 @@ pub const Superblock = extern struct {
     };
 
     comptime {
-        core.testing.expectSize(Superblock, 1024);
+        core.testing.expectSize(Superblock, .from(1024, .byte));
     }
 };
 
@@ -752,7 +752,7 @@ pub const BlockGroupDescriptor = extern struct {
     };
 
     comptime {
-        core.testing.expectSize(BlockGroupDescriptor, 64);
+        core.testing.expectSize(BlockGroupDescriptor, .from(64, .byte));
     }
 };
 

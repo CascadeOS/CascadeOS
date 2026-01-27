@@ -94,6 +94,12 @@ pub const RSDP = extern struct {
     }
 
     comptime {
-        core.testing.expectSize(RSDP, @sizeOf(u8) * 16 + @sizeOf(u32) * 2 + @sizeOf(u64) + @sizeOf(u8) * 4);
+        core.testing.expectSize(
+            RSDP,
+            core.Size.of(u8).multiplyScalar(16)
+                .add(core.Size.of(u32).multiplyScalar(2))
+                .add(.of(u64))
+                .add(core.Size.of(u8).multiplyScalar(4)),
+        );
     }
 };

@@ -629,7 +629,7 @@ pub const PageTable = extern struct {
             }
 
             comptime {
-                core.testing.expectSize(Raw, @sizeOf(u64));
+                core.testing.expectSize(Raw, .of(u64));
             }
         };
 
@@ -1156,7 +1156,7 @@ pub const PageTable = extern struct {
     };
 
     comptime {
-        core.testing.expectSize(PageTable, small_page_size.value);
+        core.testing.expectSize(PageTable, small_page_size);
     }
 };
 

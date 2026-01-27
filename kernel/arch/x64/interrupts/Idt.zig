@@ -92,7 +92,7 @@ pub const Entry = extern struct {
     }
 
     comptime {
-        core.testing.expectSize(Entry, @sizeOf(u64) * 2);
+        core.testing.expectSize(Entry, core.Size.of(u64).multiplyScalar(2));
     }
 };
 

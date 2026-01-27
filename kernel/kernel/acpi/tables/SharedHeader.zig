@@ -81,6 +81,13 @@ pub const SharedHeader = extern struct {
     }
 
     comptime {
-        core.testing.expectSize(SharedHeader, @sizeOf(u8) * 4 + @sizeOf(u32) + @sizeOf(u8) * 16 + @sizeOf(u32) * 3);
+        core.testing.expectSize(
+            SharedHeader,
+
+            core.Size.of(u8).multiplyScalar(4)
+                .add(.of(u32))
+                .add(core.Size.of(u8).multiplyScalar(16))
+                .add(core.Size.of(u32).multiplyScalar(3)),
+        );
     }
 };

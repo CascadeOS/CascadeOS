@@ -49,6 +49,6 @@ pub const Tss = extern struct {
     }
 
     comptime {
-        core.testing.expectSize(Tss, 104);
+        core.testing.expectSize(Tss, .from(104, .byte));
     }
 };

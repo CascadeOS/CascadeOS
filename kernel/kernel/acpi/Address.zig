@@ -131,6 +131,6 @@ pub const Address = extern struct {
     }
 
     comptime {
-        core.testing.expectSize(Address, @sizeOf(u64) + @sizeOf(u8) * 4);
+        core.testing.expectSize(Address, core.Size.of(u64).add(core.Size.of(u8).multiplyScalar(4)));
     }
 };

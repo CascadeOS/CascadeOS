@@ -346,7 +346,7 @@ pub const Function = extern struct {
     const pcie_configuration_space_size: core.Size = .from(4096, .byte);
 
     comptime {
-        core.testing.expectSize(Function, pcie_configuration_space_size.value);
+        core.testing.expectSize(Function, pcie_configuration_space_size);
     }
 };
 

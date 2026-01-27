@@ -877,6 +877,6 @@ pub const FADT = extern struct {
     };
 
     comptime {
-        core.testing.expectSize(FADT, 276);
+        core.testing.expectSize(FADT, .from(276, .byte));
     }
 };

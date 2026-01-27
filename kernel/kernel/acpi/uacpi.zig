@@ -2535,12 +2535,12 @@ pub const Table = extern struct {
         oem_table_id: [8]u8 = @splat(0),
 
         comptime {
-            core.testing.expectSize(TableIdentifiers, @sizeOf(c_uacpi.uacpi_table_identifiers));
+            core.testing.expectSize(TableIdentifiers, .of(c_uacpi.uacpi_table_identifiers));
         }
     };
 
     comptime {
-        core.testing.expectSize(Table, @sizeOf(c_uacpi.uacpi_table));
+        core.testing.expectSize(Table, .of(c_uacpi.uacpi_table));
     }
 };
 
@@ -3630,7 +3630,7 @@ pub const FirmwareRequest = extern struct {
     };
 
     comptime {
-        core.testing.expectSize(FirmwareRequest, @sizeOf(c_uacpi.uacpi_firmware_request));
+        core.testing.expectSize(FirmwareRequest, .of(c_uacpi.uacpi_firmware_request));
     }
 };
 

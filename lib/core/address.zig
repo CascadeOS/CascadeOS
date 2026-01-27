@@ -111,7 +111,7 @@ pub const PhysicalAddress = extern struct {
     }
 
     comptime {
-        core.testing.expectSize(PhysicalAddress, @sizeOf(u64));
+        core.testing.expectSize(PhysicalAddress, .of(u64));
     }
 };
 
@@ -231,7 +231,7 @@ pub const VirtualAddress = extern struct {
     }
 
     comptime {
-        core.testing.expectSize(VirtualAddress, @sizeOf(u64));
+        core.testing.expectSize(VirtualAddress, .of(u64));
     }
 };
 

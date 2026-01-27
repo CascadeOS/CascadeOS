@@ -62,7 +62,7 @@ pub const BaseRevison = extern struct {
     }
 
     comptime {
-        core.testing.expectSize(BaseRevison, 3 * @sizeOf(u64));
+        core.testing.expectSize(BaseRevison, core.Size.of(u64).multiplyScalar(3));
     }
 };
 

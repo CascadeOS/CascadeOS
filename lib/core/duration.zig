@@ -166,7 +166,7 @@ pub const Duration = extern struct {
     }
 
     comptime {
-        core.testing.expectSize(Duration, @sizeOf(u64));
+        core.testing.expectSize(Duration, .of(u64));
     }
 };
 

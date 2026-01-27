@@ -114,7 +114,7 @@ pub const UUID = extern struct {
     };
 
     comptime {
-        core.testing.expectSize(UUID, 16);
+        core.testing.expectSize(UUID, .from(16, .byte));
     }
 };
 

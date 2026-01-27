@@ -82,6 +82,6 @@ pub const HPET = extern struct {
     };
 
     comptime {
-        core.testing.expectSize(HPET, 56);
+        core.testing.expectSize(HPET, .from(56, .byte));
     }
 };

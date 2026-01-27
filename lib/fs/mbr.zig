@@ -29,7 +29,7 @@ pub const MBR = extern struct {
     };
 
     comptime {
-        core.testing.expectSize(MBR, 512);
+        core.testing.expectSize(MBR, .from(512, .byte));
     }
 };
 

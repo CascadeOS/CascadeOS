@@ -154,7 +154,7 @@ pub const BPB = extern struct {
     large_sector_count: u32 align(1),
 
     comptime {
-        core.testing.expectSize(BPB, 36);
+        core.testing.expectSize(BPB, .from(36, .byte));
     }
 };
 
@@ -223,7 +223,7 @@ pub const ExtendedBPB_32 = extern struct {
     };
 
     comptime {
-        core.testing.expectSize(ExtendedBPB_32, 512 - @sizeOf(BPB));
+        core.testing.expectSize(ExtendedBPB_32, core.Size.from(512, .byte).subtract(.of(BPB)));
     }
 };
 
@@ -276,7 +276,7 @@ pub const ShortFileName = extern struct {
     pub const extension_max_length = 3;
 
     comptime {
-        core.testing.expectSize(ShortFileName, 11);
+        core.testing.expectSize(ShortFileName, .from(11, .byte));
     }
 };
 
@@ -373,7 +373,7 @@ pub const DirectoryEntry = extern union {
         };
 
         comptime {
-            core.testing.expectSize(StandardDirectoryEntry, 32);
+            core.testing.expectSize(StandardDirectoryEntry, .from(32, .byte));
         }
     };
 
@@ -428,12 +428,12 @@ pub const DirectoryEntry = extern union {
         pub const maximum_number_of_long_name_entries = 20;
 
         comptime {
-            core.testing.expectSize(LongFileNameEntry, 32);
+            core.testing.expectSize(LongFileNameEntry, .from(32, .byte));
         }
     };
 
     comptime {
-        core.testing.expectSize(DirectoryEntry, 32);
+        core.testing.expectSize(DirectoryEntry, .from(32, .byte));
     }
 };
 

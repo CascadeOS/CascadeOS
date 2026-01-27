@@ -41,14 +41,16 @@ pub const MCFG = extern struct {
         _reserved: u32 align(1),
 
         comptime {
-            core.testing.expectSize(BaseAllocation, 16);
+            core.testing.expectSize(BaseAllocation, .from(16, .byte));
         }
     };
 
     comptime {
         core.testing.expectSize(
             MCFG,
-            @sizeOf(acpi.tables.SharedHeader) + @sizeOf(BaseAllocation) + @sizeOf(u64),
+            core.Size.of(acpi.tables.SharedHeader)
+                .add(.of(BaseAllocation))
+                .add(.of(u64)),
         );
     }
 };

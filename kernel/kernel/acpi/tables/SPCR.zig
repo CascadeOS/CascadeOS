@@ -173,7 +173,7 @@ pub const SPCR = extern struct {
         };
 
         comptime {
-            core.testing.expectSize(Type, @sizeOf(u16));
+            core.testing.expectSize(Type, .of(u16));
         }
     };
 
@@ -384,7 +384,7 @@ pub const SPCR = extern struct {
     }
 
     comptime {
-        core.testing.expectSize(SPCR, 88);
+        core.testing.expectSize(SPCR, .from(88, .byte));
     }
 
     pub const init = struct {

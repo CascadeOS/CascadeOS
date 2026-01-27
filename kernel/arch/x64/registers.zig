@@ -171,7 +171,7 @@ pub const RFlags = packed struct(u64) {
     }
 
     comptime {
-        core.testing.expectSize(RFlags, @sizeOf(u64));
+        core.testing.expectSize(RFlags, .of(u64));
     }
 };
 
@@ -480,7 +480,7 @@ pub const XCr0 = packed struct(u64) {
     }
 
     comptime {
-        core.testing.expectSize(XCr0, @sizeOf(u64));
+        core.testing.expectSize(XCr0, .of(u64));
     }
 };
 

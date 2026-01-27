@@ -244,7 +244,7 @@ pub const DBG2 = extern struct {
         }
 
         comptime {
-            core.testing.expectSize(DebugDevice, 22);
+            core.testing.expectSize(DebugDevice, .from(22, .byte));
         }
     };
 
@@ -287,7 +287,7 @@ pub const DBG2 = extern struct {
     }
 
     comptime {
-        core.testing.expectSize(DBG2, 44);
+        core.testing.expectSize(DBG2, .from(44, .byte));
     }
 
     pub const init = struct {
