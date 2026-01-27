@@ -11,7 +11,7 @@ const Task = kernel.Task;
 const Process = kernel.user.Process;
 const core = @import("core");
 
-const log = kernel.debug.log.scoped(.thread);
+const log = kernel.debug.log.scoped(.user);
 
 const Thread = @This();
 
@@ -86,7 +86,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    const init_log = kernel.debug.log.scoped(.thread_init);
+    const init_log = kernel.debug.log.scoped(.user_init);
 
     pub fn initializeThreads() !void {
         init_log.debug("initializing thread cache", .{});

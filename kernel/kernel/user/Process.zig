@@ -11,7 +11,7 @@ const Task = kernel.Task;
 const Thread = kernel.user.Thread;
 const core = @import("core");
 
-const log = kernel.debug.log.scoped(.process);
+const log = kernel.debug.log.scoped(.user);
 
 const Process = @This();
 
@@ -288,7 +288,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    const init_log = kernel.debug.log.scoped(.process_init);
+    const init_log = kernel.debug.log.scoped(.user_init);
 
     pub fn initializeProcesses() !void {
         init_log.debug("initializing process cache", .{});
