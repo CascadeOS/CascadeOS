@@ -12,6 +12,12 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
+const arch = @import("arch");
+const core = @import("core");
+const kernel = @import("kernel");
+
+const log = kernel.debug.log.scoped(.user);
+
 pub const Header = struct {
     is_64: bool,
     endian: std.builtin.Endian,
@@ -120,17 +126,26 @@ pub const Header = struct {
         };
     }
 
+    /// Iterates over the program header table and returns a `LoadableRegion` for each region that must be loaded.
+    ///
+    /// The provided slice must match the location and size given by `programHeaderTableLocation`.
+    pub fn loadableRegionIterator(header: *const Header, program_header_table: []const u8) LoadableRegion.Iterator {
+        return .{
+            .program_header_iterator = header.iterateProgramHeaders(program_header_table),
+        };
+    }
+
     /// Iterates over the program header table.
     ///
     /// The provided slice must match the location and size given by `programHeaderTableLocation`.
-    pub fn iterateProgramHeaders(header: *const Header, program_header_table_slice: []const u8) ProgramHeader.Iterator {
+    pub fn iterateProgramHeaders(header: *const Header, program_header_table: []const u8) ProgramHeader.Iterator {
         if (builtin.mode == .Debug) std.debug.assert(
-            program_header_table_slice.len >= header.program_header_entry_count * header.program_header_entry_size,
+            program_header_table.len >= header.program_header_entry_count * header.program_header_entry_size,
         );
 
         return .{
             .header = header,
-            .program_header_table_slice = program_header_table_slice,
+            .program_header_table = program_header_table,
         };
     }
 
@@ -261,7 +276,7 @@ pub const ProgramHeader = struct {
     pub const Iterator = struct {
         header: *const Header,
         index: usize = 0,
-        program_header_table_slice: []const u8,
+        program_header_table: []const u8,
 
         pub fn reset(it: *Iterator) void {
             it.index = 0;
@@ -273,7 +288,7 @@ pub const ProgramHeader = struct {
             if (index >= header.program_header_entry_count) return null;
             defer it.index += 1;
 
-            var reader: std.Io.Reader = .fixed(it.program_header_table_slice[header.program_header_entry_size * index ..]);
+            var reader: std.Io.Reader = .fixed(it.program_header_table[header.program_header_entry_size * index ..]);
 
             if (header.is_64) {
                 const raw_header = reader.takeStruct(
@@ -478,6 +493,71 @@ pub const ProgramHeader = struct {
         p_filesz: u64,
         p_memsz: u64,
         p_align: u64,
+    };
+};
+
+pub const LoadableRegion = struct {
+    map_range: core.VirtualRange,
+
+    destination_offset: usize,
+    source_base: usize,
+    length: usize,
+
+    protection: kernel.mem.MapType.Protection,
+
+    pub const Iterator = struct {
+        program_header_iterator: ProgramHeader.Iterator,
+
+        pub fn reset(it: *Iterator) void {
+            it.program_header_iterator.reset();
+        }
+
+        pub fn next(it: *Iterator) !?LoadableRegion {
+            while (it.program_header_iterator.next()) |program_header| {
+                if (program_header.type != .load) continue;
+                if (program_header.memory_size == 0) continue; // can this even happen with a loadable segment?
+
+                const segment_base: core.VirtualAddress = .fromInt(program_header.virtual_address);
+                const range_base = segment_base.alignBackward(arch.paging.standard_page_size);
+                const segment_offset = segment_base.difference(range_base);
+
+                const segment_size: core.Size = .from(program_header.memory_size, .byte);
+                const range_size = segment_size.add(segment_offset).alignForward(arch.paging.standard_page_size);
+
+                const new_protection = blk: {
+                    var prot: kernel.mem.MapType.Protection = .none;
+
+                    if (program_header.flags.read) prot = .read;
+                    if (program_header.flags.execute) prot = .execute;
+
+                    if (program_header.flags.write) {
+                        if (program_header.flags.execute) {
+                            log.warn("both write and execute flags set in program header", .{});
+                            return error.ProgramHeaderInvalidProtection;
+                        }
+
+                        prot = .read_write;
+                    }
+
+                    if (prot == .none) {
+                        log.warn("no protection flags set in program header", .{});
+                        return error.ProgramHeaderInvalidProtection;
+                    }
+
+                    break :blk prot;
+                };
+
+                return .{
+                    .map_range = .fromAddr(range_base, range_size),
+                    .destination_offset = segment_offset.value,
+                    .source_base = program_header.offset,
+                    .length = program_header.file_size,
+                    .protection = new_protection,
+                };
+            }
+
+            return null;
+        }
     };
 };
 
