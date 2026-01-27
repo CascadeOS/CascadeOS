@@ -252,46 +252,61 @@ const TaskCleanup = struct {
 
         task.state.dropped.queued_for_cleanup.store(false, .release);
 
-        const lock: *kernel.sync.RwLock = switch (task.type) {
-            .kernel => &globals.kernel_tasks_lock,
-            .user => &Process.from(task).threads_lock,
-        };
-
-        {
-            lock.writeLock();
-            defer lock.writeUnlock();
-
-            if (task.reference_count.load(.acquire) != 0) {
-                @branchHint(.unlikely);
-                // someone has acquired a reference to the task after it was queued for cleanup
-                log.verbose("{f} still has references", .{task});
-                return;
-            }
-
-            if (task.state.dropped.queued_for_cleanup.load(.acquire)) {
-                @branchHint(.unlikely);
-                // someone has requeued this task for cleanup
-                log.verbose("{f} has been requeued for cleanup", .{task});
-                return;
-            }
-
-            // the task is no longer referenced so we can safely destroy it
-            switch (task.type) {
-                .kernel => if (!globals.kernel_tasks.swapRemove(task)) @panic("task not found in kernel tasks"),
-                .user => {
-                    const thread: *Thread = .from(task);
-                    if (!thread.process.threads.swapRemove(thread)) @panic("thread not found in process threads");
-                },
-            }
-        }
-
-        // this log must happen before the process reference count is decremented
-        log.debug("destroying {f}", .{task});
-
         switch (task.type) {
-            .kernel => globals.cache.deallocate(task),
+            .kernel => {
+                {
+                    globals.kernel_tasks_lock.writeLock();
+                    defer globals.kernel_tasks_lock.writeUnlock();
+
+                    if (task.reference_count.load(.acquire) != 0) {
+                        @branchHint(.unlikely);
+                        // someone has acquired a reference to the task after it was queued for cleanup
+                        log.verbose("{f} still has references", .{task});
+                        return;
+                    }
+
+                    if (task.state.dropped.queued_for_cleanup.load(.acquire)) {
+                        @branchHint(.unlikely);
+                        // someone has requeued this task for cleanup
+                        log.verbose("{f} has been requeued for cleanup", .{task});
+                        return;
+                    }
+
+                    // the task is no longer referenced so we can safely destroy it
+                    if (!globals.kernel_tasks.swapRemove(task)) @panic("task not found in kernel tasks");
+                }
+
+                log.debug("destroying {f}", .{task});
+
+                globals.cache.deallocate(task);
+            },
             .user => {
                 const thread: *Thread = .from(task);
+
+                {
+                    thread.process.threads_lock.writeLock();
+                    defer thread.process.threads_lock.writeUnlock();
+
+                    if (task.reference_count.load(.acquire) != 0) {
+                        @branchHint(.unlikely);
+                        // someone has acquired a reference to the task after it was queued for cleanup
+                        log.verbose("{f} still has references", .{task});
+                        return;
+                    }
+
+                    if (task.state.dropped.queued_for_cleanup.load(.acquire)) {
+                        @branchHint(.unlikely);
+                        // someone has requeued this task for cleanup
+                        log.verbose("{f} has been requeued for cleanup", .{task});
+                        return;
+                    }
+
+                    // the task is no longer referenced so we can safely destroy it
+                    if (!thread.process.threads.swapRemove(thread)) @panic("thread not found in process threads");
+                }
+
+                kernel.debug.log.scoped(.user).debug("destroying {f}", .{thread});
+
                 thread.process.decrementReferenceCount();
                 Thread.internal.destroy(thread);
             },
