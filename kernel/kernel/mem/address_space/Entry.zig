@@ -382,7 +382,7 @@ pub const init = struct {
 };
 
 comptime {
-    if (!kernel.mem.cache.isSmallItem(@sizeOf(Entry), .of(Entry))) {
+    if (!kernel.mem.cache.isSmallItem(.of(Entry), .of(Entry))) {
         @compileError("`Entry` is a large cache item");
     }
 }

@@ -145,7 +145,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                                     "heap qcache {}",
                                     .{caches_created},
                                 ) catch unreachable,
-                                .size = options.quantum * (caches_created),
+                                .size = core.Size.from(options.quantum, .byte).multiplyScalar(caches_created),
                                 .alignment = .fromByteUnits(options.quantum),
                             });
 
@@ -414,7 +414,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                 if (quantum_aligned_len <= arena.quantum_caches.max_cached_size) {
                     const cache_index: usize = (quantum_aligned_len / arena.quantum) - 1;
                     const cache = arena.quantum_caches.caches.constSlice()[cache_index];
-                    if (core.is_debug) std.debug.assert(cache.item_size == quantum_aligned_len);
+                    if (core.is_debug) std.debug.assert(cache.item_size.value == quantum_aligned_len);
 
                     const buffer = cache.allocate() catch
                         return AllocateError.RequestedLengthUnavailable; // TODO: is there a better way to handle this?
@@ -646,7 +646,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                 if (allocation.len <= arena.quantum_caches.max_cached_size) {
                     const cache_index: usize = (allocation.len / arena.quantum) - 1;
                     const cache = arena.quantum_caches.caches.constSlice()[cache_index];
-                    if (core.is_debug) std.debug.assert(cache.item_size == allocation.len);
+                    if (core.is_debug) std.debug.assert(cache.item_size.value == allocation.len);
 
                     const buffer_ptr: [*]u8 = @ptrFromInt(allocation.base);
                     const buffer = buffer_ptr[0..allocation.len];

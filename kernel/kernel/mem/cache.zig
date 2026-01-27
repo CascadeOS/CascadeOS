@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-NON-AI-MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-// TODO: use `core.Size`
+// TODO: use `core.VirtualAddress`, search for `.value`
 
 const std = @import("std");
 
@@ -53,7 +53,7 @@ pub fn Cache(
 
             cache.raw_cache.init(.{
                 .name = options.name,
-                .size = @sizeOf(T),
+                .size = .of(T),
                 .alignment = .fromByteUnits(@alignOf(T)),
                 .constructor = if (constructor) |con|
                     struct {
@@ -144,14 +144,14 @@ pub const RawCache = struct {
 
     lock: kernel.sync.Mutex,
 
-    size_class: Size,
+    size_class: SizeClass,
 
-    item_size: usize,
+    item_size: core.Size,
 
     /// The size of the item with sufficient padding to ensure alignment.
     ///
     /// If the item is small additional space for the free list node is added.
-    effective_item_size: usize,
+    effective_item_size: core.Size,
 
     items_per_slab: usize,
 
@@ -174,7 +174,7 @@ pub const RawCache = struct {
     /// Used to ensure that only one thread allocates a new slab at a time.
     allocate_mutex: kernel.sync.Mutex,
 
-    const Size = union(enum) {
+    const SizeClass = union(enum) {
         small,
         large: Large,
 
@@ -186,7 +186,7 @@ pub const RawCache = struct {
     pub const InitOptions = struct {
         name: Name,
 
-        size: usize,
+        size: core.Size,
         alignment: std.mem.Alignment,
 
         constructor: ?*const fn (item: []u8) ConstructorError!void = null,
@@ -224,11 +224,11 @@ pub const RawCache = struct {
                 "{s}: init small item cache with effective size {f} (requested size {f} alignment {}) items per slab {} ({f})",
                 .{
                     options.name.constSlice(),
-                    core.Size.from(item_size.effective_item_size, .byte),
-                    core.Size.from(options.size, .byte),
+                    item_size.effective_item_size,
+                    options.size,
                     options.alignment.toByteUnits(),
                     item_size.items_per_slab,
-                    core.Size.from(item_size.effective_item_size * item_size.items_per_slab, .byte),
+                    item_size.effective_item_size.multiplyScalar(item_size.items_per_slab),
                 },
             );
         } else {
@@ -236,11 +236,11 @@ pub const RawCache = struct {
                 "{s}: init large item cache with effective size {f} (requested size {f} alignment {}) items per slab {} ({f})",
                 .{
                     options.name.constSlice(),
-                    core.Size.from(item_size.effective_item_size, .byte),
-                    core.Size.from(options.size, .byte),
+                    item_size.effective_item_size,
+                    options.size,
                     options.alignment.toByteUnits(),
                     item_size.items_per_slab,
-                    core.Size.from(item_size.effective_item_size * item_size.items_per_slab, .byte),
+                    item_size.effective_item_size.multiplyScalar(item_size.items_per_slab),
                 },
             );
         }
@@ -349,8 +349,8 @@ pub const RawCache = struct {
                 switch (raw_cache.size_class) {
                     .small => {
                         const item_node_ptr: [*]u8 = @ptrCast(item_node);
-                        const item_ptr = item_node_ptr - single_node_alignment.forward(raw_cache.item_size);
-                        allocated_items.appendAssumeCapacity(item_ptr[0..raw_cache.item_size]);
+                        const item_ptr = item_node_ptr - raw_cache.item_size.alignForward(single_node_alignment).value;
+                        allocated_items.appendAssumeCapacity(item_ptr[0..raw_cache.item_size.value]);
                     },
                     .large => |*large| {
                         const large_item: *LargeItem = @fieldParentPtr("node", item_node);
@@ -455,26 +455,26 @@ pub const RawCache = struct {
                 errdefer if (raw_cache.destructor) |destructor| {
                     // call the destructor for any items that the constructor was called on
                     for (0..i) |y| {
-                        const item_ptr = slab_base_ptr + (y * raw_cache.effective_item_size);
-                        destructor(item_ptr[0..raw_cache.item_size]);
+                        const item_ptr = slab_base_ptr + raw_cache.effective_item_size.multiplyScalar(y).value;
+                        destructor(item_ptr[0..raw_cache.item_size.value]);
                     }
                 };
 
                 if (raw_cache.constructor) |constructor| {
                     while (i < raw_cache.items_per_slab) : (i += 1) {
-                        const item_ptr = slab_base_ptr + (i * raw_cache.effective_item_size);
+                        const item_ptr = slab_base_ptr + raw_cache.effective_item_size.multiplyScalar(i).value;
 
-                        try constructor(item_ptr[0..raw_cache.item_size]);
+                        try constructor(item_ptr[0..raw_cache.item_size.value]);
 
                         slab.items.prepend(@ptrCast(@alignCast(
-                            item_ptr + single_node_alignment.forward(raw_cache.item_size),
+                            item_ptr + raw_cache.item_size.alignForward(single_node_alignment).value,
                         )));
                     }
                 } else {
                     while (i < raw_cache.items_per_slab) : (i += 1) {
-                        const item_ptr = slab_base_ptr + (i * raw_cache.effective_item_size);
+                        const item_ptr = slab_base_ptr + raw_cache.effective_item_size.multiplyScalar(i).value;
                         slab.items.prepend(@ptrCast(@alignCast(
-                            item_ptr + single_node_alignment.forward(raw_cache.item_size),
+                            item_ptr + raw_cache.item_size.alignForward(single_node_alignment).value,
                         )));
                     }
                 }
@@ -483,7 +483,7 @@ pub const RawCache = struct {
             },
             .large => slab: {
                 const large_item_allocation = kernel.mem.heap.heap_page_arena.allocate(
-                    raw_cache.effective_item_size * raw_cache.items_per_slab,
+                    raw_cache.effective_item_size.multiplyScalar(raw_cache.items_per_slab).value,
                     .instant_fit,
                 ) catch return AllocateError.SlabAllocationFailed;
                 errdefer kernel.mem.heap.heap_page_arena.deallocate(large_item_allocation);
@@ -522,7 +522,8 @@ pub const RawCache = struct {
                         const large_item = try globals.large_item_cache.allocate();
                         errdefer globals.large_item_cache.deallocate(large_item);
 
-                        const item: []u8 = (items_base + (i * raw_cache.effective_item_size))[0..raw_cache.item_size];
+                        const item_ptr: [*]u8 = items_base + raw_cache.effective_item_size.multiplyScalar(i).value;
+                        const item: []u8 = item_ptr[0..raw_cache.item_size.value];
 
                         large_item.* = .{
                             .item = item,
@@ -539,7 +540,8 @@ pub const RawCache = struct {
                         const large_item = try globals.large_item_cache.allocate();
                         errdefer globals.large_item_cache.deallocate(large_item);
 
-                        const item: []u8 = (items_base + (i * raw_cache.effective_item_size))[0..raw_cache.item_size];
+                        const item_ptr: [*]u8 = items_base + raw_cache.effective_item_size.multiplyScalar(i).value;
+                        const item: []u8 = item_ptr[0..raw_cache.item_size.value];
 
                         large_item.* = .{
                             .item = item,
@@ -588,7 +590,7 @@ pub const RawCache = struct {
                     const slab: *Slab = @ptrFromInt(page_start + arch.paging.standard_page_size.value - @sizeOf(Slab));
 
                     const item_node: *std.SinglyLinkedList.Node = @ptrCast(@alignCast(
-                        item.ptr + single_node_alignment.forward(raw_cache.item_size),
+                        item.ptr + raw_cache.item_size.alignForward(single_node_alignment).value,
                     ));
 
                     break :blk .{ slab, item_node };
@@ -655,8 +657,8 @@ pub const RawCache = struct {
 
                 if (raw_cache.destructor) |destructor| {
                     for (0..raw_cache.items_per_slab) |i| {
-                        const item_ptr = slab_base_ptr + (i * raw_cache.effective_item_size);
-                        destructor(item_ptr[0..raw_cache.item_size]);
+                        const item_ptr = slab_base_ptr + raw_cache.effective_item_size.multiplyScalar(i).value;
+                        destructor(item_ptr[0..raw_cache.item_size.value]);
                     }
                 }
 
@@ -725,31 +727,31 @@ pub const RawCache = struct {
 
     const ItemSize = struct {
         is_small: bool,
-        effective_item_size: usize,
+        effective_item_size: core.Size,
         items_per_slab: usize,
 
-        fn determine(size: usize, alignment: std.mem.Alignment) ItemSize {
+        fn determine(size: core.Size, alignment: std.mem.Alignment) ItemSize {
             const is_small = isSmallItem(size, alignment);
 
             const effective_item_size = if (is_small)
                 sizeOfItemWithNodeAppended(size, alignment)
             else
-                alignment.forward(size);
+                size.alignForward(.from(alignment.toByteUnits(), .byte));
 
             const items_per_slab = if (is_small)
-                (arch.paging.standard_page_size.value - @sizeOf(Slab)) / effective_item_size
+                arch.paging.standard_page_size.subtract(.of(Slab)).divide(effective_item_size)
             else blk: {
                 // TODO: why search when we can calculate?
 
                 var candidate_large_items_per_slab: usize = default_large_items_per_slab;
 
                 const initial_pages_for_allocation = arch.paging.standard_page_size.amountToCover(
-                    .from(candidate_large_items_per_slab * effective_item_size, .byte),
+                    effective_item_size.multiplyScalar(candidate_large_items_per_slab),
                 );
 
                 while (true) {
                     const next_pages_for_allocation = arch.paging.standard_page_size.amountToCover(
-                        .from((candidate_large_items_per_slab + 1) * effective_item_size, .byte),
+                        effective_item_size.multiplyScalar(candidate_large_items_per_slab + 1),
                     );
 
                     if (next_pages_for_allocation != initial_pages_for_allocation) break;
@@ -773,14 +775,16 @@ const minimum_small_items_per_slab = 8;
 const maximum_small_item_size = arch.paging.standard_page_size
     .subtract(.of(RawCache.Slab))
     .divideScalar(minimum_small_items_per_slab);
-const single_node_alignment: std.mem.Alignment = .fromByteUnits(@alignOf(std.SinglyLinkedList.Node));
+const single_node_alignment: core.Size = .from(@alignOf(std.SinglyLinkedList.Node), .byte);
 
-pub inline fn isSmallItem(size: usize, alignment: std.mem.Alignment) bool {
-    return sizeOfItemWithNodeAppended(size, alignment) <= maximum_small_item_size.value;
+pub inline fn isSmallItem(size: core.Size, alignment: std.mem.Alignment) bool {
+    return sizeOfItemWithNodeAppended(size, alignment).lessThanOrEqual(maximum_small_item_size);
 }
 
-fn sizeOfItemWithNodeAppended(size: usize, alignment: std.mem.Alignment) usize {
-    return alignment.forward(single_node_alignment.forward(size) + @sizeOf(std.SinglyLinkedList.Node));
+fn sizeOfItemWithNodeAppended(size: core.Size, alignment: std.mem.Alignment) core.Size {
+    return size.alignForward(single_node_alignment)
+        .add(.of(std.SinglyLinkedList.Node))
+        .alignForward(.from(alignment.toByteUnits(), .byte));
 }
 
 const globals = struct {

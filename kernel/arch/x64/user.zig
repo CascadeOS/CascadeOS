@@ -460,7 +460,7 @@ pub const init = struct {
         init_log.debug("initializing xsave area cache", .{});
         globals.xsave_area_cache.init(.{
             .name = try .fromSlice("xsave"),
-            .size = x64.info.xsave.xsave_area_size.value,
+            .size = x64.info.xsave.xsave_area_size,
             .alignment = .fromByteUnits(64),
         });
     }
