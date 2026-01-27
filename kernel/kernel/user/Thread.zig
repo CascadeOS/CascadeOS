@@ -31,6 +31,10 @@ pub inline fn fromConst(task: *const Task) *const Thread {
     return @fieldParentPtr("task", task);
 }
 
+pub fn format(thread: *const Thread, writer: *std.Io.Writer) !void {
+    return thread.task.format(writer);
+}
+
 pub const internal = struct {
     pub fn create(
         process: *Process,
