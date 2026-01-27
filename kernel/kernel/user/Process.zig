@@ -125,6 +125,15 @@ pub inline fn from(task: *Task) *Process {
     return thread.process;
 }
 
+/// Returns the process that the given task belongs to.
+///
+/// Asserts that the task is a user task.
+pub inline fn fromConst(task: *const Task) *const Process {
+    if (core.is_debug) std.debug.assert(task.type == .user);
+    const thread: *const Thread = .fromConst(task);
+    return thread.process;
+}
+
 pub fn format(process: *const Process, writer: *std.Io.Writer) !void {
     try writer.print("Process('{s}')", .{process.name.constSlice()});
 }

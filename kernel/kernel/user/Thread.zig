@@ -26,6 +26,11 @@ pub inline fn from(task: *Task) *Thread {
     return @fieldParentPtr("task", task);
 }
 
+pub inline fn fromConst(task: *const Task) *const Thread {
+    if (core.is_debug) std.debug.assert(task.type == .user);
+    return @fieldParentPtr("task", task);
+}
+
 pub const internal = struct {
     pub fn create(
         process: *Process,
