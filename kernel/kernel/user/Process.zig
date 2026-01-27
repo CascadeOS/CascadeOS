@@ -42,21 +42,27 @@ pub const CreateOptions = struct {
 
 /// Create a process.
 pub fn create(options: CreateOptions) !*Process {
-    const process = try globals.cache.allocate();
-    errdefer globals.cache.deallocate(process);
+    const process = blk: {
+        const process = try globals.cache.allocate();
+        errdefer globals.cache.deallocate(process);
 
-    if (core.is_debug) std.debug.assert(process.reference_count.load(.monotonic) == 0);
+        if (core.is_debug) std.debug.assert(process.reference_count.load(.monotonic) == 0);
 
-    process.name = options.name;
-    process.address_space.retarget(process);
+        process.name = options.name;
+        process.address_space.retarget(process);
 
-    globals.processes_lock.writeLock();
-    defer globals.processes_lock.writeUnlock();
+        globals.processes_lock.writeLock();
+        defer globals.processes_lock.writeUnlock();
 
-    const gop = try globals.processes.getOrPut(kernel.mem.heap.allocator, process);
-    if (gop.found_existing) @panic("process already in processes list");
+        const gop = try globals.processes.getOrPut(kernel.mem.heap.allocator, process);
+        if (gop.found_existing) @panic("process already in processes list");
 
-    process.incrementReferenceCount();
+        process.incrementReferenceCount();
+
+        break :blk process;
+    };
+
+    log.debug("created process: {f}", .{process});
 
     return process;
 }
@@ -73,33 +79,39 @@ pub fn createThread(
     process: *Process,
     options: CreateThreadOptions,
 ) !*Thread {
-    const thread = try Thread.internal.create(
-        process,
-        .{
-            .name = if (options.name) |provided_name|
-                provided_name
-            else
-                try .initPrint(
-                    "{d}",
-                    .{process.next_thread_id.fetchAdd(1, .monotonic)},
-                ),
-            .type = .user,
-            .entry = options.entry,
-        },
-    );
-    errdefer {
-        thread.task.state = .{ .dropped = .{} }; // `destroy` will assert this
-        thread.task.reference_count.store(0, .monotonic); // `destroy` will assert this
-        Thread.internal.destroy(thread);
-    }
+    const thread = blk: {
+        const thread = try Thread.internal.create(
+            process,
+            .{
+                .name = if (options.name) |provided_name|
+                    provided_name
+                else
+                    try .initPrint(
+                        "{d}",
+                        .{process.next_thread_id.fetchAdd(1, .monotonic)},
+                    ),
+                .type = .user,
+                .entry = options.entry,
+            },
+        );
+        errdefer {
+            thread.task.state = .{ .dropped = .{} }; // `destroy` will assert this
+            thread.task.reference_count.store(0, .monotonic); // `destroy` will assert this
+            Thread.internal.destroy(thread);
+        }
 
-    process.threads_lock.writeLock();
-    defer process.threads_lock.writeUnlock();
+        process.threads_lock.writeLock();
+        defer process.threads_lock.writeUnlock();
 
-    const gop = try process.threads.getOrPut(kernel.mem.heap.allocator, thread);
-    if (gop.found_existing) @panic("thread already in process threads list");
+        const gop = try process.threads.getOrPut(kernel.mem.heap.allocator, thread);
+        if (gop.found_existing) @panic("thread already in process threads list");
 
-    process.incrementReferenceCount();
+        process.incrementReferenceCount();
+
+        break :blk thread;
+    };
+
+    log.debug("created thread: {f}", .{thread});
 
     return thread;
 }
