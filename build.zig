@@ -48,7 +48,6 @@ pub fn build(b: *std.Build) !void {
         options,
         all_architectures,
     );
-    _ = applications;
 
     const kernels = try Kernel.getKernels(
         b,
@@ -57,6 +56,7 @@ pub fn build(b: *std.Build) !void {
         tools,
         options,
         all_architectures,
+        applications,
     );
 
     const image_steps = try ImageStep.registerImageSteps(

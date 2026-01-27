@@ -4,6 +4,7 @@
 const std = @import("std");
 const Step = std.Build.Step;
 
+const Application = @import("Application.zig");
 const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
 const KernelComponent = @import("KernelComponent.zig");
 const Library = @import("Library.zig");
@@ -27,6 +28,7 @@ pub fn getKernels(
     tools: Tool.Collection,
     options: Options,
     all_architectures: []const CascadeTarget.Architecture,
+    applications: Application.Collection,
 ) !Collection {
     const sdf_builder = tools.get("sdf_builder").?;
 
@@ -43,6 +45,7 @@ pub fn getKernels(
                 sdf_builder,
                 options,
                 architecture,
+                applications,
             ),
         );
     }
@@ -57,6 +60,7 @@ fn constructKernel(
     sdf_builder: Tool,
     options: Options,
     architecture: CascadeTarget.Architecture,
+    applications: Application.Collection,
 ) !Kernel {
     { // check exe
         const check_module = try constructKernelRootModule(
@@ -65,6 +69,7 @@ fn constructKernel(
             options,
             architecture,
             true,
+            applications,
         );
         const check_exe = b.addExecutable(.{
             .name = "kernel_check",
@@ -79,6 +84,7 @@ fn constructKernel(
         options,
         architecture,
         false,
+        applications,
     );
 
     const kernel_exe = b.addExecutable(.{
@@ -194,6 +200,7 @@ fn constructKernelRootModule(
     options: Options,
     architecture: CascadeTarget.Architecture,
     is_check: bool,
+    applications: Application.Collection,
 ) !*std.Build.Module {
     const required_components = try getAllRequiredComponents(b);
     const required_libraries = try getAllRequiredLibraries(b, all_libraries, required_components);
@@ -224,6 +231,22 @@ fn constructKernelRootModule(
 
         .omit_frame_pointer = false,
     });
+
+    // embed the hello world application
+    {
+        const hello_world_application = applications.get("hello_world") orelse @panic("no hello_world application");
+
+        const hello_world_exe = hello_world_application.exes.get(.{
+            .architecture = architecture,
+            .context = .cascade,
+        }).?;
+
+        required_components.get("kernel").?.module.addImport(
+            "hello_world",
+            b.createModule(.{ .root_source_file = hello_world_exe.getEmittedBin() }),
+        );
+    }
+
     kernel_root_module.addImport("arch", required_components.get("arch").?.module);
     kernel_root_module.addImport("boot", required_components.get("boot").?.module);
     kernel_root_module.addImport("kernel", required_components.get("kernel").?.module);
