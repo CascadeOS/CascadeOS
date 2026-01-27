@@ -5,7 +5,11 @@ const std = @import("std");
 
 const cascade = @import("cascade");
 
-pub export const _start = cascade._cascade_start;
+pub const _start = cascade._cascade_start;
+comptime {
+    // TODO: well this is dumb, probably need a custom test runner
+    if (!@import("builtin").is_test) @export(&_start, .{ .name = "_start" });
+}
 
 pub fn main() void {
     // TODO: actually print "hello world"...

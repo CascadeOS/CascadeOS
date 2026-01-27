@@ -5,7 +5,6 @@ const std = @import("std");
 const builtin = @import("builtin");
 const cascade = @import("cascade");
 
-/// This entry point must be exposed from the root file like `pub export const _start = cascade._cascade_start;`
 pub fn _cascade_start() callconv(.naked) noreturn {
     if (builtin.unwind_tables != .none or !builtin.strip_debug_info) {
         switch (builtin.cpu.arch) {
