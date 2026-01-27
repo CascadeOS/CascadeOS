@@ -11,7 +11,7 @@ const Task = kernel.Task;
 const Process = kernel.user.Process;
 const core = @import("core");
 
-const log = kernel.debug.log.scoped(.user);
+const log = kernel.debug.log.scoped(.user_thread);
 
 const Thread = @This();
 

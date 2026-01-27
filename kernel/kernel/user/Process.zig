@@ -11,7 +11,7 @@ const Task = kernel.Task;
 const Thread = kernel.user.Thread;
 const core = @import("core");
 
-const log = kernel.debug.log.scoped(.user);
+const log = kernel.debug.log.scoped(.user_process);
 
 const Process = @This();
 
@@ -111,7 +111,7 @@ pub fn createThread(
         break :blk thread;
     };
 
-    log.debug("created thread: {f}", .{thread});
+    kernel.debug.log.scoped(.user_thread).debug("created thread: {f}", .{thread});
 
     return thread;
 }

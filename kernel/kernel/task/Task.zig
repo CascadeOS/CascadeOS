@@ -305,7 +305,7 @@ const TaskCleanup = struct {
                     if (!thread.process.threads.swapRemove(thread)) @panic("thread not found in process threads");
                 }
 
-                kernel.debug.log.scoped(.user).debug("destroying {f}", .{thread});
+                kernel.debug.log.scoped(.user_thread).debug("destroying {f}", .{thread});
 
                 thread.process.decrementReferenceCount();
                 Thread.internal.destroy(thread);
