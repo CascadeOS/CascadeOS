@@ -126,7 +126,7 @@ pub fn createKernelTask(options: CreateKernelTaskOptions) !*Task {
 }
 
 pub fn format(
-    task: *Task,
+    task: *const Task,
     writer: *std.Io.Writer,
 ) !void {
     switch (task.type) {
@@ -135,7 +135,7 @@ pub fn format(
             .{task.name.constSlice()},
         ),
         .user => {
-            const process: *const Process = .from(task);
+            const process: *const Process = .fromConst(task);
             try writer.print(
                 "User<{s} - {s}>",
                 .{ process.name.constSlice(), task.name.constSlice() },
