@@ -339,6 +339,9 @@ fn loadHelloWorld() !void {
 
     const header = try kernel.user.elf.Header.parse(hello_world_elf);
 
+    const entry_point: core.VirtualAddress = .fromInt(header.entry);
+    if (entry_point.equal(.zero)) return error.EntryPointIsZero;
+
     const program_header_table: []const u8 = blk: {
         const program_header_table_location = header.programHeaderTableLocation();
         break :blk hello_world_elf[program_header_table_location.base..][0..program_header_table_location.length];
@@ -398,7 +401,7 @@ fn loadHelloWorld() !void {
     });
 
     arch.user.enterUserspace(.{
-        .entry_point = .fromInt(header.entry),
+        .entry_point = entry_point,
         .stack_pointer = user_stack.endBound(),
     });
 }
