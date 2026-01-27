@@ -185,6 +185,18 @@ fn initStage4() !void {
     log.debug("initializing ACPI", .{});
     try kernel.acpi.init.initialize();
 
+    log.debug("starting first user process", .{});
+    const hello_world_process: *kernel.user.Process = try .create(.{ .name = try .fromSlice("hello world") });
+    defer hello_world_process.decrementReferenceCount();
+
+    const hello_world_main_thread = try hello_world_process.createThread(
+        .{ .entry = .prepare(loadHelloWorld, .{}) },
+    );
+
+    const scheduler_handle: Task.SchedulerHandle = .get();
+    defer scheduler_handle.unlock();
+    scheduler_handle.queueTask(&hello_world_main_thread.task);
+
     Output.lock.lock();
     defer Output.lock.unlock();
     try kernel.time.init.printInitializationTime(Output.writer);
@@ -318,3 +330,75 @@ const StageBarrier = struct {
         _ = barrier.stage_complete.store(true, .release);
     }
 };
+
+fn loadHelloWorld() !void {
+    const hello_world_elf = @embedFile("hello_world");
+
+    const current_task: Task.Current = .get();
+    const process: *kernel.user.Process = .from(current_task.task);
+
+    const header = try kernel.user.elf.Header.parse(hello_world_elf);
+
+    const program_header_table: []const u8 = blk: {
+        const program_header_table_location = header.programHeaderTableLocation();
+        break :blk hello_world_elf[program_header_table_location.base..][0..program_header_table_location.length];
+    };
+
+    var iter = header.loadableRegionIterator(program_header_table);
+
+    // map all loadable segments read write - this allows the address space to merge the entries
+    // TODO: this only makes sense for an embedded program, not if it is loaded from disk
+    while (try iter.next()) |loadable_region| {
+        _ = try process.address_space.map(.{
+            .base = loadable_region.map_range.address,
+            .size = loadable_region.map_range.size,
+            .protection = .read_write,
+            .type = .zero_fill,
+        });
+    }
+
+    // copy the regions from the elf into the address space
+    {
+        current_task.incrementEnableAccessToUserMemory();
+        defer current_task.decrementEnableAccessToUserMemory();
+
+        iter.reset();
+
+        while (try iter.next()) |loadable_region| {
+            const mapped_slice = loadable_region.map_range.toByteSlice();
+
+            @memcpy(
+                mapped_slice[loadable_region.destination_offset..][0..loadable_region.length],
+                hello_world_elf[loadable_region.source_base..][0..loadable_region.length],
+            );
+        }
+    }
+
+    iter.reset();
+
+    // change each regions protections as per the elf
+    while (try iter.next()) |loadable_region| {
+        if (loadable_region.protection == .read_write) continue;
+
+        try process.address_space.changeProtection(
+            loadable_region.map_range,
+            .{
+                .both = .{
+                    .protection = loadable_region.protection,
+                    .max_protection = loadable_region.protection,
+                },
+            },
+        );
+    }
+
+    const user_stack = try process.address_space.map(.{
+        .size = .from(64, .kib),
+        .protection = .read_write,
+        .type = .zero_fill,
+    });
+
+    arch.user.enterUserspace(.{
+        .entry_point = .fromInt(header.entry),
+        .stack_pointer = user_stack.endBound(),
+    });
+}
