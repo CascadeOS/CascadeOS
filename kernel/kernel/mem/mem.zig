@@ -159,9 +159,7 @@ pub fn mapRangeToPhysicalRange(
     const last_virtual_address = virtual_range.last();
     var current_virtual_address = virtual_range.address;
 
-    errdefer {
-        // Unmap all pages that have been mapped.
-
+    errdefer { // unmap all pages that have been mapped
         var unmap_batch: VirtualRangeBatch = .{};
         unmap_batch.appendMergeIfFull(.{
             .address = virtual_range.address,
@@ -178,7 +176,7 @@ pub fn mapRangeToPhysicalRange(
         );
     }
 
-    // TODO: this can be optimized by implementing `arch.paging.mapRange`
+    // TODO: this can be optimized by implementing `arch.paging.PageTable.mapRange`
 
     var current_physical_address = physical_range.address;
 
