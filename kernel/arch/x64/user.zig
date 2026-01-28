@@ -401,7 +401,6 @@ pub fn syscallEntry() callconv(.naked) noreturn {
             \\push %r15
             \\.cfi_adjust_cfa_offset 8
             \\
-            \\cld
             \\xor %ebp, %ebp
             \\mov %rsp, %rdi
             \\call syscallDispatch
