@@ -107,8 +107,8 @@ pub const CreateKernelTaskOptions = struct {
 ///
 /// The task is in the `ready` state and is not scheduled.
 pub fn createKernelTask(options: CreateKernelTaskOptions) !*Task {
-    const task = try globals.cache.allocate();
-    errdefer globals.cache.deallocate(task);
+    const task = try globals.kernel_task_cache.allocate();
+    errdefer globals.kernel_task_cache.deallocate(task);
 
     try Task.internal.init(task, .{
         .name = options.name,
@@ -278,7 +278,7 @@ const TaskCleanup = struct {
 
                 log.debug("destroying {f}", .{task});
 
-                globals.cache.deallocate(task);
+                globals.kernel_task_cache.deallocate(task);
             },
             .user => {
                 const thread: *Thread = .from(task);
@@ -363,10 +363,10 @@ pub const internal = struct {
 };
 
 const globals = struct {
-    /// The source of task objects.
+    /// The source of kernel task objects.
     ///
     /// Initialized during `init.initializeTasks`.
-    var cache: kernel.mem.cache.Cache(
+    var kernel_task_cache: kernel.mem.cache.Cache(
         Task,
         .{
             .constructor = struct {
@@ -401,8 +401,8 @@ pub const init = struct {
     pub fn initializeTasks() !void {
         try Stack.init.initializeStacks();
 
-        init_log.debug("initializing task cache", .{});
-        globals.cache.init(.{ .name = try .fromSlice("task") });
+        init_log.debug("initializing kernel task cache", .{});
+        globals.kernel_task_cache.init(.{ .name = try .fromSlice("kernel task") });
 
         init_log.debug("initializing task cleanup service", .{});
         try globals.task_cleanup.init();
