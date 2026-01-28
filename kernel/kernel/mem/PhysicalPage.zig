@@ -277,14 +277,7 @@ pub const init = struct {
             init_globals.bootstrap_physical_regions.append(.{
                 .start_physical_page = .fromAddress(entry.range.address),
                 .first_free_page_index = 0,
-                .page_count = @intCast(std.math.divExact(
-                    usize,
-                    entry.range.size.value,
-                    arch.paging.standard_page_size.value,
-                ) catch std.debug.panic(
-                    "memory map entry size is not a multiple of page size: {f}",
-                    .{entry},
-                )),
+                .page_count = @intCast(entry.range.size.divide(arch.paging.standard_page_size)),
             }) catch @panic("exceeded max number of physical regions");
         }
     }
