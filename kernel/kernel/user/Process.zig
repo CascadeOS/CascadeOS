@@ -241,56 +241,58 @@ const globals = struct {
     /// Initialized during `init.initializeCache`.
     var cache: kernel.mem.cache.Cache(
         Process,
-        struct {
-            fn constructor(process: *Process) kernel.mem.cache.ConstructorError!void {
-                const temp_name = Process.Name.initPrint("temp {*}", .{process}) catch unreachable;
+        .{
+            .constructor = struct {
+                fn constructor(process: *Process) kernel.mem.cache.ConstructorError!void {
+                    const temp_name = Process.Name.initPrint("temp {*}", .{process}) catch unreachable;
 
-                process.* = .{
-                    .name = temp_name,
-                    .reference_count = .init(0),
-                    .address_space = undefined, // initialized below
-                };
+                    process.* = .{
+                        .name = temp_name,
+                        .reference_count = .init(0),
+                        .address_space = undefined, // initialized below
+                    };
 
-                const page = kernel.mem.PhysicalPage.allocator.allocate() catch |err| {
-                    log.warn("process constructor failed during page allocation: {t}", .{err});
-                    return error.ItemConstructionFailed;
-                };
-                errdefer {
+                    const page = kernel.mem.PhysicalPage.allocator.allocate() catch |err| {
+                        log.warn("process constructor failed during page allocation: {t}", .{err});
+                        return error.ItemConstructionFailed;
+                    };
+                    errdefer {
+                        var page_list: kernel.mem.PhysicalPage.List = .{};
+                        page_list.push(page);
+                        kernel.mem.PhysicalPage.allocator.deallocate(page_list);
+                    }
+
+                    const page_table: arch.paging.PageTable = .create(page);
+                    kernel.mem.kernelPageTable().copyTopLevelInto(page_table);
+
+                    process.address_space.init(.{
+                        .name = kernel.mem.AddressSpace.Name.fromSlice(
+                            temp_name.constSlice(),
+                        ) catch unreachable, // ensured in `kernel.config`
+                        .range = kernel.config.user.user_address_space_range,
+                        .page_table = page_table,
+                        .context = .{ .user = process },
+                    }) catch |err| {
+                        log.warn(
+                            "process constructor failed during address space initialization: {t}",
+                            .{err},
+                        );
+                        return error.ObjectConstructionFailed;
+                    };
+                }
+            }.constructor,
+            .destructor = struct {
+                fn destructor(process: *Process) void {
+                    const page_table = process.address_space.page_table;
+
+                    process.address_space.deinit();
+
                     var page_list: kernel.mem.PhysicalPage.List = .{};
-                    page_list.push(page);
+                    page_list.prepend(page_table.physical_page);
                     kernel.mem.PhysicalPage.allocator.deallocate(page_list);
                 }
-
-                const page_table: arch.paging.PageTable = .create(page);
-                kernel.mem.kernelPageTable().copyTopLevelInto(page_table);
-
-                process.address_space.init(.{
-                    .name = kernel.mem.AddressSpace.Name.fromSlice(
-                        temp_name.constSlice(),
-                    ) catch unreachable, // ensured in `kernel.config`
-                    .range = kernel.config.user.user_address_space_range,
-                    .page_table = page_table,
-                    .context = .{ .user = process },
-                }) catch |err| {
-                    log.warn(
-                        "process constructor failed during address space initialization: {t}",
-                        .{err},
-                    );
-                    return error.ObjectConstructionFailed;
-                };
-            }
-        }.constructor,
-        struct {
-            fn destructor(process: *Process) void {
-                const page_table = process.address_space.page_table;
-
-                process.address_space.deinit();
-
-                var page_list: kernel.mem.PhysicalPage.List = .{};
-                page_list.prepend(page_table.physical_page);
-                kernel.mem.PhysicalPage.allocator.deallocate(page_list);
-            }
-        }.destructor,
+            }.destructor,
+        },
     ) = undefined;
 
     var processes_lock: kernel.sync.RwLock = .{};

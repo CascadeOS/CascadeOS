@@ -368,17 +368,19 @@ const globals = struct {
     /// Initialized during `init.initializeTasks`.
     var cache: kernel.mem.cache.Cache(
         Task,
-        struct {
-            fn constructor(task: *Task) kernel.mem.cache.ConstructorError!void {
-                if (core.is_debug) task.* = undefined;
-                task.stack = try .createStack();
-            }
-        }.constructor,
-        struct {
-            fn destructor(task: *Task) void {
-                task.stack.destroyStack();
-            }
-        }.destructor,
+        .{
+            .constructor = struct {
+                fn constructor(task: *Task) kernel.mem.cache.ConstructorError!void {
+                    if (core.is_debug) task.* = undefined;
+                    task.stack = try .createStack();
+                }
+            }.constructor,
+            .destructor = struct {
+                fn destructor(task: *Task) void {
+                    task.stack.destroyStack();
+                }
+            }.destructor,
+        },
     ) = undefined;
 
     /// All currently living kernel tasks.

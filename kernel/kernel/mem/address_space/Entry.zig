@@ -366,7 +366,7 @@ pub inline fn format(entry: *const Entry, writer: *std.Io.Writer) !void {
 
 const globals = struct {
     /// Initialized during `init.initializeCaches`.
-    var entry_cache: Cache(Entry, null, null) = undefined;
+    var entry_cache: Cache(Entry, null) = undefined;
 };
 
 pub const init = struct {

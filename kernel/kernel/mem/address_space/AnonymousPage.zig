@@ -99,7 +99,7 @@ fn destroy(
 
 const globals = struct {
     /// Initialized during `init.initializeCaches`.
-    var anonymous_page_cache: Cache(AnonymousPage, null, null) = undefined;
+    var anonymous_page_cache: Cache(AnonymousPage, null) = undefined;
 };
 
 pub const init = struct {

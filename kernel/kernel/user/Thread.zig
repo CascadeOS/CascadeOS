@@ -77,20 +77,22 @@ const globals = struct {
     /// Initialized during `init.initializeThreads`.
     var cache: kernel.mem.cache.Cache(
         Thread,
-        struct {
-            fn constructor(thread: *Thread) kernel.mem.cache.ConstructorError!void {
-                if (core.is_debug) thread.* = undefined;
-                thread.task.stack = try .createStack();
-                errdefer thread.task.stack.destroyStack();
-                try arch.user.createThread(thread);
-            }
-        }.constructor,
-        struct {
-            fn destructor(thread: *Thread) void {
-                arch.user.destroyThread(thread);
-                thread.task.stack.destroyStack();
-            }
-        }.destructor,
+        .{
+            .constructor = struct {
+                fn constructor(thread: *Thread) kernel.mem.cache.ConstructorError!void {
+                    if (core.is_debug) thread.* = undefined;
+                    thread.task.stack = try .createStack();
+                    errdefer thread.task.stack.destroyStack();
+                    try arch.user.createThread(thread);
+                }
+            }.constructor,
+            .destructor = struct {
+                fn destructor(thread: *Thread) void {
+                    arch.user.destroyThread(thread);
+                    thread.task.stack.destroyStack();
+                }
+            }.destructor,
+        },
     ) = undefined;
 };
 

@@ -1345,7 +1345,7 @@ const TAGS_PER_PAGE = arch.paging.standard_page_size.value / @sizeOf(BoundaryTag
 
 const globals = struct {
     /// Initialized during `init.initializeCaches`.
-    var tag_cache: kernel.mem.cache.Cache(BoundaryTag, null, null) = undefined;
+    var tag_cache: kernel.mem.cache.Cache(BoundaryTag, null) = undefined;
 };
 
 pub const init = struct {

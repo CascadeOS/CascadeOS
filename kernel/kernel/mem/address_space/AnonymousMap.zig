@@ -336,7 +336,7 @@ pub inline fn format(_: *const *AnonymousMap, _: *std.Io.Writer) !void {
 
 const globals = struct {
     /// Initialized during `init.initializeCaches`.
-    var anonymous_map_cache: Cache(AnonymousMap, null, null) = undefined;
+    var anonymous_map_cache: Cache(AnonymousMap, null) = undefined;
 };
 
 pub const init = struct {

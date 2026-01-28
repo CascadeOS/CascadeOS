@@ -12,16 +12,12 @@ const core = @import("core");
 
 const log = kernel.debug.log.scoped(.cache);
 
-pub const ConstructorError = error{ItemConstructionFailed};
-pub const Name = core.containers.BoundedArray(u8, kernel.config.mem.cache_name_length);
-
 /// A slab based cache of T.
 ///
 /// Wrapper around `RawCache` that provides a `T`-specifc API.
 pub fn Cache(
     comptime T: type,
-    comptime constructor: ?fn (item: *T) ConstructorError!void,
-    comptime destructor: ?fn (item: *T) void,
+    comptime construct_destruct: ?ConstructDestruct(T),
 ) type {
     return struct {
         raw_cache: RawCache,
@@ -55,22 +51,18 @@ pub fn Cache(
                 .name = options.name,
                 .size = .of(T),
                 .alignment = .fromByteUnits(@alignOf(T)),
-                .constructor = if (constructor) |con|
-                    struct {
+                .construct_destruct = if (construct_destruct) |con_des| .{
+                    .constructor = struct {
                         fn innerConstructor(item: []u8) ConstructorError!void {
-                            try con(@ptrCast(@alignCast(item)));
+                            try con_des.constructor(@ptrCast(@alignCast(item)));
                         }
-                    }.innerConstructor
-                else
-                    null,
-                .destructor = if (destructor) |des|
-                    struct {
+                    }.innerConstructor,
+                    .destructor = struct {
                         fn innerDestructor(item: []u8) void {
-                            des(@ptrCast(@alignCast(item)));
+                            con_des.destructor(@ptrCast(@alignCast(item)));
                         }
-                    }.innerDestructor
-                else
-                    null,
+                    }.innerDestructor,
+                } else null,
                 .last_slab = options.last_slab,
                 .slab_source = options.slab_source,
             });
@@ -165,8 +157,7 @@ pub const RawCache = struct {
     /// `.pmm` is only valid for small item caches.
     slab_source: InitOptions.SlabSource = .heap,
 
-    constructor: ?*const fn (item: []u8) ConstructorError!void,
-    destructor: ?*const fn (item: []u8) void,
+    construct_destruct: ?RawConstructDestruct,
 
     available_slabs: std.DoublyLinkedList,
     full_slabs: std.DoublyLinkedList,
@@ -189,8 +180,7 @@ pub const RawCache = struct {
         size: core.Size,
         alignment: std.mem.Alignment,
 
-        constructor: ?*const fn (item: []u8) ConstructorError!void = null,
-        destructor: ?*const fn (item: []u8) void = null,
+        construct_destruct: ?RawConstructDestruct = null,
 
         /// What should happen to the last available slab when it is unused?
         last_slab: core.CleanupDecision = .keep,
@@ -251,8 +241,7 @@ pub const RawCache = struct {
             .lock = .{},
             .item_size = options.size,
             .effective_item_size = item_size.effective_item_size,
-            .constructor = options.constructor,
-            .destructor = options.destructor,
+            .construct_destruct = options.construct_destruct,
             .available_slabs = .{},
             .full_slabs = .{},
             .items_per_slab = item_size.items_per_slab,
@@ -451,16 +440,19 @@ pub const RawCache = struct {
                     .large_item_allocation = undefined,
                 };
 
-                var i: usize = 0;
-                errdefer if (raw_cache.destructor) |destructor| {
-                    // call the destructor for any items that the constructor was called on
-                    for (0..i) |y| {
-                        const item_ptr = slab_base_ptr + raw_cache.effective_item_size.multiplyScalar(y).value;
-                        destructor(item_ptr[0..raw_cache.item_size.value]);
-                    }
-                };
+                if (raw_cache.construct_destruct) |con_des| {
+                    var i: usize = 0;
 
-                if (raw_cache.constructor) |constructor| {
+                    errdefer { // call the destructor for any items that the constructor was called on
+                        const destructor = con_des.destructor;
+                        for (0..i) |y| {
+                            const item_ptr = slab_base_ptr + raw_cache.effective_item_size.multiplyScalar(y).value;
+                            destructor(item_ptr[0..raw_cache.item_size.value]);
+                        }
+                    }
+
+                    const constructor = con_des.constructor;
+
                     while (i < raw_cache.items_per_slab) : (i += 1) {
                         const item_ptr = slab_base_ptr + raw_cache.effective_item_size.multiplyScalar(i).value;
 
@@ -471,7 +463,7 @@ pub const RawCache = struct {
                         )));
                     }
                 } else {
-                    while (i < raw_cache.items_per_slab) : (i += 1) {
+                    for (0..raw_cache.items_per_slab) |i| {
                         const item_ptr = slab_base_ptr + raw_cache.effective_item_size.multiplyScalar(i).value;
                         slab.items.prepend(@ptrCast(@alignCast(
                             item_ptr + raw_cache.item_size.alignForward(single_node_alignment).value,
@@ -489,9 +481,8 @@ pub const RawCache = struct {
                 errdefer kernel.mem.heap.heap_page_arena.deallocate(large_item_allocation);
 
                 const slab = try globals.slab_cache.allocate();
-                slab.* = .{
-                    .large_item_allocation = large_item_allocation,
-                };
+                slab.* = .{ .large_item_allocation = large_item_allocation };
+                errdefer globals.slab_cache.deallocate(slab);
 
                 if (core.is_debug) {
                     const virtual_range: core.VirtualRange = .{
@@ -501,23 +492,20 @@ pub const RawCache = struct {
                     @memset(virtual_range.toByteSlice(), undefined);
                 }
 
-                errdefer {
-                    while (slab.items.popFirst()) |item_node| {
-                        const large_item: *LargeItem = @fieldParentPtr("node", item_node);
-
-                        if (raw_cache.destructor) |destructor| {
-                            destructor(large_item.item);
-                        }
-
-                        globals.large_item_cache.deallocate(large_item);
-                    }
-
-                    globals.slab_cache.deallocate(slab);
-                }
-
                 const items_base: [*]u8 = @ptrFromInt(large_item_allocation.base);
 
-                if (raw_cache.constructor) |constructor| {
+                if (raw_cache.construct_destruct) |con_des| {
+                    errdefer {
+                        const destructor = con_des.destructor;
+                        while (slab.items.popFirst()) |item_node| {
+                            const large_item: *LargeItem = @fieldParentPtr("node", item_node);
+                            destructor(large_item.item);
+                            globals.large_item_cache.deallocate(large_item);
+                        }
+                    }
+
+                    const constructor = con_des.constructor;
+
                     for (0..raw_cache.items_per_slab) |i| {
                         const large_item = try globals.large_item_cache.allocate();
                         errdefer globals.large_item_cache.deallocate(large_item);
@@ -536,9 +524,12 @@ pub const RawCache = struct {
                         slab.items.prepend(&large_item.node);
                     }
                 } else {
+                    errdefer while (slab.items.popFirst()) |item_node| {
+                        globals.large_item_cache.deallocate(@fieldParentPtr("node", item_node));
+                    };
+
                     for (0..raw_cache.items_per_slab) |i| {
                         const large_item = try globals.large_item_cache.allocate();
-                        errdefer globals.large_item_cache.deallocate(large_item);
 
                         const item_ptr: [*]u8 = items_base + raw_cache.effective_item_size.multiplyScalar(i).value;
                         const item: []u8 = item_ptr[0..raw_cache.item_size.value];
@@ -655,7 +646,8 @@ pub const RawCache = struct {
                 const slab_info_ptr: [*]u8 = @ptrCast(slab);
                 const slab_base_ptr: [*]u8 = slab_info_ptr + @sizeOf(Slab) - arch.paging.standard_page_size.value;
 
-                if (raw_cache.destructor) |destructor| {
+                if (raw_cache.construct_destruct) |con_des| {
+                    const destructor = con_des.destructor;
                     for (0..raw_cache.items_per_slab) |i| {
                         const item_ptr = slab_base_ptr + raw_cache.effective_item_size.multiplyScalar(i).value;
                         destructor(item_ptr[0..raw_cache.item_size.value]);
@@ -681,7 +673,8 @@ pub const RawCache = struct {
                 return;
             },
             .large => {
-                if (raw_cache.destructor) |destructor| {
+                if (raw_cache.construct_destruct) |con_des| {
+                    const destructor = con_des.destructor;
                     while (slab.items.popFirst()) |item_node| {
                         const large_item: *LargeItem = @fieldParentPtr("node", item_node);
 
@@ -771,6 +764,21 @@ pub const RawCache = struct {
     };
 };
 
+pub const RawConstructDestruct = struct {
+    constructor: *const fn (item: []u8) ConstructorError!void,
+    destructor: *const fn (item: []u8) void,
+};
+
+pub fn ConstructDestruct(comptime T: type) type {
+    return struct {
+        constructor: fn (item: *T) ConstructorError!void,
+        destructor: fn (item: *T) void,
+    };
+}
+
+pub const ConstructorError = error{ItemConstructionFailed};
+pub const Name = core.containers.BoundedArray(u8, kernel.config.mem.cache_name_length);
+
 const minimum_small_items_per_slab = 8;
 const maximum_small_item_size = arch.paging.standard_page_size
     .subtract(.of(RawCache.Slab))
@@ -789,10 +797,10 @@ fn sizeOfItemWithNodeAppended(size: core.Size, alignment: std.mem.Alignment) cor
 
 const globals = struct {
     /// Initialized during `init.initializeCaches`.
-    var slab_cache: Cache(RawCache.Slab, null, null) = undefined;
+    var slab_cache: Cache(RawCache.Slab, null) = undefined;
 
     /// Initialized during `init.initializeCaches`.
-    var large_item_cache: Cache(RawCache.LargeItem, null, null) = undefined;
+    var large_item_cache: Cache(RawCache.LargeItem, null) = undefined;
 };
 
 pub const init = struct {
