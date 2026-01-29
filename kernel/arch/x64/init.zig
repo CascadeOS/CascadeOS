@@ -113,6 +113,10 @@ fn prepareExecutorShared(
     );
 }
 
+/// Initialize the executor.
+///
+/// ** REQUIREMENTS **:
+/// - Must be called by the executor represented by `executor`
 pub fn initExecutor(executor: *kernel.Executor) void {
     const per_executor: *x64.PerExecutor = .from(executor);
 

@@ -737,10 +737,7 @@ pub const init = struct {
         executor: *kernel.Executor,
         architecture_processor_id: u64,
     ) callconv(core.inline_in_non_debug) void {
-        getFunction(
-            current_functions.init,
-            "prepareBootstrapExecutor",
-        )(executor, architecture_processor_id);
+        current_functions.init.prepareBootstrapExecutor(executor, architecture_processor_id);
     }
 
     /// Prepares the provided `Executor` for use.
@@ -756,11 +753,12 @@ pub const init = struct {
         )(executor, architecture_processor_id);
     }
 
+    /// Initialize the executor.
+    ///
+    /// ** REQUIREMENTS **:
+    /// - Must be called by the executor represented by `executor`
     pub fn initExecutor(executor: *kernel.Executor) callconv(core.inline_in_non_debug) void {
-        getFunction(
-            current_functions.init,
-            "initExecutor",
-        )(executor);
+        current_functions.init.initExecutor(executor);
     }
 
     /// Capture any system information that can be without using mmio.
@@ -1145,7 +1143,7 @@ pub const Functions = struct {
         tryGetSerialOutput: fn () ?init.InitOutput,
 
         /// Prepares the executor as the bootstrap executor.
-        prepareBootstrapExecutor: ?fn (executor: *kernel.Executor, u64) void = null,
+        prepareBootstrapExecutor: fn (executor: *kernel.Executor, u64) void,
 
         /// Prepares the provided `Executor` for use.
         ///
@@ -1155,7 +1153,7 @@ pub const Functions = struct {
             architecture_processor_id: u64,
         ) void = null,
 
-        initExecutor: ?fn (executor: *kernel.Executor) void = null,
+        initExecutor: fn (executor: *kernel.Executor) void, // non-null as the bootstrap executor needs to call this early
 
         /// Capture any system information that can be without using mmio.
         ///

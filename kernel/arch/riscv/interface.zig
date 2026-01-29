@@ -84,6 +84,14 @@ pub const functions: arch.Functions = .{
                 };
             }
         }.prepareBootstrapExecutor,
+
+        .initExecutor = struct {
+            fn initExecutor(
+                executor: *kernel.Executor,
+            ) void {
+                _ = executor;
+            }
+        }.initExecutor,
     },
 };
 
