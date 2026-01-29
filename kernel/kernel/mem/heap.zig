@@ -85,7 +85,7 @@ pub fn deallocateSpecial(virtual_range: core.VirtualRange) void {
             .kernel,
             .keep,
             .keep,
-            kernel.mem.phys.allocator,
+            kernel.mem.PhysicalPage.allocator,
         );
     }
 
