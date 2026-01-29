@@ -21,7 +21,9 @@ pub fn getFunction(address: Address) ?*volatile Function {
             @as(usize, address.device) << 15 |
             @as(usize, address.function) << 12;
 
-        return ecam.config_space_address
+        std.debug.assert(ecam.config_space.size.value >= config_space_offset + @sizeOf(Function));
+
+        return ecam.config_space.address
             .moveForward(.from(config_space_offset, .byte))
             .toPtr(*volatile Function);
     }
@@ -67,7 +69,7 @@ pub const DeviceID = enum(u16) {
 };
 
 pub const Function = extern struct {
-    full_configuration_space: [pcie_configuration_space_size.value]u8 align(pcie_configuration_space_size.value),
+    full_configuration_space: [ConfigurationSpace.size.value]u8 align(ConfigurationSpace.size.value),
 
     pub fn configurationSpace(function: *volatile Function) *volatile ConfigurationSpace {
         return @ptrCast(function);
@@ -330,7 +332,7 @@ pub const Function = extern struct {
             };
 
             comptime {
-                core.testing.expectSize(Generic, 0x30);
+                core.testing.expectSize(Generic, .from(0x30, .byte));
             }
         };
 
@@ -338,15 +340,15 @@ pub const Function = extern struct {
             // TODO: PCI-to-PCI bridges
         };
 
+        const size: core.Size = .from(4096, .byte);
+
         comptime {
-            core.testing.expectSize(ConfigurationSpace, 0x40);
+            core.testing.expectSize(ConfigurationSpace, .from(0x40, .byte));
         }
     };
 
-    const pcie_configuration_space_size: core.Size = .from(4096, .byte);
-
     comptime {
-        core.testing.expectSize(Function, pcie_configuration_space_size);
+        core.testing.expectSize(Function, ConfigurationSpace.size);
     }
 };
 
@@ -354,7 +356,7 @@ pub const ECAM = struct {
     segment_group: u16,
     start_bus: u8,
     end_bus: u8,
-    config_space_address: core.VirtualAddress,
+    config_space: core.VirtualRange,
 };
 
 const DEVICES_PER_BUS = 32;
@@ -386,21 +388,41 @@ pub const init = struct {
 
         var ecams: std.ArrayList(ECAM) = try .initCapacity(kernel.mem.heap.allocator, base_allocations.len);
         defer ecams.deinit(kernel.mem.heap.allocator);
+        errdefer for (ecams.items) |ecam| kernel.mem.heap.deallocateSpecial(ecam.config_space);
 
         for (mcfg.baseAllocations()) |base_allocation| {
             const ecam = ecams.addOneAssumeCapacity();
+
+            const number_of_buses = base_allocation.end_pci_bus - base_allocation.start_pci_bus;
+
+            const ecam_config_space_physical_range: core.PhysicalRange = .fromAddr(
+                base_allocation.base_address,
+                Function.ConfigurationSpace.size
+                    .multiplyScalar(FUNCTIONS_PER_DEVICE)
+                    .multiplyScalar(DEVICES_PER_BUS)
+                    .multiplyScalar(number_of_buses),
+            );
+
             ecam.* = .{
                 .start_bus = base_allocation.start_pci_bus,
                 .end_bus = base_allocation.end_pci_bus,
                 .segment_group = base_allocation.segment_group,
-                .config_space_address = kernel.mem.nonCachedDirectMapFromPhysical(base_allocation.base_address),
+                .config_space = try kernel.mem.heap.allocateSpecial(
+                    ecam_config_space_physical_range.size,
+                    ecam_config_space_physical_range,
+                    .{
+                        .type = .kernel,
+                        .protection = .read_write,
+                        .cache = .uncached,
+                    },
+                ),
             };
 
             init_log.debug("found ECAM - segment group: {} - start bus: {} - end bus: {} @ {f}", .{
                 ecam.segment_group,
                 ecam.start_bus,
                 ecam.end_bus,
-                base_allocation.base_address,
+                ecam_config_space_physical_range,
             });
         }
 
