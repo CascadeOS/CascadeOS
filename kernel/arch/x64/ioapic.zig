@@ -109,8 +109,19 @@ pub const init = struct {
                 .io_apic => {
                     const io_apic_data = entry.specific.io_apic;
 
-                    const address = kernel.mem.nonCachedDirectMapFromPhysical(.fromInt(io_apic_data.ioapic_address));
-                    const ioapic = IOAPIC.init(address, io_apic_data.global_system_interrupt_base);
+                    const size_to_map = IOAPIC.register_region_size.alignForward(arch.paging.standard_page_size);
+
+                    const register_region_range = try kernel.mem.heap.allocateSpecial(
+                        size_to_map,
+                        .fromAddr(.fromInt(io_apic_data.ioapic_address), size_to_map),
+                        .{
+                            .type = .kernel,
+                            .protection = .read_write,
+                            .cache = .uncached,
+                        },
+                    );
+
+                    const ioapic = IOAPIC.init(register_region_range.address, io_apic_data.global_system_interrupt_base);
 
                     init_log.debug("found ioapic for gsi {}-{}", .{
                         ioapic.gsi_base,
@@ -143,8 +154,11 @@ pub const init = struct {
     }
 };
 
+/// Represents an 82093AA I/O ADVANCED PROGRAMMABLE INTERRUPT CONTROLLER (IOAPIC).
+///
+/// Specification: http://web.archive.org/web/20161130153145/http://download.intel.com/design/chipsets/datashts/29056601.pdf
 const IOAPIC = struct {
-    ioregsel: *volatile u8,
+    ioregsel: *volatile u32,
     iowin: *volatile u32,
 
     /// The global system interrupt number where this I/O APIC's interrupt inputs start.
@@ -152,9 +166,11 @@ const IOAPIC = struct {
 
     number_of_redirection_entries: u8,
 
+    pub const register_region_size = core.Size.of(u32).multiplyScalar(2);
+
     pub fn init(base_address: core.VirtualAddress, gsi_base: u32) IOAPIC {
         var ioapic: IOAPIC = .{
-            .ioregsel = base_address.toPtr(*volatile u8),
+            .ioregsel = base_address.toPtr(*volatile u32),
             .iowin = base_address.moveForward(.from(0x10, .byte)).toPtr(*volatile u32),
             .gsi_base = gsi_base,
             .number_of_redirection_entries = undefined,
