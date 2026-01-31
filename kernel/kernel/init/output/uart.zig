@@ -273,12 +273,25 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo_mode: enum {
                             .io_port => {},
                             .memory => {
                                 const inner_uart: *UartT = @ptrCast(@alignCast(state));
-                                const write_register_physical_address = try kernel.mem.physicalFromDirectMap(
-                                    .fromPtr(@volatileCast(inner_uart.write_register)),
+
+                                const write_register_physical_address: core.PhysicalRange = .fromAddr(
+                                    kernel.mem.physicalFromDirectMap(
+                                        .fromPtr(@volatileCast(inner_uart.write_register)),
+                                    ) catch unreachable,
+                                    RegisterOffset.register_region_size,
                                 );
-                                inner_uart.write_register = kernel.mem
-                                    .nonCachedDirectMapFromPhysical(write_register_physical_address)
-                                    .toPtr([*]volatile u8);
+
+                                const register_range = try kernel.mem.heap.allocateSpecial(
+                                    RegisterOffset.register_region_size,
+                                    write_register_physical_address,
+                                    .{
+                                        .type = .kernel,
+                                        .protection = .read_write,
+                                        .cache = .uncached,
+                                    },
+                                );
+
+                                inner_uart.write_register = register_range.address.toPtr([*]volatile u8);
                                 inner_uart.line_status_register = inner_uart.write_register + @intFromEnum(RegisterOffset.line_status);
                             },
                         }
@@ -333,6 +346,8 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo_mode: enum {
             pub const divisor_latch_msb: RegisterOffset = .interrupt_enable_divisor_latch_msb;
             pub const interrupt_identification: RegisterOffset = .interrupt_identification_fifo_control;
             pub const fifo_control: RegisterOffset = .interrupt_identification_fifo_control;
+
+            const register_region_size: core.Size = .from(@as(usize, @intFromEnum(RegisterOffset.scratch)) + 1, .byte);
         };
 
         const InterruptEnableRegister = packed struct(u8) {
