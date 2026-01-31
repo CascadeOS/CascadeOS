@@ -453,7 +453,7 @@ const globals = struct {
 };
 
 pub const init = struct {
-    const init_log = kernel.debug.log.scoped(.thread_init);
+    const init_log = kernel.debug.log.scoped(.user_init);
 
     /// Perform any per-achitecture initialization needed for userspace processes/threads.
     pub fn initialize() !void {

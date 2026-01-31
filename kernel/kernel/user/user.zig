@@ -47,12 +47,8 @@ pub const init = struct {
     const init_log = kernel.debug.log.scoped(.user_init);
 
     pub fn initialize() !void {
-        init_log.debug("initializing processes", .{});
         try Process.init.initializeProcesses();
-
-        init_log.debug("initializing threads", .{});
         try Thread.init.initializeThreads();
-
         try arch.user.init.initialize();
     }
 };
