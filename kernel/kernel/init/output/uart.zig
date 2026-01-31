@@ -571,12 +571,23 @@ pub const PL011 = struct {
             .remapFn = struct {
                 fn remapFn(state: *anyopaque) anyerror!void {
                     const uart: *PL011 = @ptrCast(@alignCast(state));
-                    const write_register_physical_address = try kernel.mem.physicalFromDirectMap(
-                        .fromPtr(@volatileCast(uart.write_register)),
+
+                    const write_register_physical_address: core.PhysicalRange = .fromAddr(
+                        kernel.mem.physicalFromDirectMap(.fromPtr(@volatileCast(uart.write_register))) catch unreachable,
+                        RegisterOffset.register_region_size,
                     );
-                    uart.write_register = kernel.mem
-                        .nonCachedDirectMapFromPhysical(write_register_physical_address)
-                        .toPtr([*]volatile u32);
+
+                    const register_range = try kernel.mem.heap.allocateSpecial(
+                        RegisterOffset.register_region_size,
+                        write_register_physical_address,
+                        .{
+                            .type = .kernel,
+                            .protection = .read_write,
+                            .cache = .uncached,
+                        },
+                    );
+
+                    uart.write_register = register_range.address.toPtr([*]volatile u32);
                     uart.flag_register = uart.write_register + @intFromEnum(RegisterOffset.Flag);
                 }
             }.remapFn,
@@ -615,6 +626,8 @@ pub const PL011 = struct {
 
         pub const Read: RegisterOffset = .ReadWrite;
         pub const Write: RegisterOffset = .ReadWrite;
+
+        const register_region_size: core.Size = .from(@intFromEnum(RegisterOffset.PrimeCellIdentification3) + 1, .byte);
     };
 
     const ControlRegister = packed struct(u32) {
