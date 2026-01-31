@@ -21,8 +21,7 @@ writeFn: *const fn (state: *anyopaque, str: []const u8) void,
 
 splatFn: *const fn (state: *anyopaque, str: []const u8, splat: usize) void,
 
-/// Called to allow the output to remap itself into the non-cached direct map or special heap after they have been
-/// initialized.
+/// Called to allow the output to remap itself into the special heap after it has been initialized.
 remapFn: *const fn (state: *anyopaque) anyerror!void,
 
 state: *anyopaque,
@@ -32,38 +31,37 @@ pub const Name = core.containers.BoundedArray(u8, 32);
 pub const writer = &globals.writer;
 pub const lock = &globals.lock;
 
-/// Allow outputs to remap themselves into the non-cached direct map or special heap.
+/// Allow outputs to remap themselves into the special heap.
 pub fn remapOutputs() !void {
-    if (globals.framebuffer_output) |output| try output.remapFn(output.state);
+    if (globals.graphical_output) |output| try output.remapFn(output.state);
     if (globals.serial_output) |output| try output.remapFn(output.state);
 }
 
 pub fn registerOutputs() void {
     if (@import("framebuffer.zig").tryGetFramebufferOutput()) |output| {
-        globals.framebuffer_output = output;
+        globals.graphical_output = output;
     }
 
-    if (arch.init.tryGetSerialOutput()) |output| {
+    globals.serial_output = if (arch.init.tryGetSerialOutput()) |output|
         switch (output.preference) {
-            .use => globals.serial_output = output.output,
-            .prefer_generic => {
-                if (tryGetSerialOutputFromGenericSources()) |generic_output|
-                    globals.serial_output = generic_output
-                else
-                    globals.serial_output = output.output;
-            },
+            .use => output.output,
+            .prefer_generic => if (tryGetSerialOutputFromGenericSources()) |generic_output|
+                generic_output
+            else
+                output.output,
         }
-    } else globals.serial_output = tryGetSerialOutputFromGenericSources();
+    else
+        tryGetSerialOutputFromGenericSources();
 }
 
 pub fn logSelectedOutputs() void {
     if (!log.levelEnabled(.debug)) return;
 
-    const framebuffer_output: ?*const Output = if (globals.framebuffer_output) |*output| output else null;
+    const graphical_output: ?*const Output = if (globals.graphical_output) |*output| output else null;
     const serial_output: ?*const Output = if (globals.serial_output) |*output| output else null;
 
-    if (framebuffer_output != null or serial_output != null) {
-        if (framebuffer_output) |output|
+    if (graphical_output != null or serial_output != null) {
+        if (graphical_output) |output|
             log.debug("selected graphical output: {s}", .{output.name.constSlice()})
         else
             log.debug("no graphical output selected", .{});
@@ -110,27 +108,19 @@ fn tryGetSerialOutputFromGenericSources() ?kernel.init.Output {
 }
 
 fn writeToOutputs(str: []const u8) void {
-    if (globals.framebuffer_output) |output| {
-        output.writeFn(output.state, str);
-    }
-    if (globals.serial_output) |output| {
-        output.writeFn(output.state, str);
-    }
+    if (globals.graphical_output) |*output| output.writeFn(output.state, str);
+    if (globals.serial_output) |*output| output.writeFn(output.state, str);
 }
 
 fn splatToOutputs(str: []const u8, splat: usize) void {
-    if (globals.framebuffer_output) |output| {
-        output.splatFn(output.state, str, splat);
-    }
-    if (globals.serial_output) |output| {
-        output.splatFn(output.state, str, splat);
-    }
+    if (globals.graphical_output) |*output| output.splatFn(output.state, str, splat);
+    if (globals.serial_output) |*output| output.splatFn(output.state, str, splat);
 }
 
 const globals = struct {
     var lock: kernel.sync.TicketSpinLock = .{};
 
-    var framebuffer_output: ?Output = null;
+    var graphical_output: ?Output = null;
     var serial_output: ?Output = null;
 
     var writer_buffer: [arch.paging.standard_page_size.value]u8 = undefined;
