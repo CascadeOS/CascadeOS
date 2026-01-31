@@ -68,14 +68,22 @@ pub const init = struct {
         fadt: *const kernel.acpi.tables.FADT,
         madt: *const kernel.acpi.tables.MADT,
         x2apic_enabled: bool,
-    ) void {
+    ) !void {
         if (x2apic_enabled) {
             globals.lapic = .x2apic;
         } else {
+            const register_space_range = try kernel.mem.heap.allocateSpecial(
+                LAPIC.Register.register_space_size,
+                .fromAddr(.fromInt(madt.local_interrupt_controller_address), LAPIC.Register.register_space_size),
+                .{
+                    .type = .kernel,
+                    .protection = .read_write,
+                    .cache = .uncached,
+                },
+            );
+
             globals.lapic = .{
-                .xapic = kernel.mem.nonCachedDirectMapFromPhysical(
-                    core.PhysicalAddress.fromInt(madt.local_interrupt_controller_address), // TODO: get the address from the msr
-                ).toPtr([*]volatile u8),
+                .xapic = register_space_range.address.toPtr([*]volatile u8),
             };
         }
 
@@ -1259,5 +1267,7 @@ pub const LAPIC = union(enum) {
 
             return 0x800 + @intFromEnum(register);
         }
+
+        pub const register_space_size: core.Size = .from(4, .kib);
     };
 };
