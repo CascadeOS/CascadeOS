@@ -55,7 +55,7 @@ pub const init = struct {
         };
 
         const rsdp = switch (boot.rsdp() orelse return) {
-            // using `directMapFromPhysical` as the non-cached direct map is not yet initialized
+            // using `directMapFromPhysical` as the special heap has not been initialized yet
             .physical => |addr| kernel.mem.directMapFromPhysical(addr).toPtr(*const tables.RSDP),
             .virtual => |addr| addr.toPtr(*const tables.RSDP),
         };
@@ -69,7 +69,7 @@ pub const init = struct {
     pub fn logAcpiTables() !void {
         if (!init_log.levelEnabled(.debug) or !init_globals.acpi_present) return;
 
-        // `directMapFromPhysical` is used as the non-cached direct map is not yet initialized
+        // using `directMapFromPhysical` as the special heap has not been initialized yet
         const sdt_header = kernel.mem.directMapFromPhysical(globals.rsdp.sdtAddress())
             .toPtr(*const tables.SharedHeader);
 
@@ -196,7 +196,7 @@ pub const init = struct {
             else
                 table_iterator.nextTablePhysicalAddressImpl(u32);
 
-            // `directMapFromPhysical` is used as the non-cached direct map is not yet initialized
+            // using `directMapFromPhysical` as the special heap has not been initialized yet
             return kernel.mem
                 .directMapFromPhysical(opt_phys_addr orelse return null)
                 .toPtr(*const tables.SharedHeader);

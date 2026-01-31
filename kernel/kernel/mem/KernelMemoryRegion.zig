@@ -21,7 +21,6 @@ pub const Type = enum {
     sdf_section,
 
     direct_map,
-    non_cached_direct_map,
 
     special_heap,
 

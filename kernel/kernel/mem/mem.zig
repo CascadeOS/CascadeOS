@@ -292,11 +292,6 @@ pub fn directMapFromPhysical(physical_address: core.PhysicalAddress) core.Virtua
     return .{ .value = physical_address.value + globals.direct_map.address.value };
 }
 
-/// Returns the virtual address corresponding to this physical address in the non-cached direct map.
-pub fn nonCachedDirectMapFromPhysical(physical_address: core.PhysicalAddress) core.VirtualAddress {
-    return .{ .value = physical_address.value + globals.non_cached_direct_map.address.value };
-}
-
 /// Returns a virtual range corresponding to this physical range in the direct map.
 pub fn directMapFromPhysicalRange(physical_range: core.PhysicalRange) core.VirtualRange {
     return .{
@@ -717,13 +712,6 @@ const globals = struct {
     /// Initialized during `init.determineEarlyMemoryLayout`.
     var direct_map: core.VirtualRange = undefined;
 
-    /// Provides an identity mapping between virtual and physical addresses.
-    ///
-    /// Caching is disabled for this mapping.
-    ///
-    /// Initialized during `init.initializeMemorySystem`.
-    var non_cached_direct_map: core.VirtualRange = undefined;
-
     /// The layout of the memory regions of the kernel.
     ///
     /// Initialized during `init.initializeMemorySystem`.
@@ -796,7 +784,6 @@ pub const init = struct {
 
         init_log.debug("building kernel memory layout", .{});
         buildMemoryLayout();
-        globals.non_cached_direct_map = globals.regions.find(.non_cached_direct_map).?.range;
 
         init_log.debug("building kernel page table", .{});
         globals.kernel_page_table = buildAndLoadKernelPageTable();
@@ -829,7 +816,7 @@ pub const init = struct {
         const kernel_regions = &globals.regions;
 
         registerKernelSections(kernel_regions);
-        registerDirectMaps(kernel_regions);
+        registerDirectMap(kernel_regions);
         registerHeaps(kernel_regions);
         registerPages(kernel_regions);
 
@@ -908,7 +895,7 @@ pub const init = struct {
         }
     }
 
-    fn registerDirectMaps(kernel_regions: *KernelMemoryRegion.List) void {
+    fn registerDirectMap(kernel_regions: *KernelMemoryRegion.List) void {
         const direct_map = globals.direct_map;
 
         // does the direct map range overlap a pre-existing region?
@@ -925,16 +912,6 @@ pub const init = struct {
         kernel_regions.append(.{
             .range = direct_map,
             .type = .direct_map,
-        });
-
-        const non_cached_direct_map = kernel_regions.findFreeRange(
-            direct_map.size,
-            arch.paging.largest_page_size,
-        ) orelse @panic("no free range for non-cached direct map");
-
-        kernel_regions.append(.{
-            .range = non_cached_direct_map,
-            .type = .non_cached_direct_map,
         });
     }
 
@@ -1022,22 +999,13 @@ pub const init = struct {
 
             switch (region.type) {
                 .direct_map,
-                .non_cached_direct_map,
                 => arch.paging.init.mapToPhysicalRangeAllPageSizes(
                     kernel_page_table,
                     region.range,
                     .fromAddr(.zero, region.range.size),
-                    switch (region.type) {
-                        .direct_map => .{
-                            .type = .kernel,
-                            .protection = .read_write,
-                        },
-                        .non_cached_direct_map => .{
-                            .type = .kernel,
-                            .protection = .read_write,
-                            .cache = .uncached,
-                        },
-                        else => unreachable,
+                    .{
+                        .type = .kernel,
+                        .protection = .read_write,
                     },
                     PhysicalPage.init.bootstrap_allocator,
                 ) catch |err| std.debug.panic("failed to map {f}: {t}", .{ region, err }),
