@@ -255,6 +255,7 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo_mode: enum {
 
         pub fn output(uart: *UartT) kernel.init.Output {
             return .{
+                .name = arch.init.InitOutput.Output.Name.fromSlice("uart16X50") catch unreachable,
                 .writeFn = struct {
                     fn writeFn(state: *anyopaque, str: []const u8) void {
                         const inner_uart: *UartT = @ptrCast(@alignCast(state));
@@ -571,6 +572,7 @@ pub const PL011 = struct {
 
     pub fn output(pl011: *PL011) kernel.init.Output {
         return .{
+            .name = arch.init.InitOutput.Output.Name.fromSlice("pl011") catch unreachable,
             .writeFn = struct {
                 fn writeFn(state: *anyopaque, str: []const u8) void {
                     const uart: *PL011 = @ptrCast(@alignCast(state));

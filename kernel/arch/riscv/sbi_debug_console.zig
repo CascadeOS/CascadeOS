@@ -20,6 +20,7 @@ pub fn detect() bool {
 }
 
 pub const output: arch.init.InitOutput.Output = .{
+    .name = arch.init.InitOutput.Output.Name.fromSlice("sbi console") catch unreachable,
     .writeFn = struct {
         fn writeFn(_: *anyopaque, str: []const u8) void {
             writeStr(str);

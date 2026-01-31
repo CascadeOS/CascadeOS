@@ -15,6 +15,8 @@ const log = kernel.debug.log.scoped(.output_init);
 
 const Output = @This();
 
+name: Name,
+
 writeFn: *const fn (state: *anyopaque, str: []const u8) void,
 
 splatFn: *const fn (state: *anyopaque, str: []const u8, splat: usize) void,
@@ -24,6 +26,8 @@ splatFn: *const fn (state: *anyopaque, str: []const u8, splat: usize) void,
 remapFn: *const fn (state: *anyopaque) anyerror!void,
 
 state: *anyopaque,
+
+pub const Name = core.containers.BoundedArray(u8, 32);
 
 pub const writer = &globals.writer;
 pub const lock = &globals.lock;
@@ -50,6 +54,25 @@ pub fn registerOutputs() void {
             },
         }
     } else globals.serial_output = tryGetSerialOutputFromGenericSources();
+}
+
+pub fn logSelectedOutputs() void {
+    if (!log.levelEnabled(.debug)) return;
+
+    const framebuffer_output: ?*const Output = if (globals.framebuffer_output) |*output| output else null;
+    const serial_output: ?*const Output = if (globals.serial_output) |*output| output else null;
+
+    if (framebuffer_output != null or serial_output != null) {
+        if (framebuffer_output) |output|
+            log.debug("selected graphical output: {s}", .{output.name.constSlice()})
+        else
+            log.debug("no graphical output selected", .{});
+
+        if (serial_output) |output|
+            log.debug("selected serial output: {s}", .{output.name.constSlice()})
+        else
+            log.debug("no serial output selected", .{});
+    } else log.debug("no output selected", .{});
 }
 
 /// Attempt to get some form of init output from generic sources, like ACPI tables or device tree.

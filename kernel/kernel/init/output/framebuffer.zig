@@ -50,6 +50,7 @@ pub fn tryGetFramebufferOutput() ?kernel.init.Output {
     ) orelse return null;
 
     return .{
+        .name = arch.init.InitOutput.Output.Name.fromSlice("flanterm framebuffer") catch unreachable,
         .writeFn = struct {
             fn writeFn(con: *anyopaque, str: []const u8) void {
                 c.flanterm_write(@ptrCast(@alignCast(con)), str.ptr, str.len);
