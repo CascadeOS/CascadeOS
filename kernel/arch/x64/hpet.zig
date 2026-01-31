@@ -40,7 +40,9 @@ pub const init = struct {
     }
 
     fn initializeHPET() void {
-        globals.hpet = .{ .base = getHpetBase() };
+        globals.hpet = .{
+            .base = getHpetBase() catch |err| std.debug.panic("failed to get hpet base: {}", .{err}),
+        };
         init_log.debug("using hpet: {}", .{globals.hpet});
 
         const general_capabilities = globals.hpet.readGeneralCapabilitiesAndIDRegister();
@@ -85,7 +87,7 @@ pub const init = struct {
         }
     }
 
-    fn getHpetBase() [*]volatile u64 {
+    fn getHpetBase() ![*]volatile u64 {
         const hpet_acpi_table = HPETAcpiTable.get(0) orelse {
             // the table is known to exist as it is checked in `registerTimeSource`
             @panic("hpet table missing");
@@ -95,9 +97,19 @@ pub const init = struct {
 
         if (hpet.base_address.address_space != .memory) @panic("HPET base address is not memory mapped");
 
-        return kernel.mem
-            .nonCachedDirectMapFromPhysical(core.PhysicalAddress.fromInt(hpet.base_address.address))
-            .toPtr([*]volatile u64);
+        const size_to_map = Hpet.register_region_size.alignForward(arch.paging.standard_page_size);
+
+        const register_region_range = try kernel.mem.heap.allocateSpecial(
+            size_to_map,
+            .fromAddr(.fromInt(hpet.base_address.address), size_to_map),
+            .{
+                .type = .kernel,
+                .protection = .read_write,
+                .cache = .uncached,
+            },
+        );
+
+        return register_region_range.address.toPtr([*]volatile u64);
     }
 };
 
@@ -106,6 +118,8 @@ pub const init = struct {
 /// [IA-PC HPET Specification Link](https://www.intel.com/content/dam/www/public/us/en/documents/technical-specifications/software-developers-hpet-spec-1-0a.pdf)
 const Hpet = struct {
     base: [*]volatile u64,
+
+    pub const register_region_size: core.Size = .from(1024, .byte);
 
     pub const GeneralCapabilitiesAndIDRegister = packed struct(u64) {
         /// This indicates which revision of the function is implemented.
