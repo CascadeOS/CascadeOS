@@ -73,7 +73,7 @@ pub const List = struct {
     }
 
     pub fn sort(list: *List) void {
-        std.mem.sort(kernel.mem.KernelMemoryRegion, list.values.slice(), {}, struct {
+        std.mem.sortUnstable(kernel.mem.KernelMemoryRegion, list.values.slice(), {}, struct {
             fn lessThanFn(
                 context: void,
                 region: kernel.mem.KernelMemoryRegion,
