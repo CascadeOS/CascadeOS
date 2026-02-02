@@ -277,12 +277,10 @@ pub const Framebuffer = extern struct {
 
         pub fn videoModes(
             limine_framebuffer: *const LimineFramebuffer,
-            revision: BaseRevison.Revison,
+            response_revision: u64,
         ) []const *const VideoMode {
-            if (revision.equalToOrGreaterThan(.@"1"))
-                return limine_framebuffer._video_modes[0..limine_framebuffer._video_mode_count];
-
-            return &.{};
+            if (response_revision < 1) return &.{};
+            return limine_framebuffer._video_modes[0..limine_framebuffer._video_mode_count];
         }
 
         pub fn print(limine_framebuffer: *const LimineFramebuffer, writer: *std.Io.Writer, indent: usize) !void {
