@@ -289,62 +289,64 @@ pub const init = struct {
     ) !void {
         const pages_array_base = pages_array_range.address;
 
-        var current_range_start: ?usize = null;
-        var current_range_end: usize = 0;
+        var opt_current_range_start: ?core.VirtualAddress = null;
+        var current_range_end: core.VirtualAddress = undefined;
 
         var memory_iter = boot.memoryMap(.forward) catch @panic("no memory map");
 
         while (memory_iter.next()) |entry| {
             if (!entry.type.isUsable()) continue;
 
-            const entry_range_start = std.mem.alignBackward(
-                usize,
-                @intFromEnum(Index.fromAddress(entry.range.address)) * @sizeOf(PhysicalPage),
-                arch.paging.standard_page_size.value,
-            );
+            const entry_range_start: core.VirtualAddress = pages_array_base
+                .moveForward(
+                    core.Size
+                        .of(PhysicalPage)
+                        .multiplyScalar(@intFromEnum(Index.fromAddress(entry.range.address))),
+                )
+                .alignBackward(arch.paging.standard_page_size);
 
-            const entry_range_end = std.mem.alignForward(
-                usize,
-                (@intFromEnum(Index.fromAddress(entry.range.last())) + 1) * @sizeOf(PhysicalPage),
-                arch.paging.standard_page_size.value,
-            );
+            const entry_range_end: core.VirtualAddress = pages_array_base
+                .moveForward(
+                    core.Size
+                        .of(PhysicalPage)
+                        .multiplyScalar(@intFromEnum(Index.fromAddress(entry.range.last()))),
+                )
+                .alignForward(arch.paging.standard_page_size);
 
-            if (current_range_start) |range_start| {
-                if (entry_range_start <= current_range_end) {
-                    // extend the current range
-                    current_range_end = @max(current_range_end, entry_range_end);
-                } else {
-                    // map the current range and start a new one
+            if (opt_current_range_start) |*ptr_current_range_start| {
+                const current_range_start = ptr_current_range_start.*;
 
-                    try kernel.mem.mapRangeAndBackWithPhysicalPages(
-                        kernel_page_table,
-                        .fromAddr(
-                            pages_array_base.moveForward(.from(range_start, .byte)),
-                            .from(current_range_end - range_start, .byte),
-                        ),
-                        .{ .protection = .read_write, .type = .kernel },
-                        .kernel,
-                        .keep,
-                        bootstrap_allocator,
-                    );
-
-                    current_range_start = entry_range_start;
-                    current_range_end = entry_range_end;
+                if (entry_range_start.lessThanOrEqual(current_range_end) and
+                    entry_range_end.greaterThanOrEqual(current_range_start))
+                {
+                    ptr_current_range_start.value = @min(current_range_start.value, entry_range_start.value);
+                    current_range_end.value = @max(current_range_end.value, entry_range_end.value);
+                    continue;
                 }
-            } else {
-                current_range_start = entry_range_start;
+
+                try kernel.mem.mapRangeAndBackWithPhysicalPages(
+                    kernel_page_table,
+                    .fromAddr(current_range_start, current_range_end.difference(current_range_start)),
+                    .{ .protection = .read_write, .type = .kernel },
+                    .kernel,
+                    .keep,
+                    bootstrap_allocator,
+                );
+
+                opt_current_range_start = entry_range_start;
                 current_range_end = entry_range_end;
+
+                continue;
             }
+
+            opt_current_range_start = entry_range_start;
+            current_range_end = entry_range_end;
         }
 
-        if (current_range_start) |range_start| {
-            // handle the last range
+        if (opt_current_range_start) |current_range_start| {
             try kernel.mem.mapRangeAndBackWithPhysicalPages(
                 kernel_page_table,
-                .fromAddr(
-                    pages_array_base.moveForward(.from(range_start, .byte)),
-                    .from(current_range_end - range_start, .byte),
-                ),
+                .fromAddr(current_range_start, current_range_end.difference(current_range_start)),
                 .{ .protection = .read_write, .type = .kernel },
                 .kernel,
                 .keep,
@@ -382,9 +384,9 @@ pub const init = struct {
 
             if (entry.type.isUsable()) {
                 const first_page_index: usize = @intFromEnum(PhysicalPage.Index.fromAddress(entry.range.address));
-                const length = entry.range.size.divide(arch.paging.standard_page_size) + 1;
+                const last_page_index: usize = @intFromEnum(PhysicalPage.Index.fromAddress(entry.range.last()));
 
-                const slice = pages[first_page_index..][0..length];
+                const slice = pages[first_page_index..last_page_index];
 
                 @memset(slice, .{});
             }
