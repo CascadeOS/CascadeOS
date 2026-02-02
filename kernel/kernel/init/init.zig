@@ -40,8 +40,6 @@ pub fn initStage1() !noreturn {
     try Output.writer.writeAll(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
     try Output.writer.flush();
 
-    Output.logSelectedOutputs();
-
     kernel.mem.init.logEarlyMemoryLayout();
 
     try kernel.acpi.init.logAcpiTables();

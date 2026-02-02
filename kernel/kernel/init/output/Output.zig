@@ -38,10 +38,6 @@ pub fn remapOutputs() !void {
 }
 
 pub fn registerOutputs() void {
-    if (@import("framebuffer.zig").tryGetFramebufferOutput()) |output| {
-        globals.graphical_output = output;
-    }
-
     globals.serial_output = if (arch.init.tryGetSerialOutput()) |output|
         switch (output.preference) {
             .use => output.output,
@@ -52,25 +48,27 @@ pub fn registerOutputs() void {
         }
     else
         tryGetSerialOutputFromGenericSources();
-}
 
-pub fn logSelectedOutputs() void {
-    if (!log.levelEnabled(.debug)) return;
+    if (@import("framebuffer.zig").tryGetFramebufferOutput()) |output| {
+        globals.graphical_output = output;
+    }
 
-    const graphical_output: ?*const Output = if (globals.graphical_output) |*output| output else null;
-    const serial_output: ?*const Output = if (globals.serial_output) |*output| output else null;
+    if (log.levelEnabled(.debug)) {
+        const graphical_output: ?*const Output = if (globals.graphical_output) |*output| output else null;
+        const serial_output: ?*const Output = if (globals.serial_output) |*output| output else null;
 
-    if (graphical_output != null or serial_output != null) {
-        if (graphical_output) |output|
-            log.debug("selected graphical output: {s}", .{output.name.constSlice()})
-        else
-            log.debug("no graphical output selected", .{});
+        if (graphical_output != null or serial_output != null) {
+            if (graphical_output) |output|
+                log.debug("selected graphical output: {s}", .{output.name.constSlice()})
+            else
+                log.debug("no graphical output selected", .{});
 
-        if (serial_output) |output|
-            log.debug("selected serial output: {s}", .{output.name.constSlice()})
-        else
-            log.debug("no serial output selected", .{});
-    } else log.debug("no output selected", .{});
+            if (serial_output) |output|
+                log.debug("selected serial output: {s}", .{output.name.constSlice()})
+            else
+                log.debug("no serial output selected", .{});
+        } else log.debug("no output selected", .{});
+    }
 }
 
 /// Attempt to get some form of init output from generic sources, like ACPI tables or device tree.
