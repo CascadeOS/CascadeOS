@@ -70,7 +70,7 @@ pub const CascadeTarget = struct {
             return switch (architecture) {
                 .arm => .{ .explicit = &std.Target.aarch64.cpu.generic },
                 .riscv => .{ .explicit = &std.Target.riscv.cpu.baseline_rv64 },
-                .x64 => .{ .explicit = &std.Target.x86.cpu.x86_64_v3 },
+                .x64 => .{ .explicit = &std.Target.x86.cpu.x86_64_v2 },
             };
         }
 
