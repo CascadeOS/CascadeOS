@@ -298,6 +298,11 @@ const globals = struct {
         for (0..Idt.number_of_handlers) |i| {
             const interrupt: Interrupt = @enumFromInt(i);
 
+            if (interrupt == .page_fault) {
+                temp_handlers[i] = .prepare(interrupt_handlers.earlyPageFaultHandler, .{});
+                continue;
+            }
+
             temp_handlers[i] = if (interrupt.isException())
                 .prepare(interrupt_handlers.unhandledException, .{})
             else

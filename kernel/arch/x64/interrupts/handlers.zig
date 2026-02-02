@@ -57,6 +57,26 @@ pub fn pageFaultHandler(
     }, interrupt_frame);
 }
 
+/// Handler for page faults that occur before the standard page fault handler is installed.
+pub fn earlyPageFaultHandler(
+    interrupt_frame: arch.interrupts.InterruptFrame,
+    _: Task.Current.StateBeforeInterrupt,
+) void {
+    const faulting_address = x64.registers.Cr2.readAddress();
+
+    const arch_interrupt_frame: *const x64.interrupts.InterruptFrame = .from(interrupt_frame);
+    const error_code: x64.paging.PageFaultErrorCode = .fromErrorCode(arch_interrupt_frame.error_code);
+
+    switch (arch_interrupt_frame.contextSS()) {
+        .kernel => kernel.debug.interruptSourcePanic(
+            interrupt_frame,
+            "kernel page fault @ {f} - {f}",
+            .{ faulting_address, error_code },
+        ),
+        .user => unreachable, // a user execption is not possible during early initialization
+    }
+}
+
 pub fn flushRequestHandler(
     _: arch.interrupts.InterruptFrame,
     _: Task.Current.StateBeforeInterrupt,
