@@ -31,11 +31,6 @@ pub const output: arch.init.InitOutput.Output = .{
             for (0..splat) |_| writeStr(str);
         }
     }.splatFn,
-    .remapFn = struct {
-        fn remapFn(_: *anyopaque) !void {
-            return;
-        }
-    }.remapFn,
     .state = undefined,
 };
 

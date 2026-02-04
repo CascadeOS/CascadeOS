@@ -9,6 +9,8 @@ const kernel = @import("kernel");
 const Task = kernel.Task;
 const core = @import("core");
 
+const init_log = kernel.debug.log.scoped(.output_init);
+
 const c = @cImport({
     @cDefine("FLANTERM_IN_FLANTERM", "1"); // needed to enable including 'fb_private.h'
     @cInclude("flanterm.h");
@@ -16,13 +18,44 @@ const c = @cImport({
     @cInclude("flanterm_backends/fb_private.h"); // needed to reach into the context and remap the framebuffer
 });
 
-pub fn tryGetFramebufferOutput() ?kernel.init.Output {
+pub fn tryGetFramebufferOutput(memory_system_available: bool) ?kernel.init.Output {
+    return tryGetFramebufferOutputInner(memory_system_available) catch |err| {
+        init_log.err("failed to initialize serial output: {}", .{err});
+        return null;
+    };
+}
+
+fn tryGetFramebufferOutputInner(memory_system_available: bool) !?kernel.init.Output {
+    if (!memory_system_available) return null;
+
     const framebuffer = boot.framebuffer() orelse return null;
+
+    const physical_address: core.PhysicalAddress = try kernel.mem.physicalFromDirectMap(
+        .fromPtr(@volatileCast(framebuffer.ptr)),
+    );
+
+    if (!physical_address.isAligned(arch.paging.standard_page_size)) @panic("framebuffer is not aligned");
+
+    const framebuffer_size: core.Size = .from(framebuffer.height * framebuffer.pitch, .byte);
+
+    const virtual_range = try kernel.mem.heap.allocateSpecial(
+        framebuffer_size,
+        .fromAddr(
+            physical_address,
+            framebuffer_size,
+        ),
+        .{
+            .type = .kernel,
+            .protection = .read_write,
+            .cache = .write_combining,
+        },
+    );
+    errdefer kernel.mem.heap.deallocateSpecial(virtual_range);
 
     const flanterm_context = c.flanterm_fb_init(
         null,
         null,
-        @volatileCast(framebuffer.ptr),
+        virtual_range.address.toPtr([*]u32),
         framebuffer.width,
         framebuffer.height,
         framebuffer.pitch,
@@ -47,7 +80,7 @@ pub fn tryGetFramebufferOutput() ?kernel.init.Output {
         1,
         0,
         0,
-    ) orelse return null;
+    ) orelse return error.FailedToInitializeFramebuffer;
 
     return .{
         .name = arch.init.InitOutput.Output.Name.fromSlice("flanterm framebuffer") catch unreachable,
@@ -62,35 +95,8 @@ pub fn tryGetFramebufferOutput() ?kernel.init.Output {
                 for (0..splat) |_| c.flanterm_write(context, str.ptr, str.len);
             }
         }.splatFn,
-        .remapFn = remapFramebuffer,
         .state = flanterm_context,
     };
-}
-
-/// Map the framebuffer into the special heap as write combining.
-fn remapFramebuffer(con: *anyopaque) !void {
-    const framebuffer = boot.framebuffer().?;
-
-    const physical_address: core.PhysicalAddress = try kernel.mem.physicalFromDirectMap(.fromPtr(@volatileCast(framebuffer.ptr)));
-    if (!physical_address.isAligned(arch.paging.standard_page_size)) @panic("framebuffer is not aligned");
-
-    const framebuffer_size: core.Size = .from(framebuffer.height * framebuffer.pitch, .byte);
-
-    const virtual_range = try kernel.mem.heap.allocateSpecial(
-        framebuffer_size,
-        .fromAddr(
-            physical_address,
-            framebuffer_size,
-        ),
-        .{
-            .type = .kernel,
-            .protection = .read_write,
-            .cache = .write_combining,
-        },
-    );
-
-    const fb_context: *c.flanterm_fb_context = @ptrCast(@alignCast(con));
-    fb_context.framebuffer = virtual_range.address.toPtr([*]u32);
 }
 
 const font = @embedFile("simple.font");

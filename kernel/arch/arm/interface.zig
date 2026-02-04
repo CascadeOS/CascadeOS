@@ -58,7 +58,8 @@ pub const functions: arch.Functions = .{
         }.getStandardWallclockStartTime,
 
         .tryGetSerialOutput = struct {
-            fn tryGetSerialOutput() ?arch.init.InitOutput {
+            fn tryGetSerialOutput(memory_system_available: bool) ?arch.init.InitOutput {
+                _ = memory_system_available;
                 return null;
             }
         }.tryGetSerialOutput,

@@ -15,33 +15,33 @@ pub const DeviceTree = @import("DeviceTree");
 
 const log = kernel.debug.log.scoped(.devicetree);
 
-pub fn tryGetSerialOutput() ?uart.Uart {
-    const output_uart = tryGetSerialOutputInner() catch |err| switch (err) {
-        error.BadOffset => {
-            log.warn("attempted to use a bad offset into the device tree", .{});
-            return null;
-        },
-        error.Truncated => {
-            log.warn("the device tree blob is truncated", .{});
-            return null;
-        },
-        error.DivisorTooLarge => {
-            log.warn("baud divisor too large", .{});
-            return null;
-        },
-        error.SizeNotMultiple => {
-            log.warn("the regs property size is not a multiple of the address-cells + size-cells", .{});
-            return null;
-        },
-    } orelse return null;
+pub fn tryGetSerialOutput(memory_system_available: bool) ?uart.Uart {
+    return tryGetSerialOutputInner(memory_system_available) catch |err| {
+        switch (err) {
+            error.BadOffset => {
+                log.warn("attempted to use a bad offset into the device tree", .{});
+            },
+            error.Truncated => {
+                log.warn("the device tree blob is truncated", .{});
+            },
+            error.DivisorTooLarge => {
+                log.warn("baud divisor too large", .{});
+            },
+            error.SizeNotMultiple => {
+                log.warn("the regs property size is not a multiple of the address-cells + size-cells", .{});
+            },
+            error.NoError => {},
+            else => log.err("failed to initialize serial output: {}", .{err}),
+        }
 
-    return output_uart;
+        return null;
+    };
 }
 
-fn tryGetSerialOutputInner() GetSerialOutputError!?uart.Uart {
-    const dt = getDeviceTree() orelse return null;
+fn tryGetSerialOutputInner(memory_system_available: bool) !uart.Uart {
+    const dt = getDeviceTree() orelse return error.NoError;
 
-    if (try getSerialOutputFromChosenNode(dt)) |output_uart| return output_uart;
+    if (try getSerialOutputFromChosenNode(dt, memory_system_available)) |output_uart| return output_uart;
 
     var iter = try dt.nodeCompatibleMatchIteratorAdvanced(
         .root,
@@ -52,10 +52,10 @@ fn tryGetSerialOutputInner() GetSerialOutputError!?uart.Uart {
 
     while (try iter.next(dt)) |compatible_match| {
         const func = compatible_lookup.get(compatible_match.compatible).?;
-        if (try func(dt, compatible_match.node.node)) |output_uart| return output_uart;
+        if (try func(dt, compatible_match.node.node, memory_system_available)) |output_uart| return output_uart;
     }
 
-    return null;
+    return error.NoError;
 }
 
 fn getDeviceTree() ?DeviceTree {
@@ -67,7 +67,7 @@ fn getDeviceTree() ?DeviceTree {
     };
 }
 
-fn getSerialOutputFromChosenNode(dt: DeviceTree) GetSerialOutputError!?uart.Uart {
+fn getSerialOutputFromChosenNode(dt: DeviceTree, memory_system_available: bool) GetSerialOutputError!?uart.Uart {
     const chosen_node = blk: {
         var node_iter = try dt.nodeIterator(
             .root,
@@ -99,14 +99,16 @@ fn getSerialOutputFromChosenNode(dt: DeviceTree) GetSerialOutputError!?uart.Uart
 
     while (try compatible_iter.next()) |compatible| {
         if (compatible_lookup.get(compatible)) |getSerialOutputFn| {
-            return try getSerialOutputFn(dt, node.node);
+            return try getSerialOutputFn(dt, node.node, memory_system_available);
         }
     }
 
     return null;
 }
 
-fn getSerialOutputFromNS16550a(dt: DeviceTree, node: DeviceTree.Node) GetSerialOutputError!?uart.Uart {
+fn getSerialOutputFromNS16550a(dt: DeviceTree, node: DeviceTree.Node, memory_system_available: bool) GetSerialOutputError!?uart.Uart {
+    if (!memory_system_available) return null;
+
     const clock_frequency = blk: {
         var property_iter = try node.propertyIterator(
             dt,
@@ -141,20 +143,39 @@ fn getSerialOutputFromNS16550a(dt: DeviceTree, node: DeviceTree.Node) GetSerialO
         break :blk reg.address;
     };
 
-    return .{
-        .memory_16550 = (try uart.Memory16550.create(
-            kernel.mem.directMapFromPhysical(
-                .fromInt(address),
-            ).toPtr([*]volatile u8),
-            .{
-                .clock_frequency = @enumFromInt(clock_frequency),
-                .baud_rate = .@"115200",
-            },
-        )) orelse return null,
-    };
+    const register_range = try kernel.mem.heap.allocateSpecial(
+        uart.Memory16550.register_region_size,
+        .fromAddr(
+            .fromInt(address),
+            uart.Memory16550.register_region_size,
+        ),
+        .{
+            .type = .kernel,
+            .protection = .read_write,
+            .cache = .uncached,
+        },
+    );
+    errdefer kernel.mem.heap.deallocateSpecial(register_range);
+
+    if (try uart.Memory16550.create(
+        register_range.address.toPtr([*]volatile u8),
+        .{
+            .clock_frequency = @enumFromInt(clock_frequency),
+            .baud_rate = .@"115200",
+        },
+    )) |device| {
+        return .{ .memory_16550 = device };
+    }
+
+    // TODO: duplicating this is annoying, but there is no `nulldefer`
+    kernel.mem.heap.deallocateSpecial(register_range);
+
+    return null;
 }
 
-fn getSerialOutputFromPL011(dt: DeviceTree, node: DeviceTree.Node) GetSerialOutputError!?uart.Uart {
+fn getSerialOutputFromPL011(dt: DeviceTree, node: DeviceTree.Node, memory_system_available: bool) GetSerialOutputError!?uart.Uart {
+    if (!memory_system_available) return null;
+
     const clock_frequency = clock_frequency: {
         var property_iter = try node.propertyIterator(
             dt,
@@ -211,17 +232,34 @@ fn getSerialOutputFromPL011(dt: DeviceTree, node: DeviceTree.Node) GetSerialOutp
         break :blk reg.address;
     };
 
-    return .{
-        .pl011 = (try uart.PL011.create(
-            kernel.mem.directMapFromPhysical(
-                .fromInt(address),
-            ).toPtr([*]volatile u32),
-            .{
-                .clock_frequency = @enumFromInt(clock_frequency),
-                .baud_rate = .@"115200",
-            },
-        )) orelse return null,
-    };
+    const register_range = try kernel.mem.heap.allocateSpecial(
+        uart.PL011.register_region_size,
+        .fromAddr(
+            .fromInt(address),
+            uart.PL011.register_region_size,
+        ),
+        .{
+            .type = .kernel,
+            .protection = .read_write,
+            .cache = .uncached,
+        },
+    );
+    errdefer kernel.mem.heap.deallocateSpecial(register_range);
+
+    if (try uart.PL011.create(
+        register_range.address.toPtr([*]volatile u32),
+        .{
+            .clock_frequency = @enumFromInt(clock_frequency),
+            .baud_rate = .@"115200",
+        },
+    )) |device| {
+        return .{ .pl011 = device };
+    }
+
+    // TODO: duplicating this is annoying, but there is no `nulldefer`
+    kernel.mem.heap.deallocateSpecial(register_range);
+
+    return null;
 }
 
 fn matchFunction(_: void, compatible: [:0]const u8) bool {
@@ -235,5 +273,6 @@ const compatible_lookup = std.StaticStringMap(GetSerialOutputFn).initComptime(.{
 
 const GetSerialOutputError = DeviceTree.IteratorError ||
     DeviceTree.Property.Value.ListIteratorError ||
-    uart.Baud.DivisorError;
-const GetSerialOutputFn = *const fn (dt: DeviceTree, node: DeviceTree.Node) GetSerialOutputError!?uart.Uart;
+    uart.Baud.DivisorError ||
+    kernel.mem.heap.AllocateError;
+const GetSerialOutputFn = *const fn (dt: DeviceTree, node: DeviceTree.Node, memory_system_available: bool) GetSerialOutputError!?uart.Uart;

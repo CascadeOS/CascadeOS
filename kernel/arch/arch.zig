@@ -725,11 +725,18 @@ pub const init = struct {
     };
 
     /// Attempt to get some form of architecture specific init output if it is available.
-    pub fn tryGetSerialOutput() callconv(core.inline_in_non_debug) ?InitOutput {
+    ///
+    /// If `memory_system_available` is false, then the memory system has not been initialized so heap allocation and the special heap are
+    /// not available.
+    ///
+    /// The first time this function is called `memory_system_available` will be false, this function will be called again after the memory
+    /// system is initialized with `memory_system_available` set to true, but only if a generic serial output was not available without
+    /// needing the memory system.
+    pub fn tryGetSerialOutput(memory_system_available: bool) callconv(core.inline_in_non_debug) ?InitOutput {
         return getFunction(
             current_functions.init,
             "tryGetSerialOutput",
-        )();
+        )(memory_system_available);
     }
 
     /// Prepares the executor as the bootstrap executor.
@@ -1139,8 +1146,13 @@ pub const Functions = struct {
 
         /// Attempt to get some form of architecture specific init output if it is available.
         ///
-        /// Non-optional because it is used during early initialization.
-        tryGetSerialOutput: fn () ?init.InitOutput,
+        /// If `memory_system_available` is false, then the memory system has not been initialized so heap allocation and the special heap are
+        /// not available.
+        ///
+        /// The first time this function is called `memory_system_available` will be false, this function will be called again after the memory
+        /// system is initialized with `memory_system_available` set to true, but only if a generic serial output was not available without
+        /// needing the memory system.
+        tryGetSerialOutput: fn (memory_system_available: bool) ?init.InitOutput,
 
         /// Prepares the executor as the bootstrap executor.
         prepareBootstrapExecutor: fn (executor: *kernel.Executor, u64) void,

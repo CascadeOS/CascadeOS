@@ -21,9 +21,6 @@ writeFn: *const fn (state: *anyopaque, str: []const u8) void,
 
 splatFn: *const fn (state: *anyopaque, str: []const u8, splat: usize) void,
 
-/// Called to allow the output to remap itself into the special heap after it has been initialized.
-remapFn: *const fn (state: *anyopaque) anyerror!void,
-
 state: *anyopaque,
 
 pub const Name = core.containers.BoundedArray(u8, 32);
@@ -31,26 +28,29 @@ pub const Name = core.containers.BoundedArray(u8, 32);
 pub const writer = &globals.writer;
 pub const lock = &globals.lock;
 
-/// Allow outputs to remap themselves into the special heap.
-pub fn remapOutputs() !void {
-    if (globals.graphical_output) |output| try output.remapFn(output.state);
-    if (globals.serial_output) |output| try output.remapFn(output.state);
+const cascade_starting_message: []const u8 = "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n";
+
+/// Called before the memory system is initialized so anything that needs heap allocation or the special heap cannot be initialized yet.
+pub fn registerOutputsNoMemorySystem() void {
+    globals.serial_output = getSerialOutput(false);
+    if (globals.serial_output) |serial_output| serial_output.writeFn(serial_output.state, cascade_starting_message);
+
+    globals.graphical_output = @import("framebuffer.zig").tryGetFramebufferOutput(false);
+    if (globals.graphical_output) |*graphical_output| graphical_output.writeFn(graphical_output.state, cascade_starting_message);
 }
 
-pub fn registerOutputs() void {
-    globals.serial_output = if (arch.init.tryGetSerialOutput()) |output|
-        switch (output.preference) {
-            .use => output.output,
-            .prefer_generic => if (tryGetSerialOutputFromGenericSources()) |generic_output|
-                generic_output
-            else
-                output.output,
-        }
-    else
-        tryGetSerialOutputFromGenericSources();
+/// Called after the memory system is initialized.
+///
+/// Only attempts to initialize a serial or graphical output if an output of each type has not already been initialized.
+pub fn registerOutputsWithMemorySystem() void {
+    if (globals.serial_output == null) {
+        globals.serial_output = getSerialOutput(true);
+        if (globals.serial_output) |serial_output| serial_output.writeFn(serial_output.state, cascade_starting_message);
+    }
 
-    if (@import("framebuffer.zig").tryGetFramebufferOutput()) |output| {
-        globals.graphical_output = output;
+    if (globals.graphical_output == null) {
+        globals.graphical_output = @import("framebuffer.zig").tryGetFramebufferOutput(true);
+        if (globals.graphical_output) |*graphical_output| graphical_output.writeFn(graphical_output.state, cascade_starting_message);
     }
 
     if (log.levelEnabled(.debug)) {
@@ -71,28 +71,42 @@ pub fn registerOutputs() void {
     }
 }
 
+fn getSerialOutput(memory_system_available: bool) ?Output {
+    if (arch.init.tryGetSerialOutput(memory_system_available)) |output| {
+        return switch (output.preference) {
+            .use => output.output,
+            .prefer_generic => if (tryGetSerialOutputFromGenericSources(memory_system_available)) |generic_output|
+                generic_output
+            else
+                output.output,
+        };
+    }
+
+    return tryGetSerialOutputFromGenericSources(memory_system_available);
+}
+
 /// Attempt to get some form of init output from generic sources, like ACPI tables or device tree.
-fn tryGetSerialOutputFromGenericSources() ?kernel.init.Output {
+fn tryGetSerialOutputFromGenericSources(memory_system_available: bool) ?kernel.init.Output {
     const static = struct {
         var init_output_uart: uart.Uart = undefined;
     };
 
     blk: {
-        if (kernel.acpi.tables.SPCR.init.tryGetSerialOutput()) |output_uart| {
+        if (kernel.acpi.tables.SPCR.init.tryGetSerialOutput(memory_system_available)) |output_uart| {
             log.debug("got serial output from SPCR", .{});
 
             static.init_output_uart = output_uart;
             break :blk;
         }
 
-        if (kernel.acpi.tables.DBG2.init.tryGetSerialOutput()) |output_uart| {
+        if (kernel.acpi.tables.DBG2.init.tryGetSerialOutput(memory_system_available)) |output_uart| {
             log.debug("got serial output from DBG2", .{});
 
             static.init_output_uart = output_uart;
             break :blk;
         }
 
-        if (devicetree.tryGetSerialOutput()) |output_uart| {
+        if (devicetree.tryGetSerialOutput(memory_system_available)) |output_uart| {
             log.debug("got serial output from device tree", .{});
 
             static.init_output_uart = output_uart;

@@ -59,9 +59,10 @@ pub const functions: arch.Functions = .{
         }.getStandardWallclockStartTime,
 
         .tryGetSerialOutput = struct {
-            fn tryGetSerialOutput() ?arch.init.InitOutput {
+            fn tryGetSerialOutput(memory_system_available: bool) ?arch.init.InitOutput {
+                _ = memory_system_available;
+
                 if (riscv.sbi_debug_console.detect()) {
-                    log.debug("using sbi debug console for serial output", .{});
                     return .{
                         .output = riscv.sbi_debug_console.output,
                         .preference = .use,

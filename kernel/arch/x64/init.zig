@@ -14,10 +14,18 @@ const x64 = @import("x64.zig");
 
 const log = kernel.debug.log.scoped(.init_x64);
 
-/// Attempt to get some form of init output.
-pub fn tryGetSerialOutput() ?arch.init.InitOutput {
+/// Attempt to get some form of architecture specific init output if it is available.
+///
+/// If `memory_system_available` is false, then the memory system has not been initialized so heap allocation and the special heap are
+/// not available.
+///
+/// The first time this function is called `memory_system_available` will be false, this function will be called again after the memory
+/// system is initialized with `memory_system_available` set to true, but only if a generic serial output was not available without
+/// needing the memory system.
+pub fn tryGetSerialOutput(memory_system_available: bool) ?arch.init.InitOutput {
+    _ = memory_system_available;
+
     if (DebugCon.detect()) {
-        log.debug("using debug console for serial output", .{});
         return .{
             .output = DebugCon.output,
             .preference = .use,
@@ -40,8 +48,6 @@ pub fn tryGetSerialOutput() ?arch.init.InitOutput {
             @intFromEnum(com_port),
             .{ .clock_frequency = .@"1.8432 MHz", .baud_rate = .@"115200" },
         ) catch continue) |serial| {
-            log.debug("using {t} for serial output", .{com_port});
-
             static.init_output_serial_port = serial;
             return .{
                 .output = static.init_output_serial_port.output(),
@@ -465,11 +471,6 @@ const DebugCon = struct {
                 for (0..splat) |_| writeStr(str);
             }
         }.splatFn,
-        .remapFn = struct {
-            fn remapFn(_: *anyopaque) !void {
-                return;
-            }
-        }.remapFn,
         .state = undefined,
     };
 };

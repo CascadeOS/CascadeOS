@@ -295,7 +295,7 @@ pub const DBG2 = extern struct {
         const uart = kernel.init.Output.uart;
         const init_log = kernel.debug.log.scoped(.output_init);
 
-        pub fn tryGetSerialOutput() ?uart.Uart {
+        pub fn tryGetSerialOutput(memory_system_available: bool) ?uart.Uart {
             const dbg2_table = DBG2AcpiTable.get(0) orelse return null;
             defer dbg2_table.deinit();
 
@@ -314,13 +314,36 @@ pub const DBG2 = extern struct {
                     .serial => |subtype| switch (subtype) {
                         .@"16550", .@"16550-GAS" => {
                             switch (address.address_space) {
-                                .memory => return .{
-                                    .memory_16550 = (uart.Memory16550.create(
-                                        kernel.mem.directMapFromPhysical(
+                                .memory => {
+                                    if (!memory_system_available) continue; // TODO: early mmio pages
+
+                                    const register_range = kernel.mem.heap.allocateSpecial(
+                                        uart.Memory16550.register_region_size,
+                                        .fromAddr(
                                             .fromInt(address.address),
-                                        ).toPtr([*]volatile u8),
+                                            uart.Memory16550.register_region_size,
+                                        ),
+                                        .{
+                                            .type = .kernel,
+                                            .protection = .read_write,
+                                            .cache = .uncached,
+                                        },
+                                    ) catch |err| {
+                                        init_log.err("failed to allocate memory for 16550 UART: {}", .{err});
+                                        continue;
+                                    };
+
+                                    if (uart.Memory16550.create(
+                                        register_range.address.toPtr([*]volatile u8),
                                         null,
-                                    ) catch unreachable) orelse continue,
+                                    ) catch unreachable) |dev| {
+                                        return .{ .memory_16550 = dev };
+                                    }
+
+                                    // TODO: having this here is annoying, but there is no `nulldefer`
+                                    kernel.mem.heap.deallocateSpecial(register_range);
+
+                                    return null;
                                 },
                                 .io => return .{
                                     .io_port_16550 = (uart.IoPort16550.create(
@@ -336,13 +359,36 @@ pub const DBG2 = extern struct {
                         },
                         .@"16450" => {
                             switch (address.address_space) {
-                                .memory => return .{
-                                    .memory_16450 = (uart.Memory16450.create(
-                                        kernel.mem.directMapFromPhysical(
+                                .memory => {
+                                    if (!memory_system_available) continue; // TODO: early mmio pages
+
+                                    const register_range = kernel.mem.heap.allocateSpecial(
+                                        uart.Memory16450.register_region_size,
+                                        .fromAddr(
                                             .fromInt(address.address),
-                                        ).toPtr([*]volatile u8),
+                                            uart.Memory16450.register_region_size,
+                                        ),
+                                        .{
+                                            .type = .kernel,
+                                            .protection = .read_write,
+                                            .cache = .uncached,
+                                        },
+                                    ) catch |err| {
+                                        init_log.err("failed to allocate memory for 16450 UART: {}", .{err});
+                                        continue;
+                                    };
+
+                                    if (uart.Memory16450.create(
+                                        register_range.address.toPtr([*]volatile u8),
                                         null,
-                                    ) catch unreachable) orelse continue,
+                                    ) catch unreachable) |dev| {
+                                        return .{ .memory_16450 = dev };
+                                    }
+
+                                    // TODO: having this here is annoying, but there is no `nulldefer`
+                                    kernel.mem.heap.deallocateSpecial(register_range);
+
+                                    return null;
                                 },
                                 .io => return .{
                                     .io_port_16450 = (uart.IoPort16450.create(
@@ -362,14 +408,35 @@ pub const DBG2 = extern struct {
                                 std.debug.assert(address.access_size == .dword);
                             }
 
-                            return .{
-                                .pl011 = (uart.PL011.create(
-                                    kernel.mem.directMapFromPhysical(
-                                        .fromInt(address.address),
-                                    ).toPtr([*]volatile u32),
-                                    null,
-                                ) catch unreachable) orelse continue,
+                            if (!memory_system_available) continue; // TODO: early mmio pages
+
+                            const register_range = kernel.mem.heap.allocateSpecial(
+                                uart.PL011.register_region_size,
+                                .fromAddr(
+                                    .fromInt(address.address),
+                                    uart.PL011.register_region_size,
+                                ),
+                                .{
+                                    .type = .kernel,
+                                    .protection = .read_write,
+                                    .cache = .uncached,
+                                },
+                            ) catch |err| {
+                                init_log.err("failed to allocate memory for PL011 UART: {}", .{err});
+                                continue;
                             };
+
+                            if (uart.PL011.create(
+                                register_range.address.toPtr([*]volatile u32),
+                                null,
+                            ) catch unreachable) |dev| {
+                                return .{ .pl011 = dev };
+                            }
+
+                            // TODO: having this here is annoying, but there is no `nulldefer`
+                            kernel.mem.heap.deallocateSpecial(register_range);
+
+                            return null;
                         },
                         else => init_log.info(
                             "unhandled serial subtype: {t}",

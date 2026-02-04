@@ -35,10 +35,7 @@ pub fn initStage1() !noreturn {
     // initialize ACPI tables early to allow discovery of debug output mechanisms
     try kernel.acpi.init.earlyInitialize();
 
-    Output.registerOutputs();
-
-    try Output.writer.writeAll(comptime "starting CascadeOS " ++ kernel.config.cascade_version ++ "\n");
-    try Output.writer.flush();
+    Output.registerOutputsNoMemorySystem();
 
     kernel.mem.init.logEarlyMemoryLayout();
 
@@ -56,8 +53,7 @@ pub fn initStage1() !noreturn {
     log.debug("initializing memory system", .{});
     try kernel.mem.init.initializeMemorySystem();
 
-    log.debug("remapping init outputs", .{});
-    try Output.remapOutputs();
+    Output.registerOutputsWithMemorySystem();
 
     log.debug("capturing system information", .{});
     try arch.init.captureSystemInformation(switch (arch.current_arch) {
