@@ -13,8 +13,18 @@ const core = @import("core");
 
 const log = kernel.debug.log.scoped(.heap);
 
-pub fn allocate(size: core.Size) !core.VirtualRange {
-    const allocation = try globals.heap_arena.allocate(size.value, .instant_fit);
+pub const AllocateError = error{
+    ZeroLength,
+
+    OutOfMemory,
+};
+
+pub fn allocate(size: core.Size) AllocateError!core.VirtualRange {
+    const allocation = globals.heap_arena.allocate(size.value, .instant_fit) catch |err|
+        return switch (err) {
+            error.ZeroLength => error.ZeroLength,
+            else => error.OutOfMemory,
+        };
 
     const virtual_range = allocation.toVirtualRange();
 
@@ -46,11 +56,14 @@ pub fn allocateSpecial(
     size: core.Size,
     physical_range: core.PhysicalRange,
     map_type: kernel.mem.MapType,
-) !core.VirtualRange {
-    const allocation = try globals.special_heap_address_space_arena.allocate(
+) AllocateError!core.VirtualRange {
+    const allocation = globals.special_heap_address_space_arena.allocate(
         size.value,
         .instant_fit,
-    );
+    ) catch |err| return switch (err) {
+        error.ZeroLength => error.ZeroLength,
+        else => error.OutOfMemory,
+    };
     errdefer globals.special_heap_address_space_arena.deallocate(allocation);
 
     const virtual_range = allocation.toVirtualRange();
@@ -58,7 +71,7 @@ pub fn allocateSpecial(
     globals.special_heap_page_table_mutex.lock();
     defer globals.special_heap_page_table_mutex.unlock();
 
-    try kernel.mem.mapRangeToPhysicalRange(
+    kernel.mem.mapRangeToPhysicalRange(
         kernel.mem.kernelPageTable(),
         virtual_range,
         physical_range,
@@ -66,7 +79,10 @@ pub fn allocateSpecial(
         .kernel,
         .keep,
         kernel.mem.PhysicalPage.allocator,
-    );
+    ) catch |err| switch (err) {
+        error.AlreadyMapped, error.MappingNotValid => std.debug.panic("allocate special failed: {s}", .{@errorName(err)}),
+        error.PagesExhausted => return error.OutOfMemory,
+    };
 
     return virtual_range;
 }
