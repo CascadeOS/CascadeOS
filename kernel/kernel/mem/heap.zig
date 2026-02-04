@@ -13,6 +13,21 @@ const core = @import("core");
 
 const log = kernel.debug.log.scoped(.heap);
 
+pub const allocator: std.mem.Allocator = .{
+    .ptr = undefined,
+    .vtable = &.{
+        .alloc = allocator_impl.alloc,
+        .resize = allocator_impl.resize,
+        .remap = allocator_impl.remap,
+        .free = allocator_impl.free,
+    },
+};
+
+/// This should only be called by uACPI.
+pub fn freeWithNoSize(ptr: [*]u8) void {
+    globals.heap_arena.deallocate(allocator_impl.getAllocationHeader(ptr).*);
+}
+
 pub const AllocateError = error{
     ZeroLength,
 
@@ -33,23 +48,9 @@ pub fn allocate(size: core.Size) AllocateError!core.VirtualRange {
     return virtual_range;
 }
 
+/// The `range` provided must be exactly the same as the one returned by `allocate`.
 pub inline fn deallocate(range: core.VirtualRange) void {
     globals.heap_arena.deallocate(.fromVirtualRange(range));
-}
-
-pub const allocator: std.mem.Allocator = .{
-    .ptr = undefined,
-    .vtable = &.{
-        .alloc = allocator_impl.alloc,
-        .resize = allocator_impl.resize,
-        .remap = allocator_impl.remap,
-        .free = allocator_impl.free,
-    },
-};
-
-/// This should only be called by uACPI.
-pub fn freeWithNoSize(ptr: [*]u8) void {
-    globals.heap_arena.deallocate(allocator_impl.getAllocationHeader(ptr).*);
 }
 
 pub fn allocateSpecial(
@@ -87,6 +88,7 @@ pub fn allocateSpecial(
     return virtual_range;
 }
 
+/// The `virtual_range` provided must be exactly the same as the one returned by `allocateSpecial`.
 pub fn deallocateSpecial(virtual_range: core.VirtualRange) void {
     {
         globals.special_heap_page_table_mutex.lock();
