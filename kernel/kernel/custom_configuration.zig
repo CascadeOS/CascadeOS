@@ -80,6 +80,8 @@ pub fn customConfiguration(
                 "flanterm.c",
                 "flanterm_backends/fb.c",
             },
+            // we use the kernel heap instead of the bump allocator
+            .flags = &.{"-DFLANTERM_FB_DISABLE_BUMP_ALLOC=1"},
         });
     }
 }
