@@ -12,44 +12,44 @@ const kernel_log_scopes = kernel_options.kernel_log_scopes;
 
 pub fn scoped(comptime scope: @Type(.enum_literal)) type {
     return struct {
-        pub fn err(
+        pub inline fn err(
             comptime format: []const u8,
             args: anytype,
-        ) callconv(core.inline_in_non_debug) void {
+        ) void {
             if (comptime !levelEnabled(.err)) return;
-            logFn(prefix_err, userFmt(format), args);
+            logFn(prefix_err, comptime userFmt(format), args);
         }
 
-        pub fn warn(
+        pub inline fn warn(
             comptime format: []const u8,
             args: anytype,
-        ) callconv(core.inline_in_non_debug) void {
+        ) void {
             if (comptime !levelEnabled(.warn)) return;
-            logFn(prefix_warn, userFmt(format), args);
+            logFn(prefix_warn, comptime userFmt(format), args);
         }
 
-        pub fn info(
+        pub inline fn info(
             comptime format: []const u8,
             args: anytype,
-        ) callconv(core.inline_in_non_debug) void {
+        ) void {
             if (comptime !levelEnabled(.info)) return;
-            logFn(prefix_info, userFmt(format), args);
+            logFn(prefix_info, comptime userFmt(format), args);
         }
 
-        pub fn debug(
+        pub inline fn debug(
             comptime format: []const u8,
             args: anytype,
-        ) callconv(core.inline_in_non_debug) void {
+        ) void {
             if (comptime !levelEnabled(.debug)) return;
-            logFn(prefix_debug, userFmt(format), args);
+            logFn(prefix_debug, comptime userFmt(format), args);
         }
 
-        pub fn verbose(
+        pub inline fn verbose(
             comptime format: []const u8,
             args: anytype,
-        ) callconv(core.inline_in_non_debug) void {
+        ) void {
             if (comptime !levelEnabled(.verbose)) return;
-            logFn(prefix_verbose, userFmt(format), args);
+            logFn(prefix_verbose, comptime userFmt(format), args);
         }
 
         pub inline fn levelEnabled(comptime message_level: Level) bool {
