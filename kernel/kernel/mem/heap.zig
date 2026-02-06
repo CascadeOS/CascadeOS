@@ -141,26 +141,6 @@ pub const heap_page_arena = &globals.heap_page_arena;
 pub const c = struct {
     /// Allocate a block of memory of 'size' bytes.
     ///
-    /// Freeing the memory must be done with 'nonSizedFree'.
-    pub fn mallocWithNonSizedFree(size: usize) ?[*]u8 {
-        const buf = allocator.alloc(u8, size) catch {
-            @branchHint(.unlikely);
-            return null;
-        };
-        return buf.ptr;
-    }
-
-    /// Free a block of memory allocated with 'mallocWithNonSizedFree'.
-    pub fn nonSizedFree(opt_ptr: ?[*]u8) void {
-        const ptr = opt_ptr orelse {
-            @branchHint(.unlikely);
-            return;
-        };
-        globals.heap_arena.deallocate(allocator_impl.getAllocationHeader(ptr).*);
-    }
-
-    /// Allocate a block of memory of 'size' bytes.
-    ///
     /// Freeing the memory must be done with 'sizedFree'.
     pub fn mallocWithSizedFree(size: usize) ?[*]u8 {
         if (size == 0) {
@@ -183,51 +163,92 @@ pub const c = struct {
         if (core.is_debug) std.debug.assert(size != 0);
         deallocate(.fromSlice(u8, ptr[0..size]));
     }
-};
 
-const allocator_impl = struct {
-    const Allocation = kernel.mem.resource_arena.Allocation;
-
-    // TODO: do we really need to store the allocation header?
-    //       `c.mallocWithSizedFree` being more efficent than `alloc` hurts my soul
-
-    fn alloc(
-        _: *anyopaque,
-        len: usize,
-        alignment: std.mem.Alignment,
-        _: usize,
-    ) ?[*]u8 {
-        const alignment_bytes = alignment.toByteUnits();
-        const full_len = len + alignment_bytes - 1 + @sizeOf(Allocation);
+    /// Allocate a block of memory of 'size' bytes.
+    ///
+    /// Freeing the memory must be done with 'nonSizedFree'.
+    pub fn mallocWithNonSizedFree(size: usize) ?[*]u8 {
+        // this function assumes that the C code expects an alignment of 16 bytes or less
+        comptime {
+            std.debug.assert(allocator_impl.heap_arena_quantum >= 16);
+            std.debug.assert(@sizeOf(Allocation) == allocator_impl.heap_arena_quantum);
+        }
 
         const allocation = globals.heap_arena.allocate(
-            full_len,
+            size + @sizeOf(Allocation),
             .instant_fit,
         ) catch {
             @branchHint(.unlikely);
             return null;
         };
 
-        const unaligned_ptr: [*]u8 = @ptrFromInt(allocation.base);
-        const unaligned_addr = @intFromPtr(unaligned_ptr);
-        const aligned_addr = alignment.forward(unaligned_addr + @sizeOf(Allocation));
-        const aligned_ptr = unaligned_ptr + (aligned_addr - unaligned_addr);
+        if (core.is_debug) @memset(allocation.toVirtualRange().toByteSlice(), undefined);
 
-        getAllocationHeader(aligned_ptr).* = allocation;
+        const base_ptr: [*]u8 = @ptrFromInt(allocation.base);
+        const result_ptr = base_ptr + @sizeOf(Allocation);
 
-        return aligned_ptr;
+        getAllocationHeader(result_ptr).* = allocation;
+
+        return result_ptr;
+    }
+
+    /// Free a block of memory allocated with 'mallocWithNonSizedFree'.
+    pub fn nonSizedFree(opt_ptr: ?[*]u8) void {
+        const ptr = opt_ptr orelse {
+            @branchHint(.unlikely);
+            return;
+        };
+        globals.heap_arena.deallocate(getAllocationHeader(ptr).*);
+    }
+
+    inline fn getAllocationHeader(ptr: [*]u8) *Allocation {
+        return @ptrCast(@alignCast(ptr - @sizeOf(Allocation)));
+    }
+
+    const Allocation = kernel.mem.resource_arena.Allocation;
+};
+
+const allocator_impl = struct {
+    fn alloc(
+        _: *anyopaque,
+        len: usize,
+        alignment: std.mem.Alignment,
+        _: usize,
+    ) ?[*]u8 {
+        if (core.is_debug) std.debug.assert(len != 0);
+
+        const alignment_bytes = alignment.toByteUnits();
+        if (alignment_bytes > heap_arena_quantum) @panic("alignment greater than heap quantum");
+
+        const allocation = globals.heap_arena.allocate(len, .instant_fit) catch {
+            @branchHint(.unlikely);
+            return null;
+        };
+
+        // no need to set to `undefined` as the allocator interface will do it for us
+        return allocation.toVirtualRange().address.toPtr([*]u8);
     }
 
     fn resize(
         _: *anyopaque,
         memory: []u8,
-        _: std.mem.Alignment,
+        alignment: std.mem.Alignment,
         new_len: usize,
         _: usize,
     ) bool {
-        if (core.is_debug) std.debug.assert(new_len != 0);
-        const allocation = getAllocationHeader(memory.ptr);
-        return new_len <= allocation.len;
+        if (core.is_debug) {
+            std.debug.assert(memory.len != 0);
+            std.debug.assert(new_len != 0);
+            std.debug.assert(alignment.toByteUnits() <= heap_arena_quantum);
+        }
+
+        const max_allowed_size = std.mem.alignForward(
+            usize,
+            memory.len,
+            heap_arena_quantum,
+        );
+
+        return new_len <= max_allowed_size;
     }
 
     fn remap(
@@ -244,14 +265,22 @@ const allocator_impl = struct {
     fn free(
         _: *anyopaque,
         memory: []u8,
-        _: std.mem.Alignment,
+        alignment: std.mem.Alignment,
         _: usize,
     ) void {
-        globals.heap_arena.deallocate(getAllocationHeader(memory.ptr).*);
-    }
+        if (core.is_debug) {
+            std.debug.assert(memory.len != 0);
+            std.debug.assert(alignment.toByteUnits() <= heap_arena_quantum);
+        }
 
-    inline fn getAllocationHeader(ptr: [*]u8) *align(1) Allocation {
-        return @ptrCast(ptr - @sizeOf(Allocation));
+        globals.heap_arena.deallocate(
+            .fromVirtualRange(
+                .{
+                    .address = .fromPtr(memory.ptr),
+                    .size = core.Size.from(memory.len, .byte).alignForward(heap_arena_quantum_size),
+                },
+            ),
+        );
     }
 
     fn heapPageArenaImport(
