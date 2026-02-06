@@ -23,47 +23,65 @@ pub const allocator: std.mem.Allocator = .{
     },
 };
 
-/// This should only be called by uACPI.
-pub fn freeWithNoSize(ptr: [*]u8) void {
-    globals.heap_arena.deallocate(allocator_impl.getAllocationHeader(ptr).*);
-}
-
 pub const AllocateError = error{
     ZeroLength,
-
     OutOfMemory,
 };
 
 pub fn allocate(size: core.Size) AllocateError!core.VirtualRange {
-    const allocation = globals.heap_arena.allocate(size.value, .instant_fit) catch |err|
+    const allocation = globals.heap_arena.allocate(size.value, .instant_fit) catch |err| {
+        @branchHint(.unlikely);
         return switch (err) {
             error.ZeroLength => error.ZeroLength,
             else => error.OutOfMemory,
         };
+    };
 
-    const virtual_range = allocation.toVirtualRange();
+    var virtual_range = allocation.toVirtualRange();
 
     if (core.is_debug) @memset(virtual_range.toByteSlice(), undefined);
+
+    // the range returned by the heap arena will be aligned to the quantum size, but we want to return the size requested
+    virtual_range.size = size;
 
     return virtual_range;
 }
 
-/// The `range` provided must be exactly the same as the one returned by `allocate`.
-pub inline fn deallocate(range: core.VirtualRange) void {
-    globals.heap_arena.deallocate(.fromVirtualRange(range));
+pub fn deallocate(range: core.VirtualRange) void {
+    globals.heap_arena.deallocate(
+        .fromVirtualRange(.fromAddr(
+            range.address,
+            range.size.alignForward(allocator_impl.heap_arena_quantum_size),
+        )),
+    );
 }
 
+/// Allocate a range of memory that is mapped to a specific physical range with the given map type.
+///
+/// **REQUIREMENTS**:
+/// - `size` must be equal to `physical_range.size`.
+/// - `size` must be aligned to `arch.paging.standard_page_size`.
+/// - `physical_range.address` must be aligned to `arch.paging.standard_page_size`.
 pub fn allocateSpecial(
     size: core.Size,
     physical_range: core.PhysicalRange,
     map_type: kernel.mem.MapType,
 ) AllocateError!core.VirtualRange {
+    if (core.is_debug) {
+        std.debug.assert(size.equal(physical_range.size));
+        std.debug.assert(size.isAligned(arch.paging.standard_page_size));
+        std.debug.assert(physical_range.address.isAligned(arch.paging.standard_page_size));
+    }
+
     const allocation = globals.special_heap_address_space_arena.allocate(
         size.value,
         .instant_fit,
-    ) catch |err| return switch (err) {
-        error.ZeroLength => error.ZeroLength,
-        else => error.OutOfMemory,
+    ) catch |err| {
+        @branchHint(.unlikely);
+        return switch (err) {
+            error.ZeroLength => error.ZeroLength,
+            else => error.OutOfMemory,
+        };
     };
     errdefer globals.special_heap_address_space_arena.deallocate(allocation);
 
@@ -80,15 +98,21 @@ pub fn allocateSpecial(
         .kernel,
         .keep,
         kernel.mem.PhysicalPage.allocator,
-    ) catch |err| switch (err) {
-        error.AlreadyMapped, error.MappingNotValid => std.debug.panic("allocate special failed: {s}", .{@errorName(err)}),
-        error.PagesExhausted => return error.OutOfMemory,
+    ) catch |err| {
+        @branchHint(.unlikely);
+        switch (err) {
+            error.AlreadyMapped, error.MappingNotValid => std.debug.panic("allocate special failed: {s}", .{@errorName(err)}),
+            error.PagesExhausted => return error.OutOfMemory,
+        }
     };
 
     return virtual_range;
 }
 
-/// The `virtual_range` provided must be exactly the same as the one returned by `allocateSpecial`.
+/// Deallocate a range of memory that was allocated by `allocateSpecial`.
+///
+/// **REQUIREMENTS**:
+/// - `virtual_range` must be a range that was previously allocated by `allocateSpecial`.
 pub fn deallocateSpecial(virtual_range: core.VirtualRange) void {
     {
         globals.special_heap_page_table_mutex.lock();
@@ -110,10 +134,63 @@ pub fn deallocateSpecial(virtual_range: core.VirtualRange) void {
     globals.special_heap_address_space_arena.deallocate(.fromVirtualRange(virtual_range));
 }
 
+// pub to allow access by `kernel.mem.cache`
 pub const heap_page_arena = &globals.heap_page_arena;
+
+/// These functions are provided to allow C code to use the heap allocator and should not be used by zig code.
+pub const c = struct {
+    /// Allocate a block of memory of 'size' bytes.
+    ///
+    /// Freeing the memory must be done with 'nonSizedFree'.
+    pub fn mallocWithNonSizedFree(size: usize) ?[*]u8 {
+        const buf = allocator.alloc(u8, size) catch {
+            @branchHint(.unlikely);
+            return null;
+        };
+        return buf.ptr;
+    }
+
+    /// Free a block of memory allocated with 'mallocWithNonSizedFree'.
+    pub fn nonSizedFree(opt_ptr: ?[*]u8) void {
+        const ptr = opt_ptr orelse {
+            @branchHint(.unlikely);
+            return;
+        };
+        globals.heap_arena.deallocate(allocator_impl.getAllocationHeader(ptr).*);
+    }
+
+    /// Allocate a block of memory of 'size' bytes.
+    ///
+    /// Freeing the memory must be done with 'sizedFree'.
+    pub fn mallocWithSizedFree(size: usize) ?[*]u8 {
+        if (size == 0) {
+            @branchHint(.unlikely);
+            return null;
+        }
+        const virtual_range = allocate(.from(size, .byte)) catch {
+            @branchHint(.unlikely);
+            return null;
+        };
+        return virtual_range.address.toPtr([*]u8);
+    }
+
+    /// Free a block of memory allocated with 'mallocWithSizedFree'.
+    pub fn sizedFree(opt_ptr: ?[*]u8, size: usize) void {
+        const ptr = opt_ptr orelse {
+            @branchHint(.unlikely);
+            return;
+        };
+        if (core.is_debug) std.debug.assert(size != 0);
+        deallocate(.fromSlice(u8, ptr[0..size]));
+    }
+};
 
 const allocator_impl = struct {
     const Allocation = kernel.mem.resource_arena.Allocation;
+
+    // TODO: do we really need to store the allocation header?
+    //       `c.mallocWithSizedFree` being more efficent than `alloc` hurts my soul
+
     fn alloc(
         _: *anyopaque,
         len: usize,
@@ -126,7 +203,10 @@ const allocator_impl = struct {
         const allocation = globals.heap_arena.allocate(
             full_len,
             .instant_fit,
-        ) catch return null;
+        ) catch {
+            @branchHint(.unlikely);
+            return null;
+        };
 
         const unaligned_ptr: [*]u8 = @ptrFromInt(allocation.base);
         const unaligned_addr = @intFromPtr(unaligned_ptr);
@@ -151,15 +231,14 @@ const allocator_impl = struct {
     }
 
     fn remap(
-        current_task: *anyopaque,
+        ptr: *anyopaque,
         memory: []u8,
         alignment: std.mem.Alignment,
         new_len: usize,
         return_address: usize,
     ) ?[*]u8 {
         // TODO: resource arena can support this, find allocation and check if next tag is free
-
-        return if (resize(current_task, memory, alignment, new_len, return_address)) memory.ptr else null;
+        return if (resize(ptr, memory, alignment, new_len, return_address)) memory.ptr else null;
     }
 
     fn free(
@@ -203,7 +282,10 @@ const allocator_impl = struct {
                 .kernel,
                 .keep,
                 kernel.mem.PhysicalPage.allocator,
-            ) catch return resource_arena.AllocateError.RequestedLengthUnavailable;
+            ) catch {
+                @branchHint(.unlikely);
+                return resource_arena.AllocateError.RequestedLengthUnavailable;
+            };
         }
         errdefer comptime unreachable;
 
@@ -242,6 +324,7 @@ const allocator_impl = struct {
 
     const heap_arena_quantum: usize = 16;
     const heap_arena_quantum_caches: usize = 512 / heap_arena_quantum; // cache up to 512 bytes
+    const heap_arena_quantum_size: core.Size = .from(heap_arena_quantum, .byte);
 };
 
 const globals = struct {

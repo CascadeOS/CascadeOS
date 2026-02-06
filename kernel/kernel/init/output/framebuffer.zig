@@ -51,8 +51,16 @@ fn tryGetFramebufferOutputInner(memory_system_available: bool) !?kernel.init.Out
     errdefer kernel.mem.heap.deallocateSpecial(virtual_range);
 
     const flanterm_context = c.flanterm_fb_init(
-        flantermMalloc,
-        flantermFree,
+        struct {
+            fn flantermMalloc(size: usize) callconv(.c) ?*anyopaque {
+                return kernel.mem.heap.c.mallocWithSizedFree(size);
+            }
+        }.flantermMalloc,
+        struct {
+            fn flantermFree(raw_ptr: ?*anyopaque, size: usize) callconv(.c) void {
+                kernel.mem.heap.c.sizedFree(@ptrCast(raw_ptr), size);
+            }
+        }.flantermFree,
         virtual_range.address.toPtr([*]u32),
         framebuffer.width,
         framebuffer.height,
@@ -95,19 +103,6 @@ fn tryGetFramebufferOutputInner(memory_system_available: bool) !?kernel.init.Out
         }.splatFn,
         .state = flanterm_context,
     };
-}
-
-fn flantermMalloc(size: usize) callconv(.c) ?*anyopaque {
-    const buf = kernel.mem.heap.allocator.alloc(u8, size) catch return null;
-    return buf.ptr;
-}
-
-fn flantermFree(raw_ptr: ?*anyopaque, size: usize) callconv(.c) void {
-    const ptr: [*]u8 = @ptrCast(raw_ptr orelse {
-        @branchHint(.unlikely);
-        return;
-    });
-    kernel.mem.heap.allocator.free(ptr[0..size]);
 }
 
 const font = @embedFile("simple.font");
