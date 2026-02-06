@@ -62,7 +62,10 @@ pub fn customConfiguration(
                 "uacpi.c",
                 "utilities.c",
             },
-            .flags = &.{uacpi_log_level},
+            .flags = &.{
+                uacpi_log_level,
+                "-DUACPI_SIZED_FREES=1",
+            },
         });
         module.addIncludePath(uacpi_dep.path("include"));
     }

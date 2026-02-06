@@ -293,15 +293,15 @@ export fn uacpi_kernel_unmap(addr: [*]u8, len: usize) void {
 /// The contents of the allocated memory are unspecified.
 export fn uacpi_kernel_alloc(size: usize) ?[*]u8 {
     log.verbose("uacpi_kernel_alloc called", .{});
-    return kernel.mem.heap.c.mallocWithNonSizedFree(size);
+    return kernel.mem.heap.c.mallocWithSizedFree(size);
 }
 
 /// Free a previously allocated memory block.
 ///
 /// 'mem' might be a NULL pointer. In this case, the call is assumed to be a no-op.
-export fn uacpi_kernel_free(opt_mem: ?[*]u8) void {
-    log.verbose("uacpi_kernel_free called", .{});
-    kernel.mem.heap.c.nonSizedFree(opt_mem);
+export fn uacpi_kernel_free(opt_mem: ?[*]u8, size: usize) void {
+    log.verbose("uacpi_kernel_free called {}", .{size});
+    kernel.mem.heap.c.sizedFree(opt_mem, size);
 }
 
 export fn uacpi_kernel_log(uacpi_log_level: uacpi.LogLevel, c_msg: [*:0]const u8) void {
