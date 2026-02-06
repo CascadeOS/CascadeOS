@@ -225,8 +225,8 @@ fn constructKernelRootModule(
 
         .sanitize_c = switch (options.optimize) {
             .Debug => .full,
-            .ReleaseSafe, .ReleaseSmall => .trap,
-            .ReleaseFast => .off,
+            .ReleaseSafe => .trap,
+            .ReleaseFast, .ReleaseSmall => .off,
         },
 
         .omit_frame_pointer = false,
