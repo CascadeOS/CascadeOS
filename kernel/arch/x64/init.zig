@@ -44,16 +44,16 @@ pub fn tryGetSerialOutput(memory_system_available: bool) ?arch.init.InitOutput {
     };
 
     for (std.meta.tags(static.COMPort)) |com_port| {
-        if (SerialPort.create(
+        const serial = SerialPort.create(
             @intFromEnum(com_port),
             .{ .clock_frequency = .@"1.8432 MHz", .baud_rate = .@"115200" },
-        ) catch continue) |serial| {
-            static.init_output_serial_port = serial;
-            return .{
-                .output = static.init_output_serial_port.output(),
-                .preference = .prefer_generic,
-            };
-        }
+        ) catch continue;
+
+        static.init_output_serial_port = serial;
+        return .{
+            .output = static.init_output_serial_port.output(),
+            .preference = .prefer_generic,
+        };
     }
 
     return null;

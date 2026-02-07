@@ -28,6 +28,117 @@ pub const Memory16550 = Uart16X50(.memory, .enabled);
 pub const IoPort16450 = Uart16X50(.io_port, .disabled);
 pub const Memory16450 = Uart16X50(.memory, .disabled);
 
+pub const Uart16X50Type = enum {
+    @"16450",
+    @"16550",
+};
+
+pub fn tryGetSerialOutput16X50(
+    comptime uart_type: Uart16X50Type,
+    base_address: u64,
+    mode: Mode,
+    baud_rate: ?Baud.BaudRate,
+    memory_system_available: bool,
+) !Uart {
+    const baud: ?Baud = if (baud_rate) |br| .{
+        .clock_frequency = .@"1.8432 MHz", // TODO: we assume the clock frequency is 1.8432 MHz
+        .baud_rate = br,
+    } else null;
+
+    switch (mode) {
+        .memory => {
+            if (!memory_system_available) return error.RequiresMemorySystem; // TODO: early mmio pages
+
+            const UartT = switch (uart_type) {
+                .@"16450" => Memory16450,
+                .@"16550" => Memory16550,
+            };
+
+            const register_range = try kernel.mem.heap.allocateSpecial(
+                UartT.register_region_size,
+                .fromAddr(
+                    .fromInt(base_address),
+                    UartT.register_region_size,
+                ),
+                .{
+                    .type = .kernel,
+                    .protection = .read_write,
+                    .cache = .uncached,
+                },
+            );
+            errdefer kernel.mem.heap.deallocateSpecial(register_range);
+
+            const device = try UartT.create(
+                register_range.address.toPtr([*]volatile u8),
+                baud,
+            );
+
+            return switch (uart_type) {
+                .@"16450" => .{ .memory_16450 = device },
+                .@"16550" => .{ .memory_16550 = device },
+            };
+        },
+        .io_port => {
+            const UartT = switch (uart_type) {
+                .@"16450" => IoPort16450,
+                .@"16550" => IoPort16550,
+            };
+
+            const device = try UartT.create(
+                @intCast(base_address),
+                baud,
+            );
+
+            return switch (uart_type) {
+                .@"16450" => .{ .io_port_16450 = device },
+                .@"16550" => .{ .io_port_16550 = device },
+            };
+        },
+    }
+}
+
+pub fn tryGetSerialOutputPL011(
+    base_address: u64,
+    baud_rate: ?Baud.BaudRate,
+    memory_system_available: bool,
+) !Uart {
+    if (!memory_system_available) return error.RequiresMemorySystem; // TODO: early mmio pages
+
+    const baud: ?Baud = if (baud_rate) |br| .{
+        .clock_frequency = .@"24 MHz", // TODO: we assume the clock frequency is 24 MHz
+        .baud_rate = br,
+    } else null;
+
+    const register_range = try kernel.mem.heap.allocateSpecial(
+        PL011.register_region_size,
+        .fromAddr(
+            .fromInt(base_address),
+            PL011.register_region_size,
+        ),
+        .{
+            .type = .kernel,
+            .protection = .read_write,
+            .cache = .uncached,
+        },
+    );
+    errdefer kernel.mem.heap.deallocateSpecial(register_range);
+
+    const device = try PL011.create(
+        register_range.address.toPtr([*]volatile u32),
+        baud,
+    );
+
+    return .{ .pl011 = device };
+}
+
+pub const CreateError = error{
+    NotConnected,
+    LoopbackTestFailed,
+    IdentificationMismatch,
+} || Baud.DivisorError;
+
+pub const Mode = enum { memory, io_port };
+
 /// A basic write only 16550/16450 UART.
 ///
 /// Assumes the UART clock is 115200 Hz matching the PC serial port clock.
@@ -36,7 +147,7 @@ pub const Memory16450 = Uart16X50(.memory, .disabled);
 ///
 /// [UART 16550](https://caro.su/msx/ocm_de1/16550.pdf)
 /// [PC16550D Universal Asynchronous Receiver/Transmitter with FIFOs](https://media.digikey.com/pdf/Data%20Sheets/Texas%20Instruments%20PDFs/PC16550D.pdf)
-fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo_mode: enum { disabled, enabled }) type {
+fn Uart16X50(comptime mode: Mode, comptime fifo_mode: enum { disabled, enabled }) type {
     return struct {
         write_register: AddressT,
         line_status_register: AddressT,
@@ -48,12 +159,12 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo_mode: enum {
             .io_port => u16,
         };
 
-        pub fn create(base: AddressT, baud: ?Baud) Baud.DivisorError!?UartT {
+        pub fn create(base: AddressT, baud: ?Baud) CreateError!UartT {
             // write to scratch register to check if the UART is connected
             writeRegister(base + @intFromEnum(RegisterOffset.scratch), 0xBA);
 
             // if the scratch register is not `0xBA` then the UART is not connected
-            if (readRegister(base + @intFromEnum(RegisterOffset.scratch)) != 0xBA) return null;
+            if (readRegister(base + @intFromEnum(RegisterOffset.scratch)) != 0xBA) return error.NotConnected;
 
             // disable UART
             {
@@ -161,7 +272,7 @@ fn Uart16X50(comptime mode: enum { memory, io_port }, comptime fifo_mode: enum {
             writeRegister(base, 0xAE);
 
             // check that the `0xAE` was received due to loopback
-            if (readRegister(base) != 0xAE) return null;
+            if (readRegister(base) != 0xAE) return error.LoopbackTestFailed;
 
             // disable loopback
             {
@@ -404,14 +515,14 @@ pub const PL011 = struct {
     write_register: [*]volatile u32,
     flag_register: [*]volatile u32,
 
-    pub fn create(base: [*]volatile u32, baud: ?Baud) Baud.DivisorError!?PL011 {
+    pub fn create(base: [*]volatile u32, baud: ?Baud) CreateError!PL011 {
         const identification =
             readRegister(base + @intFromEnum(RegisterOffset.PrimeCellIdentification3)) << 24 |
             readRegister(base + @intFromEnum(RegisterOffset.PrimeCellIdentification2)) << 16 |
             readRegister(base + @intFromEnum(RegisterOffset.PrimeCellIdentification1)) << 8 |
             readRegister(base + @intFromEnum(RegisterOffset.PrimeCellIdentification0));
 
-        if (identification != 0xB105F00D) return null;
+        if (identification != 0xB105F00D) return error.IdentificationMismatch;
 
         // disable UART
         {
@@ -473,7 +584,7 @@ pub const PL011 = struct {
         writeRegister(base + @intFromEnum(RegisterOffset.Write), '\r');
 
         // check that the `\r` was received due to loopback
-        if (readRegister(base + @intFromEnum(RegisterOffset.Read)) != '\r') return null;
+        if (readRegister(base + @intFromEnum(RegisterOffset.Read)) != '\r') return error.LoopbackTestFailed;
 
         // disable loopback
         {

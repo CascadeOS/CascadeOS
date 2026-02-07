@@ -157,20 +157,15 @@ fn getSerialOutputFromNS16550a(dt: DeviceTree, node: DeviceTree.Node, memory_sys
     );
     errdefer kernel.mem.heap.deallocateSpecial(register_range);
 
-    if (try uart.Memory16550.create(
+    const device = try uart.Memory16550.create(
         register_range.address.toPtr([*]volatile u8),
         .{
             .clock_frequency = @enumFromInt(clock_frequency),
             .baud_rate = .@"115200",
         },
-    )) |device| {
-        return .{ .memory_16550 = device };
-    }
+    );
 
-    // TODO: duplicating this is annoying, but there is no `nulldefer`
-    kernel.mem.heap.deallocateSpecial(register_range);
-
-    return null;
+    return .{ .memory_16550 = device };
 }
 
 fn getSerialOutputFromPL011(dt: DeviceTree, node: DeviceTree.Node, memory_system_available: bool) GetSerialOutputError!?uart.Uart {
@@ -246,20 +241,15 @@ fn getSerialOutputFromPL011(dt: DeviceTree, node: DeviceTree.Node, memory_system
     );
     errdefer kernel.mem.heap.deallocateSpecial(register_range);
 
-    if (try uart.PL011.create(
+    const device = try uart.PL011.create(
         register_range.address.toPtr([*]volatile u32),
         .{
             .clock_frequency = @enumFromInt(clock_frequency),
             .baud_rate = .@"115200",
         },
-    )) |device| {
-        return .{ .pl011 = device };
-    }
+    );
 
-    // TODO: duplicating this is annoying, but there is no `nulldefer`
-    kernel.mem.heap.deallocateSpecial(register_range);
-
-    return null;
+    return .{ .pl011 = device };
 }
 
 fn matchFunction(_: void, compatible: [:0]const u8) bool {
@@ -273,6 +263,6 @@ const compatible_lookup = std.StaticStringMap(GetSerialOutputFn).initComptime(.{
 
 const GetSerialOutputError = DeviceTree.IteratorError ||
     DeviceTree.Property.Value.ListIteratorError ||
-    uart.Baud.DivisorError ||
+    uart.CreateError ||
     kernel.mem.heap.AllocateError;
 const GetSerialOutputFn = *const fn (dt: DeviceTree, node: DeviceTree.Node, memory_system_available: bool) GetSerialOutputError!?uart.Uart;

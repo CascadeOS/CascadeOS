@@ -406,291 +406,61 @@ pub const SPCR = extern struct {
                 .@"115200" => .@"115200",
             };
 
-            if (spcr.header.revision < 2) {
+            const mode: uart.Mode = switch (spcr.base_address.address_space) {
+                .memory => .memory,
+                .io => .io_port,
+                else => |address_space| {
+                    init_log.debug("unhandled address space: {d}", .{address_space});
+                    return null;
+                },
+            };
+
+            return (if (spcr.header.revision < 2)
                 switch (spcr.interface_type.revision_1) {
-                    .@"16550" => {
-                        const baud: ?uart.Baud = if (baud_rate) |br| .{
-                            .clock_frequency = .@"1.8432 MHz", // TODO: we assume the clock frequency is 1.8432 MHz
-                            .baud_rate = br,
-                        } else null;
-
-                        switch (spcr.base_address.address_space) {
-                            .memory => {
-                                if (!memory_system_available) return null; // TODO: early mmio pages
-
-                                const register_range = kernel.mem.heap.allocateSpecial(
-                                    uart.Memory16550.register_region_size,
-                                    .fromAddr(
-                                        .fromInt(spcr.base_address.address),
-                                        uart.Memory16550.register_region_size,
-                                    ),
-                                    .{
-                                        .type = .kernel,
-                                        .protection = .read_write,
-                                        .cache = .uncached,
-                                    },
-                                ) catch |err| {
-                                    init_log.err("failed to allocate memory for 16550 UART: {}", .{err});
-                                    return null;
-                                };
-
-                                const opt_device = uart.Memory16550.create(
-                                    register_range.address.toPtr([*]volatile u8),
-                                    baud,
-                                ) catch |err| device: {
-                                    init_log.err("failed to create 16550 UART: {}", .{err});
-                                    break :device null;
-                                };
-
-                                if (opt_device) |device| return .{ .memory_16550 = device };
-
-                                // TODO: having this here is annoying, but there is no `nulldefer`
-                                kernel.mem.heap.deallocateSpecial(register_range);
-
-                                return null;
-                            },
-                            .io => return .{
-                                .io_port_16550 = (uart.IoPort16550.create(
-                                    @intCast(spcr.base_address.address),
-                                    baud,
-                                ) catch |err| {
-                                    init_log.err("failed to create 16550 UART: {}", .{err});
-                                    return null;
-                                }) orelse return null,
-                            },
-                            else => |address_space| init_log.info(
-                                "16550 UART with unhandled address space: {t}",
-                                .{address_space},
-                            ),
-                        }
-                    },
-                    .@"16450" => {
-                        const baud: ?uart.Baud = if (baud_rate) |br| .{
-                            .clock_frequency = .@"1.8432 MHz", // TODO: we assume the clock frequency is 1.8432 MHz
-                            .baud_rate = br,
-                        } else null;
-
-                        switch (spcr.base_address.address_space) {
-                            .memory => {
-                                if (!memory_system_available) return null; // TODO: early mmio pages
-
-                                const register_range = kernel.mem.heap.allocateSpecial(
-                                    uart.Memory16450.register_region_size,
-                                    .fromAddr(
-                                        .fromInt(spcr.base_address.address),
-                                        uart.Memory16450.register_region_size,
-                                    ),
-                                    .{
-                                        .type = .kernel,
-                                        .protection = .read_write,
-                                        .cache = .uncached,
-                                    },
-                                ) catch |err| {
-                                    init_log.err("failed to allocate memory for 16450 UART: {}", .{err});
-                                    return null;
-                                };
-
-                                const opt_device = uart.Memory16450.create(
-                                    register_range.address.toPtr([*]volatile u8),
-                                    baud,
-                                ) catch |err| device: {
-                                    init_log.err("failed to create 16450 UART: {}", .{err});
-                                    break :device null;
-                                };
-
-                                if (opt_device) |device| return .{ .memory_16450 = device };
-
-                                // TODO: having this here is annoying, but there is no `nulldefer`
-                                kernel.mem.heap.deallocateSpecial(register_range);
-
-                                return null;
-                            },
-                            .io => return .{
-                                .io_port_16450 = (uart.IoPort16450.create(
-                                    @intCast(spcr.base_address.address),
-                                    baud,
-                                ) catch |err| {
-                                    init_log.err("failed to create 16450 UART: {}", .{err});
-                                    return null;
-                                }) orelse return null,
-                            },
-                            else => |address_space| init_log.info(
-                                "16450 UART with unhandled address space: {t}",
-                                .{address_space},
-                            ),
-                        }
-                    },
+                    .@"16450" => uart.tryGetSerialOutput16X50(
+                        .@"16450",
+                        spcr.base_address.address,
+                        mode,
+                        baud_rate,
+                        memory_system_available,
+                    ),
+                    .@"16550" => uart.tryGetSerialOutput16X50(
+                        .@"16550",
+                        spcr.base_address.address,
+                        mode,
+                        baud_rate,
+                        memory_system_available,
+                    ),
                 }
-
+            else switch (spcr.interface_type.revision_2_or_higher) {
+                .@"16450" => uart.tryGetSerialOutput16X50(
+                    .@"16450",
+                    spcr.base_address.address,
+                    mode,
+                    baud_rate,
+                    memory_system_available,
+                ),
+                .@"16550", .@"16550-GAS" => uart.tryGetSerialOutput16X50(
+                    .@"16550",
+                    spcr.base_address.address,
+                    mode,
+                    baud_rate,
+                    memory_system_available,
+                ),
+                .ArmPL011 => uart.tryGetSerialOutputPL011(
+                    spcr.base_address.address,
+                    baud_rate,
+                    memory_system_available,
+                ),
+                else => |sub_type| {
+                    // TODO: implement other subtypes
+                    init_log.debug("unhandled subtype: {t}", .{sub_type});
+                    return null;
+                },
+            }) catch |err| {
+                init_log.debug("encountered error fetching output from SPCR: {s}", .{@errorName(err)});
                 return null;
-            }
-
-            switch (spcr.interface_type.revision_2_or_higher) {
-                .@"16550", .@"16550-GAS" => {
-                    const baud: ?uart.Baud = if (baud_rate) |br| .{
-                        .clock_frequency = .@"1.8432 MHz", // TODO: we assume the clock frequency is 1.8432 MHz
-                        .baud_rate = br,
-                    } else null;
-
-                    switch (spcr.base_address.address_space) {
-                        .memory => {
-                            if (!memory_system_available) return null; // TODO: early mmio pages
-
-                            const register_range = kernel.mem.heap.allocateSpecial(
-                                uart.Memory16550.register_region_size,
-                                .fromAddr(
-                                    .fromInt(spcr.base_address.address),
-                                    uart.Memory16550.register_region_size,
-                                ),
-                                .{
-                                    .type = .kernel,
-                                    .protection = .read_write,
-                                    .cache = .uncached,
-                                },
-                            ) catch |err| {
-                                init_log.err("failed to allocate memory for 16550 UART: {}", .{err});
-                                return null;
-                            };
-
-                            const opt_device = uart.Memory16550.create(
-                                register_range.address.toPtr([*]volatile u8),
-                                baud,
-                            ) catch |err| device: {
-                                init_log.err("failed to create 16550 UART: {}", .{err});
-                                break :device null;
-                            };
-
-                            if (opt_device) |device| return .{ .memory_16550 = device };
-
-                            // TODO: having this here is annoying, but there is no `nulldefer`
-                            kernel.mem.heap.deallocateSpecial(register_range);
-
-                            return null;
-                        },
-                        .io => return .{
-                            .io_port_16550 = (uart.IoPort16550.create(
-                                @intCast(spcr.base_address.address),
-                                baud,
-                            ) catch |err| {
-                                init_log.err("failed to create 16550 UART: {}", .{err});
-                                return null;
-                            }) orelse return null,
-                        },
-                        else => |address_space| init_log.info(
-                            "16550 UART with unhandled address space: {t}",
-                            .{address_space},
-                        ),
-                    }
-
-                    return null;
-                },
-                .@"16450" => {
-                    const baud: ?uart.Baud = if (baud_rate) |br| .{
-                        .clock_frequency = .@"1.8432 MHz", // TODO: we assume the clock frequency is 1.8432 MHz
-                        .baud_rate = br,
-                    } else null;
-
-                    switch (spcr.base_address.address_space) {
-                        .memory => {
-                            if (!memory_system_available) return null; // TODO: early mmio pages
-
-                            const register_range = kernel.mem.heap.allocateSpecial(
-                                uart.Memory16450.register_region_size,
-                                .fromAddr(
-                                    .fromInt(spcr.base_address.address),
-                                    uart.Memory16450.register_region_size,
-                                ),
-                                .{
-                                    .type = .kernel,
-                                    .protection = .read_write,
-                                    .cache = .uncached,
-                                },
-                            ) catch |err| {
-                                init_log.err("failed to allocate memory for 16450 UART: {}", .{err});
-                                return null;
-                            };
-
-                            const opt_device = uart.Memory16450.create(
-                                register_range.address.toPtr([*]volatile u8),
-                                baud,
-                            ) catch |err| device: {
-                                init_log.err("failed to create 16450 UART: {}", .{err});
-                                break :device null;
-                            };
-
-                            if (opt_device) |device| return .{ .memory_16450 = device };
-
-                            // TODO: having this here is annoying, but there is no `nulldefer`
-                            kernel.mem.heap.deallocateSpecial(register_range);
-
-                            return null;
-                        },
-                        .io => return .{
-                            .io_port_16450 = (uart.IoPort16450.create(
-                                @intCast(spcr.base_address.address),
-                                baud,
-                            ) catch |err| {
-                                init_log.err("failed to create 16450 UART: {}", .{err});
-                                return null;
-                            }) orelse return null,
-                        },
-                        else => |address_space| init_log.info(
-                            "16450 UART with unhandled address space: {t}",
-                            .{address_space},
-                        ),
-                    }
-                },
-                .ArmPL011 => {
-                    const baud: ?uart.Baud = if (baud_rate) |br| .{
-                        .clock_frequency = .@"24 MHz", // TODO: we assume the clock frequency is 24 MHz
-                        .baud_rate = br,
-                    } else null;
-
-                    if (core.is_debug) {
-                        std.debug.assert(spcr.base_address.address_space == .memory);
-                        std.debug.assert(spcr.base_address.access_size == .dword);
-                    }
-
-                    if (!memory_system_available) return null; // TODO: early mmio pages
-
-                    const register_range = kernel.mem.heap.allocateSpecial(
-                        uart.PL011.register_region_size,
-                        .fromAddr(
-                            .fromInt(spcr.base_address.address),
-                            uart.PL011.register_region_size,
-                        ),
-                        .{
-                            .type = .kernel,
-                            .protection = .read_write,
-                            .cache = .uncached,
-                        },
-                    ) catch |err| {
-                        init_log.err("failed to allocate memory for 16450 UART: {}", .{err});
-                        return null;
-                    };
-
-                    const opt_device = uart.PL011.create(
-                        register_range.address.toPtr([*]volatile u32),
-                        baud,
-                    ) catch |err| device: {
-                        init_log.err("failed to create 16450 UART: {}", .{err});
-                        break :device null;
-                    };
-
-                    if (opt_device) |device| return .{ .pl011 = device };
-
-                    // TODO: having this here is annoying, but there is no `nulldefer`
-                    kernel.mem.heap.deallocateSpecial(register_range);
-
-                    return null;
-                },
-                else => |sub_type| init_log.info(
-                    "unhandled subtype: {t}",
-                    .{sub_type},
-                ), // TODO: implement other subtypes
-            }
-
-            return null;
+            };
         }
     };
 };
