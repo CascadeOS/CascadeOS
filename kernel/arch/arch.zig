@@ -217,6 +217,9 @@ pub const paging = struct {
         arch_specific: *current_decls.paging.PageTable,
 
         /// Create a page table in the given physical page.
+        ///
+        /// **REQUIREMENTS**:
+        /// - The provided physical page must be accessible in the direct map.
         pub fn create(physical_page: kernel.mem.PhysicalPage.Index) callconv(core.inline_in_non_debug) PageTable {
             return .{
                 .physical_page = physical_page,
@@ -908,6 +911,9 @@ pub const Functions = struct {
 
     paging: struct {
         /// Create a page table in the given physical page.
+        ///
+        /// **REQUIREMENTS**:
+        /// - The provided physical page must be accessible in the direct map.
         createPageTable: ?fn (physical_page: kernel.mem.PhysicalPage.Index) *current_decls.paging.PageTable = null,
 
         loadPageTable: ?fn (physical_page: kernel.mem.PhysicalPage.Index) void = null,

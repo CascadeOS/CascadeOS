@@ -43,6 +43,9 @@ pub const PageTable = extern struct {
     }
 
     /// Create a page table in the given physical page.
+    ///
+    /// **REQUIREMENTS**:
+    /// - The provided physical page must be accessible in the direct map.
     pub fn create(physical_page: kernel.mem.PhysicalPage.Index) *PageTable {
         const page_table = kernel.mem.directMapFromPhysical(physical_page.baseAddress()).toPtr(*PageTable);
         page_table.zero();
