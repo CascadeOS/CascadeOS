@@ -390,10 +390,6 @@ pub const init = struct {
 
                 @memset(slice, .{});
             }
-
-            if (entry.range.address.equal(.zero)) {
-                pages[0] = undefined;
-            }
         }
 
         var free_memory: core.Size = .zero;
