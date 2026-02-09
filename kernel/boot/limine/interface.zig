@@ -88,7 +88,7 @@ pub fn directMapAddress() ?core.VirtualAddress {
     return resp.offset;
 }
 
-pub fn rsdp() ?core.Address {
+pub fn rsdp() ?boot.Address {
     const resp = requests.rsdp.response orelse
         return null;
 

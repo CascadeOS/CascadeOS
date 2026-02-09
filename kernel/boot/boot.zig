@@ -106,8 +106,18 @@ pub fn directMapAddress() ?core.VirtualAddress {
     };
 }
 
+pub const Address = union(enum) {
+    physical: core.PhysicalAddress,
+    virtual: core.VirtualAddress,
+
+    pub const Raw = extern union {
+        physical: core.PhysicalAddress,
+        virtual: core.VirtualAddress,
+    };
+};
+
 /// Returns the ACPI RSDP address provided by the bootloader, if any.
-pub fn rsdp() ?core.Address {
+pub fn rsdp() ?Address {
     return switch (bootloader_api) {
         .limine => limine_interface.rsdp(),
         .unknown => null,

@@ -5,7 +5,6 @@ const std = @import("std");
 const builtin = @import("builtin");
 
 const address = @import("address.zig");
-pub const Address = address.Address;
 pub const PhysicalAddress = address.PhysicalAddress;
 pub const PhysicalRange = address.PhysicalRange;
 pub const VirtualAddress = address.VirtualAddress;

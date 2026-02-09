@@ -8,6 +8,7 @@
 
 const std = @import("std");
 
+const boot = @import("boot");
 const core = @import("core");
 const UUID = @import("uuid").UUID;
 
@@ -1036,10 +1037,10 @@ pub const RSDP = extern struct {
 
     pub const Response = extern struct {
         revision: u64,
-        _address: core.Address.Raw,
+        _address: boot.Address.Raw,
 
         /// Address of the RSDP table. Physical for base revision 3.
-        pub fn address(response: *const Response, revision: BaseRevison.Revison) core.Address {
+        pub fn address(response: *const Response, revision: BaseRevison.Revison) boot.Address {
             return switch (revision) {
                 .@"3" => .{ .physical = response._address.physical },
                 else => .{ .virtual = response._address.virtual },
