@@ -30,39 +30,28 @@ pub const Size = extern struct {
         };
     }
 
-    /// Checks if the `Size` is aligned to the given alignment.
-    ///
-    /// `alignment` must be a power of two.
-    pub inline fn isAligned(size: Size, alignment: Size) bool {
-        return std.mem.isAligned(size.value, alignment.value);
+    pub inline fn toAlignment(size: core.Size) std.mem.Alignment {
+        return .fromByteUnits(size.value);
     }
 
-    /// Aligns the `Size` forward to the given alignment.
-    ///
-    /// `alignment` must be a power of two.
-    pub fn alignForward(size: Size, alignment: Size) Size {
-        return .{ .value = std.mem.alignForward(u64, size.value, alignment.value) };
+    pub inline fn aligned(size: Size, alignment: std.mem.Alignment) bool {
+        return alignment.check(size.value);
     }
 
-    /// Aligns the `Size` forward to the given alignment.
-    ///
-    /// `alignment` must be a power of two.
-    pub fn alignForwardInPlace(size: *Size, alignment: Size) void {
-        size.value = std.mem.alignForward(u64, size.value, alignment.value);
+    pub inline fn alignForward(size: Size, alignment: std.mem.Alignment) Size {
+        return .{ .value = alignment.forward(size.value) };
     }
 
-    /// Aligns the `Size` backward to the given alignment.
-    ///
-    /// `alignment` must be a power of two.
-    pub fn alignBackward(size: Size, alignment: Size) Size {
-        return .{ .value = std.mem.alignBackward(u64, size.value, alignment.value) };
+    pub inline fn alignForwardInPlace(size: *Size, alignment: std.mem.Alignment) void {
+        size.value = alignment.forward(size.value);
     }
 
-    /// Aligns the `Size` backward to the given alignment.
-    ///
-    /// `alignment` must be a power of two.
-    pub fn alignBackwardInPlace(size: *Size, alignment: core.Size) void {
-        size.value = std.mem.alignBackward(u64, size.value, alignment.value);
+    pub inline fn alignBackward(size: Size, alignment: std.mem.Alignment) Size {
+        return .{ .value = alignment.backward(size.value) };
+    }
+
+    pub inline fn alignBackwardInPlace(size: *Size, alignment: std.mem.Alignment) void {
+        size.value = alignment.backward(size.value);
     }
 
     /// Returns the amount of `size` sizes needed to cover `target`.

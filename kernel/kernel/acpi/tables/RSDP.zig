@@ -4,10 +4,11 @@
 const std = @import("std");
 
 const arch = @import("arch");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
 const acpi = kernel.acpi;
-const core = @import("core");
+const addr = kernel.addr;
 
 /// [ACPI 6.5 Specification Link](https://uefi.org/specs/ACPI/6.5/05_ACPI_Software_Programming_Model.html#root-system-description-pointer-rsdp-structure)
 pub const RSDP = extern struct {
@@ -49,7 +50,7 @@ pub const RSDP = extern struct {
     /// 64 bit physical address of the XSDT.
     ///
     /// This field is not available in the ACPI version 1.0 RSDP Structure.
-    xsdt_addr: core.PhysicalAddress align(1),
+    xsdt_addr: addr.Physical align(1),
 
     /// This is a checksum of the entire table, including both checksum fields.
     ///
@@ -60,9 +61,9 @@ pub const RSDP = extern struct {
 
     const BYTES_IN_ACPI_1_STRUCTURE = 20;
 
-    pub fn sdtAddress(rsdp: *const RSDP) core.PhysicalAddress {
+    pub fn sdtAddress(rsdp: *const RSDP) addr.Physical {
         return switch (rsdp.revision) {
-            0 => core.PhysicalAddress.fromInt(rsdp.rsdt_addr),
+            0 => .from(rsdp.rsdt_addr),
             2 => rsdp.xsdt_addr,
             else => std.debug.panic("unknown ACPI revision: {d}", .{rsdp.revision}),
         };

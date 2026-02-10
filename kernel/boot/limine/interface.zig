@@ -5,9 +5,11 @@ const std = @import("std");
 
 const arch = @import("arch");
 const boot = @import("boot");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
-const core = @import("core");
+const addr = kernel.addr;
+
 const limine = @import("limine.zig");
 
 pub fn kernelBaseAddress() ?boot.KernelBaseAddress {
@@ -67,7 +69,7 @@ pub const MemoryMapIterator = struct {
         };
 
         return .{
-            .range = .fromAddr(limine_entry.base, limine_entry.length),
+            .range = .from(limine_entry.base, limine_entry.length),
             .type = switch (limine_entry.type) {
                 .usable => .free,
                 .executable_and_modules, .framebuffer => .in_use,
@@ -81,11 +83,11 @@ pub const MemoryMapIterator = struct {
     }
 };
 
-pub fn directMapAddress() ?core.VirtualAddress {
+pub fn directMapAddress() ?addr.Virtual.Kernel {
     const resp = requests.hhdm.response orelse
         return null;
 
-    return resp.offset;
+    return resp.address;
 }
 
 pub fn rsdp() ?boot.Address {
@@ -232,7 +234,7 @@ pub fn framebuffer() ?boot.Framebuffer {
     std.debug.assert(buffer.memory_model == .rgb);
 
     return .{
-        .ptr = buffer.address.toPtr([*]volatile u32),
+        .ptr = buffer.address.ptr([*]volatile u32),
         .width = buffer.width,
         .height = buffer.height,
         .pitch = buffer.pitch,
@@ -245,7 +247,7 @@ pub fn framebuffer() ?boot.Framebuffer {
     };
 }
 
-pub fn deviceTreeBlob() ?core.VirtualAddress {
+pub fn deviceTreeBlob() ?addr.Virtual.Kernel {
     const resp = requests.device_tree_blob.response orelse
         return null;
     return resp.address;

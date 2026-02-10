@@ -17,12 +17,12 @@
 const std = @import("std");
 
 const arch = @import("arch");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
-const Page = kernel.mem.Page;
 const Protection = kernel.mem.MapType.Protection;
 const Process = kernel.user.Process;
-const core = @import("core");
+const addr = kernel.addr;
 
 pub const AnonymousMap = @import("AnonymousMap.zig");
 pub const AnonymousPage = @import("AnonymousPage.zig");
@@ -36,7 +36,7 @@ const AddressSpace = @This();
 
 _name: Name,
 
-range: core.VirtualRange,
+range: addr.Virtual.Range,
 
 context: kernel.Context,
 
@@ -63,7 +63,7 @@ entries_version: u32,
 pub const InitOptions = struct {
     name: Name,
 
-    range: core.VirtualRange,
+    range: addr.Virtual.Range,
 
     page_table: arch.paging.PageTable,
 
@@ -153,7 +153,7 @@ pub const MapOptions = struct {
     ///
     /// Caller must ensure:
     ///  - the size is aligned to the standard page size
-    base: ?core.VirtualAddress = null,
+    base: ?addr.Virtual = null,
 
     /// The size of the range to map.
     ///
@@ -207,7 +207,7 @@ pub const MapError = error{
 pub fn map(
     address_space: *AddressSpace,
     options: MapOptions,
-) MapError!core.VirtualRange {
+) MapError!addr.Virtual.Range {
     errdefer |err| log.debug("{s}: map failed {t}", .{ address_space.name(), err });
 
     if (log.levelEnabled(.verbose)) {
@@ -226,8 +226,8 @@ pub fn map(
     }
 
     if (core.is_debug) {
-        std.debug.assert(options.size.isAligned(arch.paging.standard_page_size));
-        if (options.base) |base| std.debug.assert(base.isAligned(arch.paging.standard_page_size));
+        std.debug.assert(options.size.aligned(arch.paging.standard_page_size_alignment));
+        if (options.base) |base| std.debug.assert(base.aligned(arch.paging.standard_page_size_alignment));
     }
 
     if (options.size.equal(.zero)) {
@@ -282,7 +282,7 @@ pub fn map(
         // zig fmt: off
         const free_range: FreeRange = (
             if (options.base) |base|
-                address_space.findExactFreeRange(.fromAddr(base, options.size))
+                address_space.findExactFreeRange(.from(base, options.size))
             else
                 address_space.findFreeRange(options.size)
         ) orelse {
@@ -363,12 +363,12 @@ pub fn map(
 }
 
 const FreeRange = struct {
-    range: core.VirtualRange,
+    range: addr.Virtual.Range,
     insertion_index: usize,
 };
 
 /// If the given range is free, return the range.
-fn findExactFreeRange(address_space: *AddressSpace, range: core.VirtualRange) ?FreeRange {
+fn findExactFreeRange(address_space: *AddressSpace, range: addr.Virtual.Range) ?FreeRange {
     const entries = address_space.entries.items;
 
     const index = std.sort.lowerBound(
@@ -396,7 +396,7 @@ fn findExactFreeRange(address_space: *AddressSpace, range: core.VirtualRange) ?F
         @branchHint(.unlikely);
         return null;
     }
-    if (core.is_debug) std.debug.assert(entries[index].range.address.greaterThanOrEqual(range.endBound()));
+    if (core.is_debug) std.debug.assert(entries[index].range.address.greaterThanOrEqual(range.after()));
 
     return .{
         .range = range,
@@ -409,7 +409,7 @@ fn findFreeRange(address_space: *AddressSpace, size: core.Size) ?FreeRange {
     // TODO: we could seperately track the free ranges in the address space
 
     var candidate_insertion_index: usize = 0;
-    var candidate_range: core.VirtualRange = .fromAddr(address_space.range.address, size);
+    var candidate_range: addr.Virtual.Range = .from(address_space.range.address, size);
     var candidate_range_last_address = candidate_range.last();
 
     for (address_space.entries.items) |entry| {
@@ -419,7 +419,7 @@ fn findFreeRange(address_space: *AddressSpace, size: core.Size) ?FreeRange {
             break;
         }
 
-        candidate_range.address = entry.range.endBound();
+        candidate_range.address = entry.range.after();
         candidate_range_last_address = candidate_range.last();
         candidate_insertion_index += 1;
     }
@@ -529,7 +529,7 @@ pub const ChangeProtectionError = error{
 ///  - the size and address of the range are aligned to the standard page size
 pub fn changeProtection(
     address_space: *AddressSpace,
-    range: core.VirtualRange,
+    range: addr.Virtual.Range,
     change: ChangeProtection,
 ) ChangeProtectionError!void {
     errdefer |err| log.debug("{s}: change protection failed {t}", .{ address_space.name(), err });
@@ -539,8 +539,8 @@ pub fn changeProtection(
     log.verbose("{s}: change protection of {f} to {f}", .{ address_space.name(), range, request });
 
     if (core.is_debug) {
-        std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
-        std.debug.assert(range.size.isAligned(arch.paging.standard_page_size));
+        std.debug.assert(range.address.aligned(arch.paging.standard_page_size_alignment));
+        std.debug.assert(range.size.aligned(arch.paging.standard_page_size_alignment));
     }
 
     if (request.max_protection) |max_protection| if (max_protection == .none) {
@@ -716,7 +716,7 @@ const ChangeProtectionResult = struct {
 fn performChangeProtection(
     address_space: *AddressSpace,
     entry_range: EntryRange,
-    range: core.VirtualRange,
+    range: addr.Virtual.Range,
     request: ChangeProtection.Request,
     preallocated_entries: *PreallocatedEntries,
 ) ChangeProtectionResult {
@@ -740,18 +740,18 @@ fn performChangeProtection(
             break :no_split_first_entry;
         }
 
-        const split_offset = range.address.difference(first_entry.range.address);
+        const split_size = first_entry.range.address.difference(range.address);
         log.verbose("{s}: split first entry {f} at offset {f}", .{
             address_space.name(),
             first_entry.range,
-            split_offset,
+            split_size,
         });
 
         // the new entry will be after the first entry, and will become the new first entry in the range
         //
         // | first entry | -> | first entry | new entry |
         const new_entry = preallocated_entries.entries.pop() orelse unreachable;
-        first_entry.split(new_entry, split_offset);
+        first_entry.split(new_entry, split_size);
 
         // move first entry index forward to as the new entry is now the first entry of the entry range
         first_entry_index += 1;
@@ -777,18 +777,18 @@ fn performChangeProtection(
             break :no_split_last_entry;
         }
 
-        const split_offset = range.endBound().difference(last_entry.range.address);
+        const split_size = last_entry.range.address.difference(range.after());
         log.verbose("{s}: split last entry {f} at offset {f}", .{
             address_space.name(),
             last_entry.range,
-            split_offset,
+            split_size,
         });
 
         // the new entry will be after last entry, last entry will remain the last entry in the range
         //
         // | last entry | -> | last entry | new entry |
         const new_entry = preallocated_entries.entries.pop() orelse unreachable;
-        last_entry.split(new_entry, split_offset);
+        last_entry.split(new_entry, split_size);
 
         // `last_entry_index + 1` as the new entry is after the last entry of the entry range
         address_space.entries.insertAssumeCapacity(last_entry_index + 1, new_entry);
@@ -879,14 +879,14 @@ pub const UnmapError = error{
 ///
 /// Caller must ensure:
 ///  - the size and address of the range are aligned to the standard page size
-pub fn unmap(address_space: *AddressSpace, range: core.VirtualRange) UnmapError!void {
+pub fn unmap(address_space: *AddressSpace, range: addr.Virtual.Range) UnmapError!void {
     errdefer |err| log.debug("{s}: unmap failed {t}", .{ address_space.name(), err });
 
     log.verbose("{s}: unmap {f}", .{ address_space.name(), range });
 
     if (core.is_debug) {
-        std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
-        std.debug.assert(range.size.isAligned(arch.paging.standard_page_size));
+        std.debug.assert(range.address.aligned(arch.paging.standard_page_size_alignment));
+        std.debug.assert(range.size.aligned(arch.paging.standard_page_size_alignment));
     }
 
     const result: UnmapResult = blk: {
@@ -986,7 +986,7 @@ const UnmapResult = struct {
 fn performUnmap(
     address_space: *AddressSpace,
     entry_range: EntryRange,
-    range: core.VirtualRange,
+    range: addr.Virtual.Range,
     preallocated_entries: *PreallocatedEntries,
 ) UnmapResult {
     var result: UnmapResult = .none;
@@ -995,18 +995,18 @@ fn performUnmap(
 
     if (entry_range.isWithinSingleEntry()) {
         const first = address_space.entries.items[first_entry_index];
-        const split_offset = range.address.difference(first.range.address);
+        const split_size = first.range.address.difference(range.address);
 
         // split the first entry, the two entries together still cover the entire range of the first entry
         // | first entry | -> | first entry | second entry |
         const second_entry = preallocated_entries.entries.pop() orelse unreachable;
-        first.split(second_entry, split_offset);
+        first.split(second_entry, split_size);
 
         // now shrink the second entry to leave a hole in between the first and second entry
         // | entry | -> | first entry | UNMAPPED | second entry |
         second_entry.shrink(
             .beginning,
-            second_entry.range.endBound().difference(range.endBound()),
+            range.after().difference(second_entry.range.after()),
         );
 
         address_space.entries.insertAssumeCapacity(first_entry_index + 1, second_entry);
@@ -1023,7 +1023,7 @@ fn performUnmap(
 
         first_entry.shrink(
             .end,
-            range.address.difference(first_entry.range.address),
+            first_entry.range.address.difference(range.address),
         );
 
         result.entries_shrunk += 1;
@@ -1037,7 +1037,7 @@ fn performUnmap(
 
         last_entry.shrink(
             .beginning,
-            last_entry.range.endBound().difference(range.endBound()),
+            range.after().difference(last_entry.range.after()),
         );
 
         result.entries_shrunk += 1;
@@ -1100,7 +1100,7 @@ pub fn handlePageFault(
     var fault_info: FaultInfo = .{
         .address_space = address_space,
         .faulting_address = page_fault_details.faulting_address.alignBackward(
-            arch.paging.standard_page_size,
+            arch.paging.standard_page_size.toAlignment(),
         ),
         .access_type = page_fault_details.access_type,
     };
@@ -1199,13 +1199,13 @@ pub const Name = core.containers.BoundedArray(u8, kernel.config.user.address_spa
 ///
 /// Caller must ensure:
 ///  - the address space entries are atleast read locked
-pub fn entryIndexByAddress(address_space: *const AddressSpace, address: core.VirtualAddress) ?usize {
+pub fn entryIndexByAddress(address_space: *const AddressSpace, address: addr.Virtual) ?usize {
     if (core.is_debug) std.debug.assert(address_space.entries_lock.isReadLocked() or address_space.entries_lock.isWriteLocked());
     return innerEntryIndexByAddress(address_space.entries.items, address);
 }
 
 // Exists so that a subslice of entries can be searched unlike with `entryIndexByAddress` which searches the entire slice.
-inline fn innerEntryIndexByAddress(entries: []const *const Entry, address: core.VirtualAddress) ?usize {
+inline fn innerEntryIndexByAddress(entries: []const *const Entry, address: addr.Virtual) ?usize {
     return std.sort.binarySearch(
         *const Entry,
         entries,
@@ -1214,8 +1214,8 @@ inline fn innerEntryIndexByAddress(entries: []const *const Entry, address: core.
     );
 }
 
-fn entryAddressCompare(addr: core.VirtualAddress, entry: *const Entry) std.math.Order {
-    return entry.range.containsAddressOrder(addr);
+fn entryAddressCompare(virtual_address: addr.Virtual, entry: *const Entry) std.math.Order {
+    return entry.range.containsAddressOrder(virtual_address);
 }
 
 const EntryRange = struct {
@@ -1234,7 +1234,7 @@ const EntryRange = struct {
             entry_range.end_overlap;
     }
 
-    pub fn rangeIterator(entry_range: EntryRange, range: core.VirtualRange, entries: []const *const Entry) RangeIterator {
+    pub fn rangeIterator(entry_range: EntryRange, range: addr.Virtual.Range, entries: []const *const Entry) RangeIterator {
         return .{
             .entry_range = entry_range,
             .range = range,
@@ -1245,12 +1245,12 @@ const EntryRange = struct {
 
     const RangeIterator = struct {
         entry_range: EntryRange,
-        range: core.VirtualRange,
+        range: addr.Virtual.Range,
         entries: []const *const Entry,
 
         index: usize,
 
-        pub fn next(iter: *RangeIterator) ?core.VirtualRange {
+        pub fn next(iter: *RangeIterator) ?addr.Virtual.Range {
             const entry_range = &iter.entry_range;
             const end_index = entry_range.start + entry_range.length;
 
@@ -1272,18 +1272,18 @@ const EntryRange = struct {
                     return range;
                 }
 
-                return .fromAddr(
+                return .from(
                     range.address,
-                    entry.range.endBound().difference(range.address),
+                    range.address.difference(entry.range.after()),
                 );
             }
 
             if (index == end_index - 1 and entry_range.end_overlap) {
                 @branchHint(.unlikely);
 
-                return .fromAddr(
+                return .from(
                     entry.range.address,
-                    range.endBound().difference(entry.range.address),
+                    entry.range.address.difference(range.after()),
                 );
             }
 
@@ -1293,7 +1293,7 @@ const EntryRange = struct {
 
     pub fn rangeAndProtectionIterator(
         entry_range: EntryRange,
-        range: core.VirtualRange,
+        range: addr.Virtual.Range,
         entries: []const *const Entry,
     ) RangeAndProtectionIterator {
         return .{
@@ -1306,13 +1306,13 @@ const EntryRange = struct {
 
     const RangeAndProtectionIterator = struct {
         entry_range: EntryRange,
-        range: core.VirtualRange,
+        range: addr.Virtual.Range,
         entries: []const *const Entry,
 
         index: usize,
 
         const VirtualRangeWithProtection = struct {
-            virtual_range: core.VirtualRange,
+            virtual_range: addr.Virtual.Range,
             protection: kernel.mem.MapType.Protection,
         };
 
@@ -1342,9 +1342,9 @@ const EntryRange = struct {
                 }
 
                 return .{
-                    .virtual_range = .fromAddr(
+                    .virtual_range = .from(
                         range.address,
-                        entry.range.endBound().difference(range.address),
+                        range.address.difference(entry.range.after()),
                     ),
                     .protection = entry.protection,
                 };
@@ -1354,9 +1354,9 @@ const EntryRange = struct {
                 @branchHint(.unlikely);
 
                 return .{
-                    .virtual_range = .fromAddr(
+                    .virtual_range = .from(
                         entry.range.address,
-                        range.endBound().difference(entry.range.address),
+                        entry.range.address.difference(range.after()),
                     ),
                     .protection = entry.protection,
                 };
@@ -1373,7 +1373,7 @@ const EntryRange = struct {
 /// Return the start index and length of the entries that overlap the given range.
 ///
 /// Also determines if the first and last entries overlap the start and end of the range.
-fn entryRange(address_space: *const AddressSpace, range: core.VirtualRange) ?EntryRange {
+fn entryRange(address_space: *const AddressSpace, range: addr.Virtual.Range) ?EntryRange {
     const entries = address_space.entries.items;
 
     var entry_range: EntryRange = blk: {

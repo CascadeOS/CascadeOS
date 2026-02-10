@@ -5,9 +5,10 @@ const std = @import("std");
 
 const arch = @import("arch");
 const boot = @import("boot");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
-const core = @import("core");
+const addr = kernel.addr;
 
 pub const Output = @import("output/Output.zig");
 
@@ -335,7 +336,7 @@ fn loadHelloWorld() !void {
 
     const header = try kernel.user.elf.Header.parse(hello_world_elf);
 
-    const entry_point: core.VirtualAddress = .fromInt(header.entry);
+    const entry_point: addr.Virtual.User = .from(header.entry);
     if (entry_point.equal(.zero)) return error.EntryPointIsZero;
 
     const program_header_table: []const u8 = blk: {
@@ -349,7 +350,7 @@ fn loadHelloWorld() !void {
     // TODO: this only makes sense for an embedded program, not if it is loaded from disk
     while (try iter.next()) |loadable_region| {
         _ = try process.address_space.map(.{
-            .base = loadable_region.map_range.address,
+            .base = loadable_region.map_range.address.toVirtual(),
             .size = loadable_region.map_range.size,
             .protection = .read_write,
             .type = .zero_fill,
@@ -364,7 +365,7 @@ fn loadHelloWorld() !void {
         iter.reset();
 
         while (try iter.next()) |loadable_region| {
-            const mapped_slice = loadable_region.map_range.toByteSlice();
+            const mapped_slice = loadable_region.map_range.byteSlice();
 
             @memcpy(
                 mapped_slice[loadable_region.destination_offset..][0..loadable_region.length],
@@ -380,7 +381,7 @@ fn loadHelloWorld() !void {
         if (loadable_region.protection == .read_write) continue;
 
         try process.address_space.changeProtection(
-            loadable_region.map_range,
+            loadable_region.map_range.toVirtualRange(),
             .{
                 .both = .{
                     .protection = loadable_region.protection,
@@ -398,6 +399,6 @@ fn loadHelloWorld() !void {
 
     arch.user.enterUserspace(.{
         .entry_point = entry_point,
-        .stack_pointer = user_stack.endBound(),
+        .stack_pointer = user_stack.toUser().after(),
     });
 }

@@ -4,9 +4,10 @@
 const std = @import("std");
 
 const arch = @import("arch");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
-const core = @import("core");
+const addr = kernel.addr;
 
 const x64 = @import("x64.zig");
 
@@ -36,7 +37,7 @@ pub const functions: arch.Functions = .{
             }
         }.createStackIterator,
         .instructionPointer = struct {
-            fn instructionPointer(interrupt_frame: *const x64.interrupts.InterruptFrame) usize {
+            fn instructionPointer(interrupt_frame: *const x64.interrupts.InterruptFrame) addr.Virtual {
                 return interrupt_frame.rip;
             }
         }.instructionPointer,
@@ -165,8 +166,8 @@ pub const decls: arch.Decls = .{
     .paging = .{
         .standard_page_size = .from(4, .kib),
         .largest_page_size = .from(1, .gib),
-        .lower_half_size = .from(128, .tib),
-        .higher_half_start = .fromInt(0xffff800000000000),
+        .lower_half_range = .from(.zero, .from(128, .tib)),
+        .higher_half_range = .from(.from(0xffff800000000000), .from(128, .tib)),
         .PageTable = x64.paging.PageTable,
     },
 

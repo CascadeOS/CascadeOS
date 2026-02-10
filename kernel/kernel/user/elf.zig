@@ -15,6 +15,7 @@ const builtin = @import("builtin");
 const arch = @import("arch");
 const core = @import("core");
 const kernel = @import("kernel");
+const addr = kernel.addr;
 
 const log = kernel.debug.log.scoped(.user);
 
@@ -497,7 +498,7 @@ pub const ProgramHeader = struct {
 };
 
 pub const LoadableRegion = struct {
-    map_range: core.VirtualRange,
+    map_range: addr.Virtual.Range.User,
 
     destination_offset: usize,
     source_base: usize,
@@ -517,12 +518,22 @@ pub const LoadableRegion = struct {
                 if (program_header.type != .load) continue;
                 if (program_header.memory_size == 0) continue; // can this even happen with a loadable segment?
 
-                const segment_base: core.VirtualAddress = .fromInt(program_header.virtual_address);
-                const range_base = segment_base.alignBackward(arch.paging.standard_page_size);
-                const segment_offset = segment_base.difference(range_base);
+                const raw_segment_base: addr.Virtual = .from(program_header.virtual_address);
+                const raw_range_base = raw_segment_base.alignBackward(arch.paging.standard_page_size_alignment);
+
+                const segment_offset_size = raw_range_base.difference(raw_segment_base);
 
                 const segment_size: core.Size = .from(program_header.memory_size, .byte);
-                const range_size = segment_size.add(segment_offset).alignForward(arch.paging.standard_page_size);
+                const range_size = segment_size
+                    .add(segment_offset_size)
+                    .alignForward(arch.paging.standard_page_size_alignment);
+
+                const raw_map_range: addr.Virtual.Range = .from(raw_segment_base, range_size);
+                if (raw_map_range.getType() != .user) {
+                    log.warn("program header has invalid user virtual address range: {f}", .{program_header});
+                    return error.ProgramHeaderInvalidVirtualAddress;
+                }
+                const map_range = raw_map_range.toUser();
 
                 const new_protection = blk: {
                     var prot: kernel.mem.MapType.Protection = .none;
@@ -548,8 +559,8 @@ pub const LoadableRegion = struct {
                 };
 
                 return .{
-                    .map_range = .fromAddr(range_base, range_size),
-                    .destination_offset = segment_offset.value,
+                    .map_range = map_range,
+                    .destination_offset = segment_offset_size.value,
                     .source_base = program_header.offset,
                     .length = program_header.file_size,
                     .protection = new_protection,

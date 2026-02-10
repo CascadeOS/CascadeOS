@@ -173,10 +173,10 @@ fn buildFATPartition(allocator: std.mem.Allocator, partition: ImageDescription.P
         .byte,
     );
 
-    const four_kib = core.Size.from(4, .kib);
+    const four_kib_alignment = core.Size.from(4, .kib).toAlignment();
 
     const padding_before_backup_info = size_of_info
-        .alignForward(four_kib)
+        .alignForward(four_kib_alignment)
         .subtract(size_of_info);
 
     @memcpy(

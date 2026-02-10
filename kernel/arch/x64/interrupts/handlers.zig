@@ -67,7 +67,7 @@ pub fn earlyPageFaultHandler(
     const arch_interrupt_frame: *const x64.interrupts.InterruptFrame = .from(interrupt_frame);
     const error_code: x64.paging.PageFaultErrorCode = .fromErrorCode(arch_interrupt_frame.error_code);
 
-    switch (arch_interrupt_frame.contextSS()) {
+    switch (arch_interrupt_frame.context()) {
         .kernel => kernel.debug.interruptSourcePanic(
             interrupt_frame,
             "kernel page fault @ {f} - {f}",
@@ -100,7 +100,7 @@ pub fn unhandledException(
     _: Task.Current.StateBeforeInterrupt,
 ) void {
     const arch_interrupt_frame: *const x64.interrupts.InterruptFrame = .from(interrupt_frame);
-    switch (arch_interrupt_frame.contextSS()) {
+    switch (arch_interrupt_frame.context()) {
         .kernel => kernel.debug.interruptSourcePanic(
             interrupt_frame,
             "unhandled kernel exception: {t}",

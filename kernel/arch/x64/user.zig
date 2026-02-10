@@ -3,17 +3,18 @@
 
 const std = @import("std");
 
-const cascade = @import("cascade");
 const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
 const Process = kernel.user.Process;
 const Thread = kernel.user.Thread;
-const core = @import("core");
-
-const log = kernel.debug.log.scoped(.user_x64);
+const addr = kernel.addr;
 
 const x64 = @import("x64.zig");
+
+const log = kernel.debug.log.scoped(.user_x64);
 
 pub const PerThread = struct {
     extended_state: ExtendedState,
@@ -188,13 +189,13 @@ pub fn enterUserspace(options: arch.user.EnterUserspaceOptions) noreturn {
 }
 
 const EnterUserspaceFrame = extern struct {
-    rip: core.VirtualAddress,
+    rip: addr.Virtual.User,
     cs: extern union {
         full: u64,
         selector: x64.Gdt.Selector,
     } = .{ .selector = .user_code },
     rflags: x64.registers.RFlags = user_rflags,
-    rsp: core.VirtualAddress,
+    rsp: addr.Virtual.User,
     ss: extern union {
         full: u64,
         selector: x64.Gdt.Selector,
@@ -257,8 +258,8 @@ pub const SyscallFrame = extern struct {
     /// r11
     rflags: x64.registers.RFlags,
     /// rcx
-    rip: u64,
-    rsp: u64,
+    rip: addr.Virtual,
+    rsp: addr.Virtual,
 
     pub inline fn from(syscall_frame: arch.user.SyscallFrame) *SyscallFrame {
         return &syscall_frame.arch_specific;
@@ -319,7 +320,7 @@ pub const SyscallFrame = extern struct {
         try writer.print("arg11: 0x{x:0>16}, arg12: 0x{x:0>16},\n", .{ value.arg(.eleven), value.arg(.twelve) });
 
         try writer.splatByteAll(' ', new_indent);
-        try writer.print("rsp:   0x{x:0>16}, rip:   0x{x:0>16},\n", .{ value.rsp, value.rip });
+        try writer.print("rsp:   0x{x:0>16}, rip:   0x{x:0>16},\n", .{ value.rsp.value, value.rip.value });
 
         try writer.splatByteAll(' ', new_indent);
         try writer.writeAll("rflags: ");

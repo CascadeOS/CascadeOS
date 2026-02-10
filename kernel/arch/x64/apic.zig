@@ -74,7 +74,7 @@ pub const init = struct {
         } else {
             const register_space_range = try kernel.mem.heap.allocateSpecial(
                 LAPIC.Register.register_space_size,
-                .fromAddr(.fromInt(madt.local_interrupt_controller_address), LAPIC.Register.register_space_size),
+                .from(.from(madt.local_interrupt_controller_address), LAPIC.Register.register_space_size),
                 .{
                     .type = .kernel,
                     .protection = .read_write,
@@ -83,7 +83,7 @@ pub const init = struct {
             );
 
             globals.lapic = .{
-                .xapic = register_space_range.address.toPtr([*]volatile u8),
+                .xapic = register_space_range.address.ptr([*]volatile u8),
             };
         }
 

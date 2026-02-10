@@ -4,10 +4,11 @@
 const std = @import("std");
 
 const arch = @import("arch");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
 const acpi = kernel.acpi;
-const core = @import("core");
+const addr = kernel.addr;
 
 /// TCG Hardware Interface Description Table Format for TPM 2.0
 ///
@@ -37,7 +38,7 @@ pub const TPM2 = extern struct {
     ///
     /// For interfaces that use a FIFO interface as defined in the PTP without a fixed base address, this field SHALL be
     /// the base address of the FIFO interface.
-    address: core.PhysicalAddress align(1),
+    address: addr.Physical align(1),
 
     /// The Start Method selector determines which mechanism the device driver uses to notify the TPM 2.0 device that a
     /// command is available for processing.
@@ -68,7 +69,7 @@ pub const TPM2 = extern struct {
     ///
     /// Note: The format of the TCG event log area is defined in the “PC Client PFP” specification, Section 9.
     /// The crypto agile log format as defined by the “PC Client PFP” specification should be used.
-    _log_area_start_address: core.PhysicalAddress align(1),
+    _log_area_start_address: addr.Physical align(1),
 
     pub const SIGNATURE_STRING = "TPM2";
 
@@ -77,8 +78,8 @@ pub const TPM2 = extern struct {
         return .from(tpm2._log_area_minimum_length, .byte);
     }
 
-    pub fn logAreaStartAddress(tpm2: *const TPM2) ?core.PhysicalAddress {
-        if (tpm2.header.length < @offsetOf(TPM2, "_log_area_start_address") + @sizeOf(core.PhysicalAddress)) return null;
+    pub fn logAreaStartAddress(tpm2: *const TPM2) ?addr.Physical {
+        if (tpm2.header.length < @offsetOf(TPM2, "_log_area_start_address") + @sizeOf(addr.Physical)) return null;
         return tpm2._log_area_start_address;
     }
 
@@ -268,13 +269,13 @@ pub const TPM2 = extern struct {
             /// is ready in the ControlArea buffer for the TPM.
             ///
             /// Set this 32-bit value to 1 to indicate to the TPM the message is ready.
-            tpm_start_address: core.PhysicalAddress align(1),
+            tpm_start_address: addr.Physical align(1),
 
             /// The 64-bit physical address of the 32-bit reply register to indicate the CRB Control Area or Response
             /// Area has been updated by the TPM.
             ///
             /// TPM sets this 32-bit value to 1 when complete.
-            tpm_reply_address: core.PhysicalAddress align(1),
+            tpm_reply_address: addr.Physical align(1),
 
             pub fn print(
                 command_response_buffer_with_amd_mailbox: *const CommandResponseBufferWithAMDMailbox,

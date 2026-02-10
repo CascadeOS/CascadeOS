@@ -5,9 +5,10 @@ const std = @import("std");
 
 const arch = @import("arch");
 const boot = @import("boot");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
-const core = @import("core");
+const addr = kernel.addr;
 
 const init_log = kernel.debug.log.scoped(.output_init);
 
@@ -28,17 +29,17 @@ fn tryGetFramebufferOutputInner(memory_system_available: bool) !?kernel.init.Out
 
     const framebuffer = boot.framebuffer() orelse return null;
 
-    const physical_address: core.PhysicalAddress = try kernel.mem.physicalFromDirectMap(
-        .fromPtr(@volatileCast(framebuffer.ptr)),
+    const physical_address: addr.Physical = try .fromDirectMap(
+        .from(@intFromPtr(@volatileCast(framebuffer.ptr))),
     );
 
-    if (!physical_address.isAligned(arch.paging.standard_page_size)) @panic("framebuffer is not aligned");
+    if (!physical_address.aligned(arch.paging.standard_page_size_alignment)) @panic("framebuffer is not aligned");
 
     const framebuffer_size: core.Size = .from(framebuffer.height * framebuffer.pitch, .byte);
 
     const virtual_range = try kernel.mem.heap.allocateSpecial(
         framebuffer_size,
-        .fromAddr(
+        .from(
             physical_address,
             framebuffer_size,
         ),
@@ -61,7 +62,7 @@ fn tryGetFramebufferOutputInner(memory_system_available: bool) !?kernel.init.Out
                 kernel.mem.heap.c.sizedFree(@ptrCast(raw_ptr), size);
             }
         }.flantermFree,
-        virtual_range.address.toPtr([*]u32),
+        virtual_range.address.ptr([*]u32),
         framebuffer.width,
         framebuffer.height,
         framebuffer.pitch,

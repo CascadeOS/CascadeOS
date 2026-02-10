@@ -4,9 +4,10 @@
 const std = @import("std");
 
 const arch = @import("arch");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
-const core = @import("core");
+const addr = kernel.addr;
 
 const x64 = @import("x64.zig");
 
@@ -73,7 +74,7 @@ pub inline fn disableInterruptsAndHalt() noreturn {
     }
 }
 
-pub inline fn invlpg(address: core.VirtualAddress) void {
+pub inline fn invlpg(address: addr.Virtual) void {
     asm volatile ("invlpg (%[address])"
         :
         : [address] "r" (address.value),

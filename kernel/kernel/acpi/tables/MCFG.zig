@@ -4,10 +4,11 @@
 const std = @import("std");
 
 const arch = @import("arch");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
 const acpi = kernel.acpi;
-const core = @import("core");
+const addr = kernel.addr;
 
 /// PCI-Express Memory Mapped Configuration Table (MCFG)
 pub const MCFG = extern struct {
@@ -30,7 +31,7 @@ pub const MCFG = extern struct {
     pub const SIGNATURE_STRING = "MCFG";
 
     pub const BaseAllocation = extern struct {
-        base_address: core.PhysicalAddress align(1),
+        base_address: addr.Physical align(1),
 
         segment_group: u16 align(1),
 

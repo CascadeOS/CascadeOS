@@ -1,14 +1,15 @@
 // SPDX-License-Identifier: LicenseRef-NON-AI-MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-// TODO: use `core.VirtualAddress`, search for `.value`
+// TODO: use `addr.Virtual.Kernel`, search for `.value`
 
 const std = @import("std");
 
 const arch = @import("arch");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
-const core = @import("core");
+const addr = kernel.addr;
 
 const log = kernel.debug.log.scoped(.cache);
 
@@ -411,7 +412,7 @@ pub const RawCache = struct {
                         const physical_page = kernel.mem.PhysicalPage.allocator.allocate() catch
                             return AllocateError.SlabAllocationFailed;
 
-                        const slab_base_ptr = kernel.mem.directMapFromPhysical(physical_page.baseAddress()).toPtr([*]u8);
+                        const slab_base_ptr = physical_page.baseAddress().toDirectMap().ptr([*]u8);
 
                         if (core.is_debug) @memset(slab_base_ptr[0..arch.paging.standard_page_size.value], undefined);
 
@@ -427,7 +428,7 @@ pub const RawCache = struct {
                     .pmm => {
                         var deallocate_page_list: kernel.mem.PhysicalPage.List = .{};
                         deallocate_page_list.prepend(.fromAddress(
-                            kernel.mem.physicalFromDirectMap(.fromPtr(slab_base_ptr)) catch unreachable,
+                            addr.Physical.fromDirectMap(.from(@intFromPtr(slab_base_ptr))) catch unreachable,
                         ));
                         kernel.mem.PhysicalPage.allocator.deallocate(deallocate_page_list);
                     },
@@ -485,11 +486,11 @@ pub const RawCache = struct {
                 errdefer globals.slab_cache.deallocate(slab);
 
                 if (core.is_debug) {
-                    const virtual_range: core.VirtualRange = .{
-                        .address = .fromInt(slab.large_item_allocation.base),
+                    const virtual_range: addr.Virtual.Range.Kernel = .{
+                        .address = .from(slab.large_item_allocation.base),
                         .size = .from(slab.large_item_allocation.len, .byte),
                     };
-                    @memset(virtual_range.toByteSlice(), undefined);
+                    @memset(virtual_range.byteSlice(), undefined);
                 }
 
                 const items_base: [*]u8 = @ptrFromInt(large_item_allocation.base);
@@ -664,7 +665,7 @@ pub const RawCache = struct {
                     .pmm => {
                         var deallocate_page_list: kernel.mem.PhysicalPage.List = .{};
                         deallocate_page_list.prepend(.fromAddress(
-                            kernel.mem.physicalFromDirectMap(.fromPtr(slab_base_ptr)) catch unreachable,
+                            addr.Physical.fromDirectMap(.from(@intFromPtr(slab_base_ptr))) catch unreachable,
                         ));
                         kernel.mem.PhysicalPage.allocator.deallocate(deallocate_page_list);
                     },
@@ -729,7 +730,7 @@ pub const RawCache = struct {
             const effective_item_size = if (is_small)
                 sizeOfItemWithNodeAppended(size, alignment)
             else
-                size.alignForward(.from(alignment.toByteUnits(), .byte));
+                size.alignForward(alignment);
 
             const items_per_slab = if (is_small)
                 arch.paging.standard_page_size.subtract(.of(Slab)).divide(effective_item_size)
@@ -783,7 +784,7 @@ const minimum_small_items_per_slab = 8;
 const maximum_small_item_size = arch.paging.standard_page_size
     .subtract(.of(RawCache.Slab))
     .divideScalar(minimum_small_items_per_slab);
-const single_node_alignment: core.Size = .from(@alignOf(std.SinglyLinkedList.Node), .byte);
+const single_node_alignment: std.mem.Alignment = .of(std.SinglyLinkedList.Node);
 
 pub inline fn isSmallItem(size: core.Size, alignment: std.mem.Alignment) bool {
     return sizeOfItemWithNodeAppended(size, alignment).lessThanOrEqual(maximum_small_item_size);
@@ -792,7 +793,7 @@ pub inline fn isSmallItem(size: core.Size, alignment: std.mem.Alignment) bool {
 fn sizeOfItemWithNodeAppended(size: core.Size, alignment: std.mem.Alignment) core.Size {
     return size.alignForward(single_node_alignment)
         .add(.of(std.SinglyLinkedList.Node))
-        .alignForward(.from(alignment.toByteUnits(), .byte));
+        .alignForward(alignment);
 }
 
 const globals = struct {

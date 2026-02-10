@@ -56,8 +56,8 @@ pub fn tryGetSerialOutput16X50(
 
             const register_range = try kernel.mem.heap.allocateSpecial(
                 UartT.register_region_size,
-                .fromAddr(
-                    .fromInt(base_address),
+                .from(
+                    .from(base_address),
                     UartT.register_region_size,
                 ),
                 .{
@@ -69,7 +69,7 @@ pub fn tryGetSerialOutput16X50(
             errdefer kernel.mem.heap.deallocateSpecial(register_range);
 
             const device = try UartT.create(
-                register_range.address.toPtr([*]volatile u8),
+                register_range.address.ptr([*]volatile u8),
                 baud,
             );
 
@@ -111,8 +111,8 @@ pub fn tryGetSerialOutputPL011(
 
     const register_range = try kernel.mem.heap.allocateSpecial(
         PL011.register_region_size,
-        .fromAddr(
-            .fromInt(base_address),
+        .from(
+            .from(base_address),
             PL011.register_region_size,
         ),
         .{
@@ -124,7 +124,7 @@ pub fn tryGetSerialOutputPL011(
     errdefer kernel.mem.heap.deallocateSpecial(register_range);
 
     const device = try PL011.create(
-        register_range.address.toPtr([*]volatile u32),
+        register_range.address.ptr([*]volatile u32),
         baud,
     );
 

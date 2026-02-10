@@ -4,9 +4,10 @@
 const std = @import("std");
 
 const arch = @import("arch");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
-const core = @import("core");
+const addr = kernel.addr;
 
 const x64 = @import("x64.zig");
 
@@ -234,8 +235,8 @@ pub const Cr0 = packed struct(u64) {
 /// Stores the linear address that was accessed to result in the last page fault.
 pub const Cr2 = struct {
     /// Read the page fault linear address from the CR2 register.
-    pub inline fn readAddress() core.VirtualAddress {
-        return core.VirtualAddress.fromInt(asm ("mov %%cr2, %[value]"
+    pub inline fn readAddress() kernel.addr.Virtual {
+        return .from(asm ("mov %%cr2, %[value]"
             : [value] "=r" (-> u64),
         ));
     }
@@ -243,14 +244,14 @@ pub const Cr2 = struct {
 
 pub const Cr3 = struct {
     /// Reads the CR3 register and returns the page table address.
-    pub inline fn readAddress() core.PhysicalAddress {
-        return core.PhysicalAddress.fromInt(asm ("mov %%cr3, %[value]"
+    pub inline fn readAddress() addr.Physical {
+        return .from(asm ("mov %%cr3, %[value]"
             : [value] "=r" (-> u64),
         ) & 0xFFFF_FFFF_FFFF_F000);
     }
 
     /// Writes the CR3 register with the given page table address.
-    pub inline fn writeAddress(address: core.PhysicalAddress) void {
+    pub inline fn writeAddress(address: addr.Physical) void {
         asm volatile ("mov %[address], %%cr3"
             :
             : [address] "r" (address.value & 0xFFFF_FFFF_FFFF_F000),
@@ -1004,24 +1005,24 @@ pub fn MSR(comptime T: type, comptime register: u32) type {
 
 fn DebugAddressRegister(comptime register: enum { DR0, DR1, DR2, DR3 }) type {
     return struct {
-        pub fn read() core.VirtualAddress {
+        pub fn read() addr.Virtual {
             return switch (register) {
-                .DR0 => .fromInt(asm ("mov %%dr0, %[value]"
+                .DR0 => .from(asm ("mov %%dr0, %[value]"
                     : [value] "=r" (-> u64),
                 )),
-                .DR1 => .fromInt(asm ("mov %%dr1, %[value]"
+                .DR1 => .from(asm ("mov %%dr1, %[value]"
                     : [value] "=r" (-> u64),
                 )),
-                .DR2 => .fromInt(asm ("mov %%dr2, %[value]"
+                .DR2 => .from(asm ("mov %%dr2, %[value]"
                     : [value] "=r" (-> u64),
                 )),
-                .DR3 => .fromInt(asm ("mov %%dr3, %[value]"
+                .DR3 => .from(asm ("mov %%dr3, %[value]"
                     : [value] "=r" (-> u64),
                 )),
             };
         }
 
-        pub fn write(address: core.VirtualAddress) void {
+        pub fn write(address: addr.Virtual) void {
             switch (register) {
                 .DR0 => asm volatile ("mov %[address], %%dr0"
                     :

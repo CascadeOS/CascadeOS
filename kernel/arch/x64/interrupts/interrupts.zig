@@ -5,10 +5,11 @@ const std = @import("std");
 
 const arch = @import("arch");
 const Handler = arch.interrupts.Interrupt.Handler;
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
 const Thread = kernel.user.Thread;
-const core = @import("core");
+const addr = kernel.addr;
 
 const x64 = @import("../x64.zig");
 const Idt = @import("Idt.zig");
@@ -196,13 +197,13 @@ pub const InterruptFrame = extern struct {
         interrupt: Interrupt,
     },
     error_code: u64,
-    rip: u64,
+    rip: addr.Virtual,
     cs: extern union {
         full: u64,
         selector: x64.Gdt.Selector,
     },
     rflags: x64.registers.RFlags,
-    rsp: u64,
+    rsp: addr.Virtual,
     ss: extern union {
         full: u64,
         selector: x64.Gdt.Selector,
@@ -213,7 +214,7 @@ pub const InterruptFrame = extern struct {
     }
 
     /// Returns the context that the interrupt was triggered from.
-    pub fn contextSS(interrupt_frame: *const InterruptFrame) kernel.Context.Type {
+    pub fn context(interrupt_frame: *const InterruptFrame) kernel.Context.Type {
         return switch (interrupt_frame.cs.selector) {
             .kernel_code => return .kernel,
             .user_code, .user_code_32bit => .user,
@@ -240,7 +241,7 @@ pub const InterruptFrame = extern struct {
         try writer.print("cs: {t}, ss: {t},\n", .{ value.cs.selector, value.ss.selector });
 
         try writer.splatByteAll(' ', new_indent);
-        try writer.print("rsp: 0x{x:0>16}, rip: 0x{x:0>16},\n", .{ value.rsp, value.rip });
+        try writer.print("rsp: 0x{x:0>16}, rip: 0x{x:0>16},\n", .{ value.rsp.value, value.rip.value });
 
         try writer.splatByteAll(' ', new_indent);
         try writer.print("rax: 0x{x:0>16}, rbx: 0x{x:0>16},\n", .{ value.rax, value.rbx });

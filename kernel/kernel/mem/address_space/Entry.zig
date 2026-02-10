@@ -22,6 +22,7 @@ const Task = kernel.Task;
 const Cache = kernel.mem.cache.Cache;
 const Protection = kernel.mem.MapType.Protection;
 const core = @import("core");
+const addr = kernel.addr;
 
 const AnonymousMap = @import("AnonymousMap.zig");
 const Object = @import("Object.zig");
@@ -30,7 +31,7 @@ const log = kernel.debug.log.scoped(.address_space);
 
 const Entry = @This();
 
-range: core.VirtualRange,
+range: addr.Virtual.Range,
 
 protection: Protection,
 max_protection: Protection,
@@ -84,7 +85,7 @@ pub fn canMerge(first_entry: *const Entry, second_entry: *const Entry) bool {
     if (first_entry.copy_on_write != second_entry.copy_on_write) return false;
     if (first_entry.wired_count != second_entry.wired_count) return false;
 
-    if (first_entry.range.endBound().notEqual(second_entry.range.address)) {
+    if (!first_entry.range.after().equal(second_entry.range.address)) {
         // `second_entry` does not immediately follow `first_entry`
         return false;
     }
@@ -208,28 +209,28 @@ pub fn merge(first_entry: *Entry, second_entry: *const Entry) void {
     first_entry.range.size.addInPlace(second_entry.range.size);
 }
 
-/// Split `first_entry` at `split_offset` into its range.
+/// Split `first_entry` at `split_size` into its range.
 ///
-/// `first_entry` is modified to cover the range before `split_offset` and `new_second_entry` is filled in to cover the
-/// range after `split_offset`.
+/// `first_entry` is modified to cover the range before `split_size` and `new_second_entry` is filled in to cover the
+/// range after `split_size`.
 ///
 /// Caller must ensure:
 ///  - `first_entry` and `new_second_entry` are not the same entry
-///  - `split_offset` is not `.zero`
-///  - `split_offset` is less than or equal to `first_entry.range.size`
-///  - `split_offset` is a multiple of the standard page size
-pub fn split(first_entry: *Entry, new_second_entry: *Entry, split_offset: core.Size) void {
+///  - `split_size` is not `.zero`
+///  - `split_size` is less than or equal to `first_entry.range.size`
+///  - `split_size` is a multiple of the standard page size
+pub fn split(first_entry: *Entry, new_second_entry: *Entry, split_size: core.Size) void {
     if (core.is_debug) {
         std.debug.assert(first_entry != new_second_entry);
         std.debug.assert(first_entry.range.size.notEqual(.zero));
-        std.debug.assert(split_offset.lessThanOrEqual(first_entry.range.size));
-        std.debug.assert(split_offset.isAligned(arch.paging.standard_page_size));
+        std.debug.assert(split_size.lessThanOrEqual(first_entry.range.size));
+        std.debug.assert(split_size.aligned(arch.paging.standard_page_size_alignment));
     }
 
     new_second_entry.* = .{
-        .range = .fromAddr(
-            first_entry.range.address.moveForward(split_offset),
-            first_entry.range.size.subtract(split_offset),
+        .range = .from(
+            first_entry.range.address.moveForward(split_size),
+            first_entry.range.size.subtract(split_size),
         ),
         .protection = first_entry.protection,
         .max_protection = first_entry.max_protection,
@@ -243,7 +244,7 @@ pub fn split(first_entry: *Entry, new_second_entry: *Entry, split_offset: core.S
     };
 
     if (first_entry.anonymous_map_reference.anonymous_map) |anonymous_map| {
-        new_second_entry.anonymous_map_reference.start_offset.addInPlace(split_offset);
+        new_second_entry.anonymous_map_reference.start_offset.addInPlace(split_size);
 
         anonymous_map.lock.writeLock();
         defer anonymous_map.lock.writeUnlock();
@@ -252,7 +253,7 @@ pub fn split(first_entry: *Entry, new_second_entry: *Entry, split_offset: core.S
     }
 
     if (first_entry.object_reference.object) |object| {
-        new_second_entry.object_reference.start_offset.addInPlace(split_offset);
+        new_second_entry.object_reference.start_offset.addInPlace(split_size);
 
         object.lock.writeLock();
         defer object.lock.writeUnlock();
@@ -260,7 +261,7 @@ pub fn split(first_entry: *Entry, new_second_entry: *Entry, split_offset: core.S
         object.reference_count += 1;
     }
 
-    first_entry.range.size = split_offset;
+    first_entry.range.size = split_size;
 }
 
 const ShrinkDirection = enum {
@@ -285,7 +286,7 @@ pub fn shrink(
     if (core.is_debug) {
         std.debug.assert(new_size.notEqual(.zero));
         std.debug.assert(new_size.lessThan(entry.range.size));
-        std.debug.assert(new_size.isAligned(arch.paging.standard_page_size));
+        std.debug.assert(new_size.aligned(arch.paging.standard_page_size_alignment));
     }
 
     const size_change = entry.range.size.subtract(new_size);

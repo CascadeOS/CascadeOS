@@ -4,9 +4,10 @@
 const std = @import("std");
 
 const arch = @import("arch");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
-const core = @import("core");
+const addr = kernel.addr;
 
 const PhysicalPage = @This();
 
@@ -23,13 +24,13 @@ pub const Index = enum(u32) {
     _,
 
     /// Returns the physical page that contains the given physical address.
-    pub fn fromAddress(physical_address: core.PhysicalAddress) Index {
+    pub fn fromAddress(physical_address: addr.Physical) Index {
         return @enumFromInt(physical_address.value / arch.paging.standard_page_size.value);
     }
 
     /// Returns the base address of the given physical page.
-    pub fn baseAddress(index: Index) core.PhysicalAddress {
-        return .fromInt(@intFromEnum(index) * arch.paging.standard_page_size.value);
+    pub fn baseAddress(index: Index) addr.Physical {
+        return .from(@intFromEnum(index) * arch.paging.standard_page_size.value);
     }
 };
 
@@ -57,12 +58,12 @@ fn allocate() Allocator.AllocateError!Index {
     );
 
     if (core.is_debug) {
-        const virtual_range: core.VirtualRange = .fromAddr(
-            kernel.mem.directMapFromPhysical(index.baseAddress()),
+        const virtual_range: addr.Virtual.Range.Kernel = .from(
+            index.baseAddress().toDirectMap(),
             arch.paging.standard_page_size,
         );
 
-        @memset(virtual_range.toByteSlice(), undefined);
+        @memset(virtual_range.byteSlice(), undefined);
     }
 
     return index;
@@ -285,33 +286,31 @@ pub const init = struct {
     /// Maps the pages array sparsely, only backing regions corresponding to usable physical memory.
     pub fn mapPagesArray(
         kernel_page_table: arch.paging.PageTable,
-        pages_array_range: core.VirtualRange,
+        pages_array_range: addr.Virtual.Range.Kernel,
     ) !void {
         const pages_array_base = pages_array_range.address;
 
-        var opt_current_range_start: ?core.VirtualAddress = null;
-        var current_range_end: core.VirtualAddress = undefined;
+        var opt_current_range_start: ?addr.Virtual.Kernel = null;
+        var current_range_end: addr.Virtual.Kernel = undefined;
 
         var memory_iter = boot.memoryMap(.forward) catch @panic("no memory map");
 
         while (memory_iter.next()) |entry| {
             if (!entry.type.isUsable()) continue;
 
-            const entry_range_start: core.VirtualAddress = pages_array_base
+            const entry_range_start: addr.Virtual.Kernel = pages_array_base
                 .moveForward(
-                    core.Size
-                        .of(PhysicalPage)
+                    core.Size.of(PhysicalPage)
                         .multiplyScalar(@intFromEnum(Index.fromAddress(entry.range.address))),
                 )
-                .alignBackward(arch.paging.standard_page_size);
+                .alignBackward(arch.paging.standard_page_size_alignment);
 
-            const entry_range_end: core.VirtualAddress = pages_array_base
+            const entry_range_end: addr.Virtual.Kernel = pages_array_base
                 .moveForward(
-                    core.Size
-                        .of(PhysicalPage)
+                    core.Size.of(PhysicalPage)
                         .multiplyScalar(@intFromEnum(Index.fromAddress(entry.range.last()))),
                 )
-                .alignForward(arch.paging.standard_page_size);
+                .alignForward(arch.paging.standard_page_size_alignment);
 
             if (opt_current_range_start) |*ptr_current_range_start| {
                 const current_range_start = ptr_current_range_start.*;
@@ -326,7 +325,10 @@ pub const init = struct {
 
                 try kernel.mem.mapRangeAndBackWithPhysicalPages(
                     kernel_page_table,
-                    .fromAddr(current_range_start, current_range_end.difference(current_range_start)),
+                    .from(
+                        current_range_start.toVirtual(),
+                        current_range_start.difference(current_range_end),
+                    ),
                     .{ .protection = .read_write, .type = .kernel },
                     .kernel,
                     .keep,
@@ -346,7 +348,10 @@ pub const init = struct {
         if (opt_current_range_start) |current_range_start| {
             try kernel.mem.mapRangeAndBackWithPhysicalPages(
                 kernel_page_table,
-                .fromAddr(current_range_start, current_range_end.difference(current_range_start)),
+                .from(
+                    current_range_start.toVirtual(),
+                    current_range_start.difference(current_range_end),
+                ),
                 .{ .protection = .read_write, .type = .kernel },
                 .kernel,
                 .keep,
@@ -358,10 +363,10 @@ pub const init = struct {
     /// Initializes the normal physical page allocator and the pages array.
     ///
     /// Pulls all memory out of the bootstrap physical page allocator and uses it to populate the normal allocator.
-    pub fn initializePhysicalMemory(pages_range: core.VirtualRange) void {
+    pub fn initializePhysicalMemory(pages_range: addr.Virtual.Range.Kernel) void {
         const pages: []PhysicalPage = @alignCast(std.mem.bytesAsSlice(
             PhysicalPage,
-            pages_range.toByteSlice(),
+            pages_range.byteSlice(),
         ));
         globals.pages = pages;
 

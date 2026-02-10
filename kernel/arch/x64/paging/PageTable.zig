@@ -5,10 +5,11 @@ const std = @import("std");
 
 const arch = @import("arch");
 const bitjuggle = @import("bitjuggle");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
 const MapType = kernel.mem.MapType;
-const core = @import("core");
+const addr = kernel.addr;
 
 const x64 = @import("../x64.zig");
 
@@ -17,14 +18,22 @@ pub const PageTable = extern struct {
     entries: [number_of_entries]Entry.Raw align(small_page_size.value),
 
     pub const number_of_entries = 512;
+
     pub const small_page_size: core.Size = .from(4, .kib);
+    pub const small_page_size_alignment = small_page_size.toAlignment();
+
     pub const medium_page_size: core.Size = .from(2, .mib);
+    const medium_page_size_alignment = medium_page_size.toAlignment();
+
     pub const large_page_size: core.Size = .from(1, .gib);
+    const large_page_size_alignment = large_page_size.toAlignment();
 
     pub const level_1_address_space_size = small_page_size;
     pub const level_2_address_space_size = medium_page_size;
     pub const level_3_address_space_size = large_page_size;
+
     pub const level_4_address_space_size = core.Size.from(512, .gib);
+    const level_4_address_space_size_alignment = level_4_address_space_size.toAlignment();
 
     pub fn sizeOfTopLevelEntry() core.Size {
         // TODO: Only correct for 4 level paging
@@ -47,7 +56,7 @@ pub const PageTable = extern struct {
     /// **REQUIREMENTS**:
     /// - The provided physical page must be accessible in the direct map.
     pub fn create(physical_page: kernel.mem.PhysicalPage.Index) *PageTable {
-        const page_table = kernel.mem.directMapFromPhysical(physical_page.baseAddress()).toPtr(*PageTable);
+        const page_table = physical_page.baseAddress().toDirectMap().ptr(*PageTable);
         page_table.zero();
         return page_table;
     }
@@ -55,12 +64,12 @@ pub const PageTable = extern struct {
     /// Maps a 4 KiB page.
     pub fn map4KiB(
         level4_table: *PageTable,
-        virtual_address: core.VirtualAddress,
+        virtual_address: addr.Virtual,
         phys_page: kernel.mem.PhysicalPage.Index,
         map_type: MapType,
         physical_page_allocator: kernel.mem.PhysicalPage.Allocator,
     ) kernel.mem.MapError!void {
-        if (core.is_debug) std.debug.assert(virtual_address.isAligned(small_page_size));
+        if (core.is_debug) std.debug.assert(virtual_address.aligned(small_page_size_alignment));
 
         var deallocate_page_list: kernel.mem.PhysicalPage.List = .{};
         errdefer physical_page_allocator.deallocate(deallocate_page_list);
@@ -128,15 +137,15 @@ pub const PageTable = extern struct {
     ///  - does not flush the TLB
     pub fn unmap(
         level4_table: *PageTable,
-        virtual_range: core.VirtualRange,
+        virtual_range: addr.Virtual.Range,
         backing_page_decision: core.CleanupDecision,
         top_level_decision: core.CleanupDecision,
         flush_batch: *kernel.mem.VirtualRangeBatch,
         deallocate_page_list: *kernel.mem.PhysicalPage.List,
     ) void {
         if (core.is_debug) {
-            std.debug.assert(virtual_range.address.isAligned(small_page_size));
-            std.debug.assert(virtual_range.size.isAligned(small_page_size));
+            std.debug.assert(virtual_range.address.aligned(small_page_size_alignment));
+            std.debug.assert(virtual_range.size.aligned(small_page_size_alignment));
         }
 
         var current_virtual_address = virtual_range.address;
@@ -149,14 +158,12 @@ pub const PageTable = extern struct {
 
         var level4_index = p4Index(current_virtual_address);
 
-        var opt_in_progress_range: ?core.VirtualRange = null;
+        var opt_in_progress_range: ?addr.Virtual.Range = null;
 
         while (level4_index <= last_virtual_address_p4_index) : (level4_index += 1) {
             const level4_entry = level4_table.entries[level4_index].load();
 
-            const level3_table = level4_entry.getNextLevel(
-                kernel.mem.directMapFromPhysical,
-            ) catch |err| switch (err) {
+            const level3_table = level4_entry.getNextLevel() catch |err| switch (err) {
                 error.NotPresent => {
                     if (opt_in_progress_range) |in_progress_range| {
                         flush_batch.appendMergeIfFull(in_progress_range);
@@ -164,7 +171,7 @@ pub const PageTable = extern struct {
                     }
 
                     current_virtual_address.moveForwardInPlace(level_4_address_space_size);
-                    current_virtual_address.alignBackwardInPlace(level_4_address_space_size);
+                    current_virtual_address.alignBackwardInPlace(level_4_address_space_size_alignment);
                     continue;
                 },
                 error.HugePage => @panic("page table entry is huge"),
@@ -184,9 +191,7 @@ pub const PageTable = extern struct {
             while (level3_index <= last_level3_index) : (level3_index += 1) {
                 const level3_entry = level3_table.entries[level3_index].load();
 
-                const level2_table = level3_entry.getNextLevel(
-                    kernel.mem.directMapFromPhysical,
-                ) catch |err| switch (err) {
+                const level2_table = level3_entry.getNextLevel() catch |err| switch (err) {
                     error.NotPresent => {
                         if (opt_in_progress_range) |in_progress_range| {
                             flush_batch.appendMergeIfFull(in_progress_range);
@@ -194,7 +199,7 @@ pub const PageTable = extern struct {
                         }
 
                         current_virtual_address.moveForwardInPlace(large_page_size);
-                        current_virtual_address.alignBackwardInPlace(large_page_size);
+                        current_virtual_address.alignBackwardInPlace(large_page_size_alignment);
                         continue;
                     },
                     error.HugePage => @panic("page table entry is huge"),
@@ -214,9 +219,7 @@ pub const PageTable = extern struct {
                 while (level2_index <= last_level2_index) : (level2_index += 1) {
                     const level2_entry = level2_table.entries[level2_index].load();
 
-                    const level1_table = level2_entry.getNextLevel(
-                        kernel.mem.directMapFromPhysical,
-                    ) catch |err| switch (err) {
+                    const level1_table = level2_entry.getNextLevel() catch |err| switch (err) {
                         error.NotPresent => {
                             if (opt_in_progress_range) |in_progress_range| {
                                 flush_batch.appendMergeIfFull(in_progress_range);
@@ -224,7 +227,7 @@ pub const PageTable = extern struct {
                             }
 
                             current_virtual_address.moveForwardInPlace(medium_page_size);
-                            current_virtual_address.alignBackwardInPlace(medium_page_size);
+                            current_virtual_address.alignBackwardInPlace(medium_page_size_alignment);
                             continue;
                         },
                         error.HugePage => @panic("page table entry is huge"),
@@ -264,7 +267,7 @@ pub const PageTable = extern struct {
                         if (opt_in_progress_range) |*in_progress_range| {
                             in_progress_range.size.addInPlace(small_page_size);
                         } else {
-                            opt_in_progress_range = .fromAddr(
+                            opt_in_progress_range = .from(
                                 current_virtual_address,
                                 small_page_size,
                             );
@@ -281,14 +284,14 @@ pub const PageTable = extern struct {
 
     pub fn changeProtection(
         level4_table: *PageTable,
-        virtual_range: core.VirtualRange,
+        virtual_range: addr.Virtual.Range,
         previous_map_type: MapType,
         new_map_type: MapType,
         flush_batch: *kernel.mem.VirtualRangeBatch,
     ) void {
         if (core.is_debug) {
-            std.debug.assert(virtual_range.address.isAligned(small_page_size));
-            std.debug.assert(virtual_range.size.isAligned(small_page_size));
+            std.debug.assert(virtual_range.address.aligned(small_page_size_alignment));
+            std.debug.assert(virtual_range.size.aligned(small_page_size_alignment));
         }
 
         const need_to_flush = needToFlush(previous_map_type, new_map_type);
@@ -304,14 +307,12 @@ pub const PageTable = extern struct {
         var level4_index = p4Index(current_virtual_address);
 
         // if `need_to_flush` is false then this will never be non-null
-        var opt_in_progress_range: ?core.VirtualRange = null;
+        var opt_in_progress_range: ?addr.Virtual.Range = null;
 
         while (level4_index <= last_virtual_address_p4_index) : (level4_index += 1) {
             const level4_entry = level4_table.entries[level4_index].load();
 
-            const level3_table = level4_entry.getNextLevel(
-                kernel.mem.directMapFromPhysical,
-            ) catch |err| switch (err) {
+            const level3_table = level4_entry.getNextLevel() catch |err| switch (err) {
                 error.NotPresent => {
                     if (opt_in_progress_range) |in_progress_range| {
                         flush_batch.appendMergeIfFull(in_progress_range);
@@ -319,7 +320,7 @@ pub const PageTable = extern struct {
                     }
 
                     current_virtual_address.moveForwardInPlace(level_4_address_space_size);
-                    current_virtual_address.alignBackwardInPlace(level_4_address_space_size);
+                    current_virtual_address.alignBackwardInPlace(level_4_address_space_size_alignment);
                     continue;
                 },
                 error.HugePage => @panic("page table entry is huge"),
@@ -334,9 +335,7 @@ pub const PageTable = extern struct {
             while (level3_index <= last_level3_index) : (level3_index += 1) {
                 const level3_entry = level3_table.entries[level3_index].load();
 
-                const level2_table = level3_entry.getNextLevel(
-                    kernel.mem.directMapFromPhysical,
-                ) catch |err| switch (err) {
+                const level2_table = level3_entry.getNextLevel() catch |err| switch (err) {
                     error.NotPresent => {
                         if (opt_in_progress_range) |in_progress_range| {
                             flush_batch.appendMergeIfFull(in_progress_range);
@@ -344,7 +343,7 @@ pub const PageTable = extern struct {
                         }
 
                         current_virtual_address.moveForwardInPlace(large_page_size);
-                        current_virtual_address.alignBackwardInPlace(large_page_size);
+                        current_virtual_address.alignBackwardInPlace(large_page_size_alignment);
                         continue;
                     },
                     error.HugePage => @panic("page table entry is huge"),
@@ -359,9 +358,7 @@ pub const PageTable = extern struct {
                 while (level2_index <= last_level2_index) : (level2_index += 1) {
                     const level2_entry = level2_table.entries[level2_index].load();
 
-                    const level1_table = level2_entry.getNextLevel(
-                        kernel.mem.directMapFromPhysical,
-                    ) catch |err| switch (err) {
+                    const level1_table = level2_entry.getNextLevel() catch |err| switch (err) {
                         error.NotPresent => {
                             if (opt_in_progress_range) |in_progress_range| {
                                 flush_batch.appendMergeIfFull(in_progress_range);
@@ -369,7 +366,7 @@ pub const PageTable = extern struct {
                             }
 
                             current_virtual_address.moveForwardInPlace(medium_page_size);
-                            current_virtual_address.alignBackwardInPlace(medium_page_size);
+                            current_virtual_address.alignBackwardInPlace(medium_page_size_alignment);
                             continue;
                         },
                         error.HugePage => @panic("page table entry is huge"),
@@ -401,7 +398,7 @@ pub const PageTable = extern struct {
                         if (opt_in_progress_range) |*in_progress_range| {
                             in_progress_range.size.addInPlace(small_page_size);
                         } else if (need_to_flush) {
-                            opt_in_progress_range = .fromAddr(
+                            opt_in_progress_range = .from(
                                 current_virtual_address,
                                 small_page_size,
                             );
@@ -436,7 +433,7 @@ pub const PageTable = extern struct {
     fn setEntry(
         page_table: *PageTable,
         index: usize,
-        physical_address: core.PhysicalAddress,
+        physical_address: addr.Physical,
         map_type: MapType,
         page_type: PageType,
     ) error{AlreadyMapped}!void {
@@ -644,30 +641,30 @@ pub const PageTable = extern struct {
             return entry._raw.isZero();
         }
 
-        fn getAddress4kib(entry: Entry) core.PhysicalAddress {
+        fn getAddress4kib(entry: Entry) addr.Physical {
             return .{ .value = entry._address_4kib_aligned.readNoShiftFullSize() };
         }
 
-        fn setAddress4kib(entry: *Entry, address: core.PhysicalAddress) void {
-            if (core.is_debug) std.debug.assert(address.isAligned(small_page_size));
+        fn setAddress4kib(entry: *Entry, address: addr.Physical) void {
+            if (core.is_debug) std.debug.assert(address.aligned(small_page_size_alignment));
             entry._address_4kib_aligned.writeNoShiftFullSize(address.value);
         }
 
-        fn getAddress2mib(entry: Entry) core.PhysicalAddress {
+        fn getAddress2mib(entry: Entry) addr.Physical {
             return .{ .value = entry._address_2mib_aligned.readNoShiftFullSize() };
         }
 
-        fn setAddress2mib(entry: *Entry, address: core.PhysicalAddress) void {
-            if (core.is_debug) std.debug.assert(address.isAligned(medium_page_size));
+        fn setAddress2mib(entry: *Entry, address: addr.Physical) void {
+            if (core.is_debug) std.debug.assert(address.aligned(medium_page_size_alignment));
             entry._address_2mib_aligned.writeNoShiftFullSize(address.value);
         }
 
-        fn getAddress1gib(entry: Entry) core.PhysicalAddress {
+        fn getAddress1gib(entry: Entry) addr.Physical {
             return .{ .value = entry._address_1gib_aligned.readNoShiftFullSize() };
         }
 
-        fn setAddress1gib(entry: *Entry, address: core.PhysicalAddress) void {
-            if (core.is_debug) std.debug.assert(address.isAligned(large_page_size));
+        fn setAddress1gib(entry: *Entry, address: addr.Physical) void {
+            if (core.is_debug) std.debug.assert(address.aligned(large_page_size_alignment));
             entry._address_1gib_aligned.writeNoShiftFullSize(address.value);
         }
 
@@ -680,11 +677,11 @@ pub const PageTable = extern struct {
         /// Otherwise returns a pointer to the next page table level.
         fn getNextLevel(
             entry: Entry,
-            comptime virtualFromPhysical: fn (core.PhysicalAddress) core.VirtualAddress,
+            // comptime virtualFromPhysical: fn (addr.Physical) addr.Virtual.Kernel,
         ) error{ NotPresent, HugePage }!*PageTable {
             if (!entry.present.read()) return error.NotPresent;
             if (entry.huge.read()) return error.HugePage;
-            return virtualFromPhysical(entry.getAddress4kib()).toPtr(*PageTable);
+            return entry.getAddress4kib().toDirectMap().ptr(*PageTable);
         }
 
         fn applyMapType(
@@ -887,10 +884,9 @@ pub const PageTable = extern struct {
         entry: *const PageTable,
         writer: *std.Io.Writer,
         comptime print_detailed_level1: bool,
-        comptime virtualFromPhysical: fn (core.PhysicalAddress) core.VirtualAddress,
     ) !void {
         for (entry.entries, 0..) |raw_level4_entry, level4_index| {
-            const level4_entry: Entry = .{ .raw = raw_level4_entry };
+            const level4_entry: Entry = raw_level4_entry.load();
 
             if (!level4_entry.present.read()) continue;
 
@@ -899,58 +895,58 @@ pub const PageTable = extern struct {
             // The level 4 part is sign extended to ensure the address is cannonical.
             const level4_part = signExtendAddress(level4_index << level_4_shift);
 
-            try writer.print("level 4 [{}] {}    Flags: ", .{ level4_index, core.VirtualAddress.fromInt(level4_part) });
+            try writer.print("level 4 [{}] {f}    Flags: ", .{ level4_index, addr.Virtual.from(level4_part) });
             try level4_entry.printDirectoryEntryFlags(writer);
             try writer.writeByte('\n');
 
-            const level3_table = try level4_entry.getNextLevel(virtualFromPhysical);
+            const level3_table = try level4_entry.getNextLevel();
             for (level3_table.entries, 0..) |raw_level3_entry, level3_index| {
-                const level3_entry: Entry = .{ .raw = raw_level3_entry };
+                const level3_entry: Entry = raw_level3_entry.load();
 
                 if (!level3_entry.present.read()) continue;
 
                 const level3_part = level3_index << level_3_shift;
 
                 if (level3_entry.huge.read()) {
-                    const virtual = core.VirtualAddress.fromInt(level4_part | level3_part);
+                    const virtual = addr.Virtual.from(level4_part | level3_part);
                     const physical = level3_entry.getAddress1gib();
-                    try writer.print("  [{}] 1GIB {} -> {}    Flags: ", .{ level3_index, virtual, physical });
+                    try writer.print("  [{}] 1GIB {f} -> {f}    Flags: ", .{ level3_index, virtual, physical });
                     try level3_entry.printHugeEntryFlags(writer);
                     try writer.writeByte('\n');
                     continue;
                 }
 
-                try writer.print("  level 3 [{}] {}    Flags: ", .{ level3_index, core.VirtualAddress.fromInt(level4_part | level3_part) });
+                try writer.print("  level 3 [{}] {f}    Flags: ", .{ level3_index, addr.Virtual.from(level4_part | level3_part) });
                 try level3_entry.printDirectoryEntryFlags(writer);
                 try writer.writeByte('\n');
 
-                const level2_table = try level3_entry.getNextLevel(virtualFromPhysical);
+                const level2_table = try level3_entry.getNextLevel();
                 for (level2_table.entries, 0..) |raw_level2_entry, level2_index| {
-                    const level2_entry: Entry = .{ .raw = raw_level2_entry };
+                    const level2_entry: Entry = raw_level2_entry.load();
 
                     if (!level2_entry.present.read()) continue;
 
                     const level2_part = level2_index << level_2_shift;
 
                     if (level2_entry.huge.read()) {
-                        const virtual = core.VirtualAddress.fromInt(level4_part | level3_part | level2_part);
+                        const virtual = addr.Virtual.from(level4_part | level3_part | level2_part);
                         const physical = level2_entry.getAddress2mib();
-                        try writer.print("    [{}] 2MIB {} -> {}    Flags: ", .{ level2_index, virtual, physical });
+                        try writer.print("    [{}] 2MIB {f} -> {f}    Flags: ", .{ level2_index, virtual, physical });
                         try level2_entry.printHugeEntryFlags(writer);
                         try writer.writeByte('\n');
                         continue;
                     }
 
-                    try writer.print("    level 2 [{}] {}    Flags: ", .{ level2_index, core.VirtualAddress.fromInt(level4_part | level3_part | level2_part) });
+                    try writer.print("    level 2 [{}] {f}    Flags: ", .{ level2_index, addr.Virtual.from(level4_part | level3_part | level2_part) });
                     try level2_entry.printDirectoryEntryFlags(writer);
                     try writer.writeByte('\n');
 
                     // use only when `print_detailed_level1` is false
                     var level1_present_entries: usize = 0;
 
-                    const level1_table = try level2_entry.getNextLevel(virtualFromPhysical);
+                    const level1_table = try level2_entry.getNextLevel();
                     for (level1_table.entries, 0..) |raw_level1_entry, level1_index| {
-                        const level1_entry: Entry = .{ .raw = raw_level1_entry };
+                        const level1_entry: Entry = raw_level1_entry.load();
 
                         if (!level1_entry.present.read()) continue;
 
@@ -963,9 +959,9 @@ pub const PageTable = extern struct {
 
                         const level1_part = level1_index << level_1_shift;
 
-                        const virtual = core.VirtualAddress.fromInt(level4_part | level3_part | level2_part | level1_part);
+                        const virtual = addr.Virtual.from(level4_part | level3_part | level2_part | level1_part);
                         const physical = level1_entry.getAddress4kib();
-                        try writer.print("      [{}] 4KIB {} -> {}    Flags: ", .{ level1_index, virtual, physical });
+                        try writer.print("      [{}] 4KIB {f} -> {f}    Flags: ", .{ level1_index, virtual, physical });
                         try level1_entry.printSmallEntryFlags(writer);
                         try writer.writeByte('\n');
                     }
@@ -988,13 +984,13 @@ pub const PageTable = extern struct {
         ///  - does not rollback on error
         pub fn fillTopLevel(
             page_table: *PageTable,
-            range: core.VirtualRange,
+            range: addr.Virtual.Range,
             physical_page_allocator: kernel.mem.PhysicalPage.Allocator,
         ) !void {
             const size_of_top_level_entry = arch.paging.init.sizeOfTopLevelEntry();
             if (core.is_debug) {
                 std.debug.assert(range.size.equal(size_of_top_level_entry));
-                std.debug.assert(range.address.isAligned(size_of_top_level_entry));
+                std.debug.assert(range.address.aligned(size_of_top_level_entry.toAlignment()));
             }
 
             const raw_entry = &page_table.entries[p4Index(range.address)];
@@ -1019,16 +1015,16 @@ pub const PageTable = extern struct {
         ///  - does not rollback on error
         pub fn mapToPhysicalRangeAllPageSizes(
             level4_table: *PageTable,
-            virtual_range: core.VirtualRange,
-            physical_range: core.PhysicalRange,
+            virtual_range: addr.Virtual.Range,
+            physical_range: addr.Physical.Range,
             map_type: MapType,
             physical_page_allocator: kernel.mem.PhysicalPage.Allocator,
         ) !void {
             if (core.is_debug) {
-                std.debug.assert(virtual_range.address.isAligned(small_page_size));
-                std.debug.assert(virtual_range.size.isAligned(small_page_size));
-                std.debug.assert(physical_range.address.isAligned(small_page_size));
-                std.debug.assert(physical_range.size.isAligned(small_page_size));
+                std.debug.assert(virtual_range.address.aligned(small_page_size_alignment));
+                std.debug.assert(virtual_range.size.aligned(small_page_size_alignment));
+                std.debug.assert(physical_range.address.aligned(small_page_size_alignment));
+                std.debug.assert(physical_range.size.aligned(small_page_size_alignment));
                 std.debug.assert(virtual_range.size.equal(physical_range.size));
             }
 
@@ -1069,8 +1065,8 @@ pub const PageTable = extern struct {
                 while (level3_index <= last_level3_index) : (level3_index += 1) {
                     if (supports_1gib and
                         size_remaining.greaterThanOrEqual(large_page_size) and
-                        current_virtual_address.isAligned(large_page_size) and
-                        current_physical_address.isAligned(large_page_size))
+                        current_virtual_address.aligned(large_page_size_alignment) and
+                        current_physical_address.aligned(large_page_size_alignment))
                     {
                         // large 1 GiB page
                         try level3_table.setEntry(
@@ -1101,8 +1097,8 @@ pub const PageTable = extern struct {
 
                     while (level2_index <= last_level2_index) : (level2_index += 1) {
                         if (size_remaining.greaterThanOrEqual(medium_page_size) and
-                            current_virtual_address.isAligned(medium_page_size) and
-                            current_physical_address.isAligned(medium_page_size))
+                            current_virtual_address.aligned(medium_page_size_alignment) and
+                            current_physical_address.aligned(medium_page_size_alignment))
                         {
                             // large 2 MiB page
                             try level2_table.setEntry(
@@ -1187,7 +1183,7 @@ fn ensureNextTable(
         errdefer comptime unreachable;
 
         const physical_address = physical_page.baseAddress();
-        kernel.mem.directMapFromPhysical(physical_address).toPtr(*PageTable).zero();
+        physical_address.toDirectMap().ptr(*PageTable).zero();
 
         entry.setAddress4kib(physical_address);
         entry.present.write(true);
@@ -1203,28 +1199,26 @@ fn ensureNextTable(
     };
 
     return .{
-        kernel.mem
-            .directMapFromPhysical(next_level_physical_address)
-            .toPtr(*PageTable),
+        next_level_physical_address.toDirectMap().ptr(*PageTable),
         created_table,
     };
 }
 
 const PageType = enum { small, medium, large };
 
-inline fn p1Index(address: core.VirtualAddress) usize {
+inline fn p1Index(address: addr.Virtual) usize {
     return @as(u9, @truncate(address.value >> level_1_shift));
 }
 
-inline fn p2Index(address: core.VirtualAddress) usize {
+inline fn p2Index(address: addr.Virtual) usize {
     return @as(u9, @truncate(address.value >> level_2_shift));
 }
 
-inline fn p3Index(address: core.VirtualAddress) usize {
+inline fn p3Index(address: addr.Virtual) usize {
     return @as(u9, @truncate(address.value >> level_3_shift));
 }
 
-inline fn p4Index(address: core.VirtualAddress) usize {
+inline fn p4Index(address: addr.Virtual) usize {
     return @as(u9, @truncate(address.value >> level_4_shift));
 }
 

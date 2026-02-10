@@ -4,9 +4,10 @@
 const std = @import("std");
 
 const arch = @import("arch");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
-const core = @import("core");
+const addr = kernel.addr;
 
 const limine_interface = @import("limine/interface.zig");
 
@@ -19,8 +20,8 @@ pub fn kernelBaseAddress() ?KernelBaseAddress {
 }
 
 pub const KernelBaseAddress = struct {
-    virtual: core.VirtualAddress,
-    physical: core.PhysicalAddress,
+    virtual: addr.Virtual.Kernel,
+    physical: addr.Physical,
 };
 
 /// Returns an iterator over the memory map entries, iterating in the given direction.
@@ -42,7 +43,7 @@ pub const MemoryMap = struct {
             } orelse
                 return null;
 
-            if (entry.range.address.equal(.fromInt(0xfd00000000))) {
+            if (entry.range.address.equal(.from(0xfd00000000))) {
                 // this is a qemu specific hack to not have a 1TiB direct map
                 // this `0xfd00000000` memory region is not listed in qemu's `info mtree` but the bootloader reports it
                 continue;
@@ -54,7 +55,7 @@ pub const MemoryMap = struct {
 
     /// An entry in the memory map provided by the bootloader.
     pub const Entry = struct {
-        range: core.PhysicalRange,
+        range: addr.Physical.Range,
         type: Type,
 
         pub const Type = enum {
@@ -99,7 +100,7 @@ pub const MemoryMap = struct {
 };
 
 /// Returns the direct map address provided by the bootloader, if any.
-pub fn directMapAddress() ?core.VirtualAddress {
+pub fn directMapAddress() ?addr.Virtual.Kernel {
     return switch (bootloader_api) {
         .limine => limine_interface.directMapAddress(),
         .unknown => null,
@@ -107,12 +108,12 @@ pub fn directMapAddress() ?core.VirtualAddress {
 }
 
 pub const Address = union(enum) {
-    physical: core.PhysicalAddress,
-    virtual: core.VirtualAddress,
+    physical: addr.Physical,
+    virtual: addr.Virtual.Kernel,
 
     pub const Raw = extern union {
-        physical: core.PhysicalAddress,
-        virtual: core.VirtualAddress,
+        physical: addr.Physical,
+        virtual: addr.Virtual.Kernel,
     };
 };
 
@@ -244,7 +245,7 @@ pub fn framebuffer() ?Framebuffer {
 }
 
 /// Returns the device tree blob provided by the bootloader, if any.
-pub fn deviceTreeBlob() ?core.VirtualAddress {
+pub fn deviceTreeBlob() ?addr.Virtual.Kernel {
     return switch (bootloader_api) {
         .limine => limine_interface.deviceTreeBlob(),
         .unknown => null,

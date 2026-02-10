@@ -10,10 +10,11 @@ const std = @import("std");
 const Wyhash = std.hash.Wyhash;
 
 const arch = @import("arch");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
 const RawCache = kernel.mem.cache.RawCache;
-const core = @import("core");
+const addr = kernel.addr;
 
 const log = kernel.debug.log.scoped(.resource_arena);
 
@@ -134,8 +135,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                             @panic("heap quantum cache allocation failed");
                         pages.prepend(page);
 
-                        const page_caches = kernel.mem.directMapFromPhysical(page.baseAddress())
-                            .toPtr(*[QUANTUM_CACHES_PER_PAGE]RawCache);
+                        const page_caches = page.baseAddress().toDirectMap().ptr(*[QUANTUM_CACHES_PER_PAGE]RawCache);
 
                         for (page_caches) |*cache| {
                             caches_created += 1;
@@ -964,14 +964,14 @@ pub const Allocation = struct {
     base: usize,
     len: usize,
 
-    pub fn toVirtualRange(self: Allocation) core.VirtualRange {
+    pub inline fn toVirtualRange(self: Allocation) addr.Virtual.Range.Kernel {
         return .{
-            .address = .fromInt(self.base),
+            .address = .from(self.base),
             .size = .from(self.len, .byte),
         };
     }
 
-    pub fn fromVirtualRange(range: core.VirtualRange) Allocation {
+    pub inline fn fromVirtualRange(range: addr.Virtual.Range.Kernel) Allocation {
         return .{
             .base = range.address.value,
             .len = range.size.value,

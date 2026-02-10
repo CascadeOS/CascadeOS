@@ -4,9 +4,10 @@
 const std = @import("std");
 
 const arch = @import("arch");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
-const core = @import("core");
+const addr = kernel.addr;
 
 const x64 = @import("x64.zig");
 
@@ -109,11 +110,11 @@ pub const init = struct {
                 .io_apic => {
                     const io_apic_data = entry.specific.io_apic;
 
-                    const size_to_map = IOAPIC.register_region_size.alignForward(arch.paging.standard_page_size);
+                    const size_to_map = IOAPIC.register_region_size.alignForward(arch.paging.standard_page_size_alignment);
 
                     const register_region_range = try kernel.mem.heap.allocateSpecial(
                         size_to_map,
-                        .fromAddr(.fromInt(io_apic_data.ioapic_address), size_to_map),
+                        .from(.from(io_apic_data.ioapic_address), size_to_map),
                         .{
                             .type = .kernel,
                             .protection = .read_write,
@@ -168,10 +169,10 @@ const IOAPIC = struct {
 
     pub const register_region_size = core.Size.of(u32).multiplyScalar(2);
 
-    pub fn init(base_address: core.VirtualAddress, gsi_base: u32) IOAPIC {
+    pub fn init(base_address: addr.Virtual.Kernel, gsi_base: u32) IOAPIC {
         var ioapic: IOAPIC = .{
-            .ioregsel = base_address.toPtr(*volatile u32),
-            .iowin = base_address.moveForward(.from(0x10, .byte)).toPtr(*volatile u32),
+            .ioregsel = base_address.ptr(*volatile u32),
+            .iowin = base_address.moveForward(.from(0x10, .byte)).ptr(*volatile u32),
             .gsi_base = gsi_base,
             .number_of_redirection_entries = undefined,
         };

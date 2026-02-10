@@ -4,25 +4,26 @@
 const std = @import("std");
 
 const arch = @import("arch");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
-const core = @import("core");
+const addr = kernel.addr;
 
 const Stack = @This();
 
 /// The entire virtual range including the guard page.
-range: core.VirtualRange,
+range: addr.Virtual.Range.Kernel,
 
 /// The usable range excluding the guard page.
-usable_range: core.VirtualRange,
+usable_range: addr.Virtual.Range.Kernel,
 
 /// The current stack pointer.
-stack_pointer: core.VirtualAddress,
+stack_pointer: addr.Virtual.Kernel,
 
 /// The top of the stack.
 ///
-/// This is not the same as `usable_range.endBound()` as a zero return address is pushed onto the top of the stack.
-top_stack_pointer: core.VirtualAddress,
+/// This is not the same as `usable_range.after()` as a zero return address is pushed onto the top of the stack.
+top_stack_pointer: addr.Virtual.Kernel,
 
 /// Creates a stack from a range.
 ///
@@ -30,20 +31,20 @@ top_stack_pointer: core.VirtualAddress,
 /// - `usable_range` must be atleast `@sizeOf(usize)` bytes.
 /// - `range` and `usable_range` must be aligned to 16 bytes.
 /// - `range` must fully contain `usable_range`.
-pub fn fromRange(range: core.VirtualRange, usable_range: core.VirtualRange) Stack {
+pub fn fromRange(range: addr.Virtual.Range.Kernel, usable_range: addr.Virtual.Range.Kernel) Stack {
     if (core.is_debug) {
         std.debug.assert(usable_range.size.greaterThanOrEqual(core.Size.of(usize)));
-        std.debug.assert(range.fullyContainsRange(usable_range));
+        std.debug.assert(range.fullyContains(usable_range));
 
         // TODO: are these two checks needed needed as we don't use SIMD? non-x64?
-        std.debug.assert(range.address.isAligned(.from(16, .byte)));
-        std.debug.assert(usable_range.address.isAligned(.from(16, .byte)));
+        std.debug.assert(range.address.aligned(.@"16"));
+        std.debug.assert(usable_range.address.aligned(.@"16"));
     }
 
     var stack: Stack = .{
         .range = range,
         .usable_range = usable_range,
-        .stack_pointer = usable_range.endBound(),
+        .stack_pointer = usable_range.after(),
         .top_stack_pointer = undefined, // set by `reset`
     };
 
@@ -54,10 +55,10 @@ pub fn fromRange(range: core.VirtualRange, usable_range: core.VirtualRange) Stac
 
 /// Pushes a value onto the stack.
 pub fn push(stack: *Stack, value: usize) error{StackOverflow}!void {
-    const new_stack_pointer: core.VirtualAddress = stack.stack_pointer.moveBackward(.of(usize));
+    const new_stack_pointer: addr.Virtual.Kernel = stack.stack_pointer.moveBackward(.of(usize));
     if (new_stack_pointer.lessThan(stack.usable_range.address)) return error.StackOverflow;
 
-    const ptr: *usize = new_stack_pointer.toPtr(*usize);
+    const ptr: *usize = new_stack_pointer.ptr(*usize);
     ptr.* = value;
 
     stack.stack_pointer = new_stack_pointer;
@@ -66,13 +67,13 @@ pub fn push(stack: *Stack, value: usize) error{StackOverflow}!void {
 /// Returns true if there is space for `number` of `usize` values on the stack.
 pub fn spaceFor(stack: *const Stack, number: usize) bool {
     const size = core.Size.of(usize).multiplyScalar(number);
-    const new_stack_pointer: core.VirtualAddress = stack.stack_pointer.moveBackward(size);
+    const new_stack_pointer: addr.Virtual.Kernel = stack.stack_pointer.moveBackward(size);
     if (new_stack_pointer.lessThan(stack.usable_range.address)) return false;
     return true;
 }
 
 pub fn reset(stack: *Stack) void {
-    stack.stack_pointer = stack.usable_range.endBound();
+    stack.stack_pointer = stack.usable_range.after();
 
     // push a zero return address
     stack.push(0) catch unreachable; // TODO: is this correct for non-x64?
@@ -88,7 +89,7 @@ pub fn createStack() !Stack {
     errdefer globals.stack_arena.deallocate(stack_range);
 
     const range = stack_range.toVirtualRange();
-    const usable_range: core.VirtualRange = .{
+    const usable_range: addr.Virtual.Range.Kernel = .{
         .address = range.address,
         .size = kernel.config.task.kernel_stack_size,
     };
@@ -99,7 +100,7 @@ pub fn createStack() !Stack {
 
         kernel.mem.mapRangeAndBackWithPhysicalPages(
             kernel.mem.kernelPageTable(),
-            usable_range,
+            usable_range.toVirtualRange(),
             .{ .type = .kernel, .protection = .read_write },
             .kernel,
             .keep,
@@ -116,7 +117,7 @@ pub fn destroyStack(stack: Stack) void {
         defer globals.stack_page_table_mutex.unlock();
 
         var unmap_batch: kernel.mem.VirtualRangeBatch = .{};
-        unmap_batch.appendMergeIfFull(stack.usable_range);
+        unmap_batch.appendMergeIfFull(stack.usable_range.toVirtualRange());
 
         kernel.mem.unmap(
             kernel.mem.kernelPageTable(),

@@ -4,10 +4,11 @@
 const std = @import("std");
 
 const arch = @import("arch");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
 const acpi = kernel.acpi;
-const core = @import("core");
+const addr = kernel.addr;
 
 /// The Fixed ACPI Description Table (FADT) defines various fixed hardware ACPI information vital to an ACPI-compatible
 /// OS, such as the base address for the following hardware registers blocks:
@@ -380,7 +381,7 @@ pub const FADT = extern struct {
     ///
     /// If `fixed_feature_flags.HARDWARE_REDUCED_ACPI` flag is set, and both this field and the `FIRMWARE_CTRL` field
     /// are zero, there is no FACS available
-    X_FIRMWARE_CTRL: core.PhysicalAddress align(1),
+    X_FIRMWARE_CTRL: addr.Physical align(1),
 
     /// Extended physical address of the DSDT.
     ///
@@ -388,7 +389,7 @@ pub const FADT = extern struct {
     /// by the OSPM.
     ///
     /// Use `getDSDT` to get the DSDT.
-    _X_DSDT: core.PhysicalAddress align(1),
+    _X_DSDT: addr.Physical align(1),
 
     /// Extended address of the PM1a Event Register Block.
     ///
@@ -499,11 +500,11 @@ pub const FADT = extern struct {
     pub const SIGNATURE_STRING = "FACP";
 
     /// Physical address of the DSDT.
-    pub fn getDSDT(fadt: *const FADT) core.PhysicalAddress {
-        return if (fadt._X_DSDT.notEqual(.zero))
+    pub fn getDSDT(fadt: *const FADT) addr.Physical {
+        return if (!fadt._X_DSDT.equal(.zero))
             fadt._X_DSDT
         else
-            .fromInt(fadt._DSDT);
+            .from(fadt._DSDT);
     }
 
     /// Address of the PM1a Control Register Block.

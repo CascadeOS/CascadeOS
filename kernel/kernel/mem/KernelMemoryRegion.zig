@@ -8,10 +8,11 @@ const kernel = @import("kernel");
 const Task = kernel.Task;
 const MapType = kernel.mem.MapType;
 const core = @import("core");
+const addr = kernel.addr;
 
 const KernelMemoryRegion = @This();
 
-range: core.VirtualRange,
+range: addr.Virtual.Range.Kernel,
 type: Type,
 
 pub const Type = enum {
@@ -57,7 +58,7 @@ pub const List = struct {
     }
 
     /// Find the region containing the given address.
-    pub fn containingAddress(list: *const List, address: core.VirtualAddress) ?KernelMemoryRegion.Type {
+    pub fn containingAddress(list: *const List, address: addr.Virtual.Kernel) ?KernelMemoryRegion.Type {
         for (list.values.constSlice()) |region| {
             if (region.range.containsAddress(address)) return region.type;
         }
@@ -88,19 +89,14 @@ pub const List = struct {
     pub fn findFreeRange(
         list: *List,
         size: core.Size,
-        alignment: core.Size,
-    ) ?core.VirtualRange {
+        alignment: std.mem.Alignment,
+    ) ?addr.Virtual.Range.Kernel {
         // needs the regions to be sorted
         list.sort();
 
         const regions = list.constSlice();
 
-        var current_address = arch.paging.higher_half_start;
-        comptime {
-            // this means any range returned by this function cannot overlap with the undefined address
-            std.debug.assert(arch.paging.higher_half_start.greaterThan(.undefined_address));
-        }
-
+        var current_address = arch.paging.higher_half_range.address.toKernel();
         current_address.alignForwardInPlace(alignment);
 
         var i: usize = 0;
@@ -114,13 +110,13 @@ pub const List = struct {
 
                 if (size_of_free_range.lessThan(size)) return null;
 
-                return core.VirtualRange.fromAddr(current_address, size);
+                return .from(current_address, size);
             };
 
             const region_address = region.range.address;
 
             if (region_address.lessThanOrEqual(current_address)) {
-                current_address = region.range.endBound();
+                current_address = region.range.after();
                 current_address.alignForwardInPlace(alignment);
                 i += 1;
                 continue;
@@ -132,13 +128,13 @@ pub const List = struct {
             );
 
             if (size_of_free_range.lessThan(size)) {
-                current_address = region.range.endBound();
+                current_address = region.range.after();
                 current_address.alignForwardInPlace(alignment);
                 i += 1;
                 continue;
             }
 
-            return core.VirtualRange.fromAddr(current_address, size);
+            return .from(current_address, size);
         }
     }
 };

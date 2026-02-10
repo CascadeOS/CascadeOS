@@ -8,6 +8,7 @@ const kernel = @import("kernel");
 const Task = kernel.Task;
 const Process = kernel.user.Process;
 const core = @import("core");
+const addr = kernel.addr;
 
 pub const AddressSpace = @import("address_space/AddressSpace.zig");
 pub const cache = @import("cache.zig");
@@ -40,17 +41,15 @@ pub inline fn kernelAddressSpace() *AddressSpace {
 /// - `map_type.protection` must not be `.none`
 pub fn mapSinglePage(
     page_table: arch.paging.PageTable,
-    virtual_address: core.VirtualAddress,
+    virtual_address: addr.Virtual,
     physical_page: PhysicalPage.Index,
     map_type: MapType,
     physical_page_allocator: PhysicalPage.Allocator,
 ) MapError!void {
     if (core.is_debug) {
         std.debug.assert(map_type.protection != .none);
-        std.debug.assert(virtual_address.isAligned(arch.paging.standard_page_size));
+        std.debug.assert(virtual_address.aligned(arch.paging.standard_page_size_alignment));
     }
-
-    // TODO: replace with `mapRangeToPhysicalRange`
 
     try page_table.mapSinglePage(
         virtual_address,
@@ -71,7 +70,7 @@ pub fn mapSinglePage(
 /// - `map_type.protection` must not be `.none`
 pub fn mapRangeAndBackWithPhysicalPages(
     page_table: arch.paging.PageTable,
-    virtual_range: core.VirtualRange,
+    virtual_range: addr.Virtual.Range,
     map_type: MapType,
     flush_target: kernel.Context,
     top_level_decision: core.CleanupDecision,
@@ -79,8 +78,8 @@ pub fn mapRangeAndBackWithPhysicalPages(
 ) MapError!void {
     if (core.is_debug) {
         std.debug.assert(map_type.protection != .none);
-        std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
-        std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
+        std.debug.assert(virtual_range.address.aligned(arch.paging.standard_page_size_alignment));
+        std.debug.assert(virtual_range.size.aligned(arch.paging.standard_page_size_alignment));
     }
 
     const last_virtual_address = virtual_range.last();
@@ -92,7 +91,7 @@ pub fn mapRangeAndBackWithPhysicalPages(
         var unmap_batch: VirtualRangeBatch = .{};
         unmap_batch.appendMergeIfFull(.{
             .address = virtual_range.address,
-            .size = .from(current_virtual_address.value - virtual_range.address.value, .byte),
+            .size = virtual_range.address.difference(current_virtual_address),
         });
 
         unmap(
@@ -140,8 +139,8 @@ pub fn mapRangeAndBackWithPhysicalPages(
 /// - `map_type.protection` must not be `.none`
 pub fn mapRangeToPhysicalRange(
     page_table: arch.paging.PageTable,
-    virtual_range: core.VirtualRange,
-    physical_range: core.PhysicalRange,
+    virtual_range: addr.Virtual.Range,
+    physical_range: addr.Physical.Range,
     map_type: MapType,
     flush_target: kernel.Context,
     top_level_decision: core.CleanupDecision,
@@ -149,10 +148,10 @@ pub fn mapRangeToPhysicalRange(
 ) MapError!void {
     if (core.is_debug) {
         std.debug.assert(map_type.protection != .none);
-        std.debug.assert(virtual_range.address.isAligned(arch.paging.standard_page_size));
-        std.debug.assert(virtual_range.size.isAligned(arch.paging.standard_page_size));
-        std.debug.assert(physical_range.address.isAligned(arch.paging.standard_page_size));
-        std.debug.assert(physical_range.size.isAligned(arch.paging.standard_page_size));
+        std.debug.assert(virtual_range.address.aligned(arch.paging.standard_page_size_alignment));
+        std.debug.assert(virtual_range.size.aligned(arch.paging.standard_page_size_alignment));
+        std.debug.assert(physical_range.address.aligned(arch.paging.standard_page_size_alignment));
+        std.debug.assert(physical_range.size.aligned(arch.paging.standard_page_size_alignment));
         std.debug.assert(virtual_range.size.equal(physical_range.size));
     }
 
@@ -163,7 +162,7 @@ pub fn mapRangeToPhysicalRange(
         var unmap_batch: VirtualRangeBatch = .{};
         unmap_batch.appendMergeIfFull(.{
             .address = virtual_range.address,
-            .size = .from(current_virtual_address.value - virtual_range.address.value, .byte),
+            .size = virtual_range.address.difference(current_virtual_address),
         });
 
         unmap(
@@ -287,45 +286,6 @@ pub fn changeProtection(
     }
 }
 
-/// Returns the virtual address corresponding to this physical address in the direct map.
-pub fn directMapFromPhysical(physical_address: core.PhysicalAddress) core.VirtualAddress {
-    return .{ .value = physical_address.value + globals.direct_map.address.value };
-}
-
-/// Returns a virtual range corresponding to this physical range in the direct map.
-pub fn directMapFromPhysicalRange(physical_range: core.PhysicalRange) core.VirtualRange {
-    return .{
-        .address = directMapFromPhysical(physical_range.address),
-        .size = physical_range.size,
-    };
-}
-
-/// Returns the physical address of the given virtual address if it is in the direct map.
-pub fn physicalFromDirectMap(virtual_address: core.VirtualAddress) error{AddressNotInDirectMap}!core.PhysicalAddress {
-    if (globals.direct_map.containsAddress(virtual_address)) {
-        return .{ .value = virtual_address.value - globals.direct_map.address.value };
-    }
-    return error.AddressNotInDirectMap;
-}
-
-/// Returns the physical range of the given direct map virtual range.
-pub fn physicalRangeFromDirectMap(virtual_range: core.VirtualRange) error{AddressNotInDirectMap}!core.PhysicalRange {
-    if (globals.direct_map.fullyContainsRange(virtual_range)) {
-        return .{
-            .address = .fromInt(virtual_range.address.value - globals.direct_map.address.value),
-            .size = virtual_range.size,
-        };
-    }
-    return error.AddressNotInDirectMap;
-}
-
-/// Returns the physical address of the given kernel ELF section virtual address.
-///
-/// It is the caller's responsibility to ensure that the given virtual address is in the kernel ELF sections.
-pub fn physicalFromKernelSectionUnsafe(virtual_address: core.VirtualAddress) core.PhysicalAddress {
-    return .{ .value = virtual_address.value - globals.physical_to_virtual_offset.value };
-}
-
 /// Executed upon page fault.
 pub fn onPageFault(
     page_fault_details: PageFaultDetails,
@@ -335,15 +295,10 @@ pub fn onPageFault(
     current_task.decrementInterruptDisable();
 
     switch (page_fault_details.faulting_context) {
-        .kernel => onKernelPageFault(
-            page_fault_details,
-            interrupt_frame,
-        ),
+        .kernel => onKernelPageFault(page_fault_details, interrupt_frame),
         .user => {
             const process: *kernel.user.Process = .from(current_task.task);
-            process.address_space.handlePageFault(
-                page_fault_details,
-            ) catch |err| std.debug.panic(
+            process.address_space.handlePageFault(page_fault_details) catch |err| std.debug.panic(
                 "user page fault failed: {t}\n{f}",
                 .{ err, page_fault_details },
             );
@@ -355,87 +310,93 @@ fn onKernelPageFault(
     page_fault_details: PageFaultDetails,
     interrupt_frame: arch.interrupts.InterruptFrame,
 ) void {
-    if (page_fault_details.faulting_address.lessThan(arch.paging.higher_half_start)) {
-        @branchHint(.cold);
+    switch (page_fault_details.faulting_address.getType()) {
+        .user => {
+            const process: *Process = blk: {
+                const current_task: Task.Current = .get();
 
-        const process: *Process = blk: {
-            const current_task: Task.Current = .get();
+                break :blk switch (current_task.task.type) {
+                    .kernel => {
+                        @branchHint(.cold);
+                        kernel.debug.interruptSourcePanic(
+                            interrupt_frame,
+                            "kernel page fault in lower half\n{f}",
+                            .{page_fault_details},
+                        );
+                        unreachable;
+                    },
+                    .user => .from(current_task.task),
+                };
+            };
 
-            break :blk switch (current_task.task.type) {
-                .kernel => {
+            if (!page_fault_details.faulting_context.kernel.access_to_user_memory_enabled) {
+                @branchHint(.cold);
+
+                kernel.debug.interruptSourcePanic(
+                    interrupt_frame,
+                    "kernel accessed user memory\n{f}",
+                    .{page_fault_details},
+                );
+            }
+
+            process.address_space.handlePageFault(page_fault_details) catch |err|
+                kernel.debug.interruptSourcePanic(
+                    interrupt_frame,
+                    "kernel page fault in user memory failed: {t}\n{f}",
+                    .{ err, page_fault_details },
+                );
+        },
+        .kernel => {
+            const region_type = globals.regions.containingAddress(page_fault_details.faulting_address.toKernel()) orelse {
+                @branchHint(.cold);
+
+                kernel.debug.interruptSourcePanic(
+                    interrupt_frame,
+                    "kernel page fault outside of any kernel region\n{f}",
+                    .{page_fault_details},
+                );
+            };
+
+            switch (region_type) {
+                .kernel_address_space => {
+                    @branchHint(.likely);
+                    globals.kernel_address_space.handlePageFault(page_fault_details) catch |err| switch (err) {
+                        error.OutOfMemory => std.debug.panic(
+                            "no memory available to handle page fault in kernel address space\n{f}",
+                            .{page_fault_details},
+                        ),
+                        else => |e| kernel.debug.interruptSourcePanic(
+                            interrupt_frame,
+                            "failed to handle page fault in kernel address space: {t}\n{f}",
+                            .{ e, page_fault_details },
+                        ),
+                    };
+                },
+                else => {
                     @branchHint(.cold);
+
                     kernel.debug.interruptSourcePanic(
                         interrupt_frame,
-                        "kernel page fault in lower half\n{f}",
-                        .{page_fault_details},
+                        "kernel page fault in '{t}'\n{f}",
+                        .{ region_type, page_fault_details },
                     );
-                    unreachable;
                 },
-                .user => .from(current_task.task),
-            };
-        };
-
-        if (!page_fault_details.faulting_context.kernel.access_to_user_memory_enabled) {
-            @branchHint(.cold);
-
-            kernel.debug.interruptSourcePanic(
-                interrupt_frame,
-                "kernel accessed user memory\n{f}",
-                .{page_fault_details},
-            );
-        }
-
-        process.address_space.handlePageFault(
-            page_fault_details,
-        ) catch |err|
-            kernel.debug.interruptSourcePanic(
-                interrupt_frame,
-                "kernel page fault in user memory failed: {t}\n{f}",
-                .{ err, page_fault_details },
-            );
-
-        return;
-    }
-
-    const region_type = globals.regions.containingAddress(page_fault_details.faulting_address) orelse {
-        @branchHint(.cold);
-
-        kernel.debug.interruptSourcePanic(
-            interrupt_frame,
-            "kernel page fault outside of any kernel region\n{f}",
-            .{page_fault_details},
-        );
-    };
-
-    switch (region_type) {
-        .kernel_address_space => {
-            @branchHint(.likely);
-            globals.kernel_address_space.handlePageFault(page_fault_details) catch |err| switch (err) {
-                error.OutOfMemory => std.debug.panic(
-                    "no memory available to handle page fault in kernel address space\n{f}",
-                    .{page_fault_details},
-                ),
-                else => |e| kernel.debug.interruptSourcePanic(
-                    interrupt_frame,
-                    "failed to handle page fault in kernel address space: {t}\n{f}",
-                    .{ e, page_fault_details },
-                ),
-            };
+            }
         },
-        else => {
+        .invalid => {
             @branchHint(.cold);
 
             kernel.debug.interruptSourcePanic(
                 interrupt_frame,
-                "kernel page fault in '{t}'\n{f}",
-                .{ region_type, page_fault_details },
+                "kernel page fault with invalid address\n{f}",
+                .{page_fault_details},
             );
         },
     }
 }
 
 pub const PageFaultDetails = struct {
-    faulting_address: core.VirtualAddress,
+    faulting_address: addr.Virtual,
     access_type: AccessType,
     fault_type: FaultType,
 
@@ -502,17 +463,13 @@ pub const MapError = error{
     MappingNotValid,
 } || PhysicalPage.Allocator.AllocateError;
 
-pub fn kernelVirtualOffset() core.Size {
-    return globals.kernel_virtual_offset;
-}
-
 /// A batch of virtual ranges.
 ///
 /// Attempts to merge adjacent ranges if they are reasonably close together see
 /// `kernel.config.virtual_range_batching_seperation_to_merge_over`.
 pub const VirtualRangeBatch = struct {
     ranges: core.containers.BoundedArray(
-        core.VirtualRange,
+        addr.Virtual.Range,
         kernel.config.mem.virtual_ranges_to_batch,
     ) = .{},
 
@@ -521,13 +478,14 @@ pub const VirtualRangeBatch = struct {
     /// If full then always merges with the last range.
     ///
     /// **REQUIREMENTS**:
+    /// - Each subsequent range must be greater than or equal to the previous range.
     /// - `range.address` must be greater than or equal to the end of the last range in the batch
     /// - `range.address` must be aligned to `arch.paging.standard_page_size`
     /// - `range.size` must be aligned to `arch.paging.standard_page_size`
-    pub fn appendMergeIfFull(batch: *VirtualRangeBatch, range: core.VirtualRange) void {
+    pub fn appendMergeIfFull(batch: *VirtualRangeBatch, range: addr.Virtual.Range) void {
         if (core.is_debug) {
-            std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
-            std.debug.assert(range.size.isAligned(arch.paging.standard_page_size));
+            std.debug.assert(range.address.aligned(arch.paging.standard_page_size_alignment));
+            std.debug.assert(range.size.aligned(arch.paging.standard_page_size_alignment));
         }
 
         switch (batch.ranges.len) {
@@ -537,24 +495,23 @@ pub const VirtualRangeBatch = struct {
             },
             kernel.config.mem.virtual_ranges_to_batch => {
                 // we have hit the limit of virtual ranges to batch together so we always merge with the last range
-                const last: *core.VirtualRange = &batch.ranges.slice()[kernel.config.mem.virtual_ranges_to_batch - 1];
+                const last: *addr.Virtual.Range = &batch.ranges.slice()[kernel.config.mem.virtual_ranges_to_batch - 1];
 
-                if (core.is_debug) std.debug.assert(range.address.greaterThanOrEqual(last.endBound()));
+                if (core.is_debug) std.debug.assert(range.address.greaterThanOrEqual(last.after()));
 
-                const seperation = range.address.difference(last.endBound());
-                last.size.addInPlace(seperation);
+                last.size.addInPlace(last.after().difference(range.address));
                 last.size.addInPlace(range.size);
             },
             else => |len| {
                 @branchHint(.likely);
-                const last: *core.VirtualRange = &batch.ranges.slice()[len - 1];
+                const last: *addr.Virtual.Range = &batch.ranges.slice()[len - 1];
 
-                if (core.is_debug) std.debug.assert(range.address.greaterThanOrEqual(last.endBound()));
+                if (core.is_debug) std.debug.assert(range.address.greaterThanOrEqual(last.after()));
 
-                const seperation = range.address.difference(last.endBound());
+                const seperation_size = last.after().difference(range.address);
 
-                if (seperation.lessThanOrEqual(kernel.config.mem.virtual_range_batching_merge_distance)) {
-                    last.size.addInPlace(seperation);
+                if (seperation_size.lessThanOrEqual(kernel.config.mem.virtual_range_batching_merge_distance)) {
+                    last.size.addInPlace(seperation_size);
                     last.size.addInPlace(range.size);
                 } else {
                     batch.ranges.appendAssumeCapacity(range);
@@ -568,13 +525,14 @@ pub const VirtualRangeBatch = struct {
     /// Returns `false` if the batch is full and the range could not be appended.
     ///
     /// **REQUIREMENTS**:
+    /// - Each subsequent range must be greater than or equal to the previous range.
     /// - `range.address` must be greater than or equal to the end of the last range in the batch
     /// - `range.address` must be aligned to `arch.paging.standard_page_size`
     /// - `range.size` must be aligned to `arch.paging.standard_page_size`
-    pub fn append(batch: *VirtualRangeBatch, range: core.VirtualRange) bool {
+    pub fn append(batch: *VirtualRangeBatch, range: addr.Virtual.Range) bool {
         if (core.is_debug) {
-            std.debug.assert(range.address.isAligned(arch.paging.standard_page_size));
-            std.debug.assert(range.size.isAligned(arch.paging.standard_page_size));
+            std.debug.assert(range.address.aligned(arch.paging.standard_page_size_alignment));
+            std.debug.assert(range.size.aligned(arch.paging.standard_page_size_alignment));
         }
 
         const len = batch.ranges.len;
@@ -585,14 +543,14 @@ pub const VirtualRangeBatch = struct {
             return true;
         }
 
-        const last: *core.VirtualRange = &batch.ranges.slice()[len - 1];
+        const last: *addr.Virtual.Range = &batch.ranges.slice()[len - 1];
 
-        if (core.is_debug) std.debug.assert(range.address.greaterThanOrEqual(last.endBound()));
+        if (core.is_debug) std.debug.assert(range.address.greaterThanOrEqual(last.after()));
 
-        const seperation = range.address.difference(last.endBound());
+        const seperation_size = last.after().difference(range.address);
 
-        if (seperation.lessThanOrEqual(kernel.config.mem.virtual_range_batching_merge_distance)) {
-            last.size.addInPlace(seperation);
+        if (seperation_size.lessThanOrEqual(kernel.config.mem.virtual_range_batching_merge_distance)) {
+            last.size.addInPlace(seperation_size);
             last.size.addInPlace(range.size);
             return true;
         }
@@ -626,7 +584,7 @@ pub const ChangeProtectionBatch = struct {
     ) = .{},
 
     pub const VirtualRangeWithMapType = struct {
-        virtual_range: core.VirtualRange,
+        virtual_range: addr.Virtual.Range,
         previous_map_type: MapType,
     };
 
@@ -638,8 +596,8 @@ pub const ChangeProtectionBatch = struct {
     /// - `range.virtual_range.size` must be aligned to `arch.paging.standard_page_size`
     pub fn append(batch: *ChangeProtectionBatch, range: VirtualRangeWithMapType) bool {
         if (core.is_debug) {
-            std.debug.assert(range.virtual_range.address.isAligned(arch.paging.standard_page_size));
-            std.debug.assert(range.virtual_range.size.isAligned(arch.paging.standard_page_size));
+            std.debug.assert(range.virtual_range.address.aligned(arch.paging.standard_page_size_alignment));
+            std.debug.assert(range.virtual_range.size.aligned(arch.paging.standard_page_size_alignment));
         }
 
         const len = batch.ranges.len;
@@ -652,14 +610,14 @@ pub const ChangeProtectionBatch = struct {
 
         const last: *VirtualRangeWithMapType = &batch.ranges.slice()[len - 1];
 
-        if (core.is_debug) std.debug.assert(range.virtual_range.address.greaterThanOrEqual(last.virtual_range.endBound()));
+        if (core.is_debug) std.debug.assert(range.virtual_range.address.greaterThanOrEqual(last.virtual_range.after()));
 
-        const seperation = range.virtual_range.address.difference(last.virtual_range.endBound());
+        const seperation_size = last.virtual_range.after().difference(range.virtual_range.address);
 
-        if (seperation.lessThanOrEqual(kernel.config.mem.virtual_range_batching_merge_distance) and
+        if (seperation_size.lessThanOrEqual(kernel.config.mem.virtual_range_batching_merge_distance) and
             last.previous_map_type.equal(range.previous_map_type))
         {
-            last.virtual_range.size.addInPlace(seperation);
+            last.virtual_range.size.addInPlace(seperation_size);
             last.virtual_range.size.addInPlace(range.virtual_range.size);
             return true;
         }
@@ -682,7 +640,7 @@ pub const ChangeProtectionBatch = struct {
     }
 };
 
-const globals = struct {
+pub const globals = struct {
     /// The kernel page table.
     ///
     /// All other page tables start as a copy of this one.
@@ -700,17 +658,17 @@ const globals = struct {
     /// The virtual base address that the kernel was loaded at.
     ///
     /// Initialized during `init.determineEarlyMemoryLayout`.
-    var virtual_base_address: core.VirtualAddress = undefined;
+    var virtual_base_address: addr.Virtual.Kernel = undefined;
 
     /// The offset from the requested ELF virtual base address to the address that the kernel was actually loaded at.
     ///
     /// Initialized during `init.determineEarlyMemoryLayout`.
-    var kernel_virtual_offset: core.Size = undefined;
+    pub var kernel_virtual_offset: core.Size = undefined;
 
     /// Provides an identity mapping between virtual and physical addresses.
     ///
     /// Initialized during `init.determineEarlyMemoryLayout`.
-    var direct_map: core.VirtualRange = undefined;
+    pub var direct_map: addr.Virtual.Range.Kernel = undefined;
 
     /// The layout of the memory regions of the kernel.
     ///
@@ -751,12 +709,12 @@ pub const init = struct {
             if (direct_map_size.lessThan(four_gib)) direct_map_size = four_gib;
 
             // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
-            direct_map_size.alignForwardInPlace(arch.paging.largest_page_size);
+            direct_map_size.alignForwardInPlace(arch.paging.largest_page_size_alignment);
 
             break :direct_map_size direct_map_size;
         };
 
-        globals.direct_map = core.VirtualRange.fromAddr(
+        globals.direct_map = .from(
             boot.directMapAddress() orelse @panic("direct map address not provided"),
             direct_map_size,
         );
@@ -805,7 +763,7 @@ pub const init = struct {
         try globals.kernel_address_space.init(
             .{
                 .name = try .fromSlice("kernel"),
-                .range = globals.regions.find(.kernel_address_space).?.range,
+                .range = globals.regions.find(.kernel_address_space).?.range.toVirtualRange(),
                 .page_table = globals.kernel_page_table,
                 .context = .kernel,
             },
@@ -842,31 +800,31 @@ pub const init = struct {
         };
 
         const sdf_slice = kernel.debug.sdfSlice() catch &.{};
-        const sdf_range = core.VirtualRange.fromSlice(u8, sdf_slice);
+        const sdf_range: addr.Virtual.Range.Kernel = .fromSlice(u8, sdf_slice);
 
         const sections: []const struct {
-            core.VirtualAddress,
-            core.VirtualAddress,
+            addr.Virtual.Kernel,
+            addr.Virtual.Kernel,
             KernelMemoryRegion.Type,
         } = &.{
             .{
-                core.VirtualAddress.fromPtr(&linker_symbols.__text_start),
-                core.VirtualAddress.fromPtr(&linker_symbols.__text_end),
+                .from(@intFromPtr(&linker_symbols.__text_start)),
+                .from(@intFromPtr(&linker_symbols.__text_end)),
                 .executable_section,
             },
             .{
-                core.VirtualAddress.fromPtr(&linker_symbols.__rodata_start),
-                core.VirtualAddress.fromPtr(&linker_symbols.__rodata_end),
+                .from(@intFromPtr(&linker_symbols.__rodata_start)),
+                .from(@intFromPtr(&linker_symbols.__rodata_end)),
                 .readonly_section,
             },
             .{
-                core.VirtualAddress.fromPtr(&linker_symbols.__data_start),
-                core.VirtualAddress.fromPtr(&linker_symbols.__data_end),
+                .from(@intFromPtr(&linker_symbols.__data_start)),
+                .from(@intFromPtr(&linker_symbols.__data_end)),
                 .writeable_section,
             },
             .{
                 sdf_range.address,
-                sdf_range.endBound(),
+                sdf_range.after(),
                 .sdf_section,
             },
         };
@@ -878,15 +836,11 @@ pub const init = struct {
 
             if (core.is_debug) std.debug.assert(end_address.greaterThan(start_address));
 
-            const virtual_range: core.VirtualRange = .fromAddr(
+            const virtual_range: addr.Virtual.Range.Kernel = .from(
                 start_address,
                 core.Size.from(end_address.value - start_address.value, .byte)
-                    .alignForward(arch.paging.standard_page_size),
+                    .alignForward(arch.paging.standard_page_size_alignment),
             );
-
-            if (virtual_range.containsAddress(.undefined_address)) {
-                std.debug.panic("kernel section {t} overlaps with the undefined address", .{region_type});
-            }
 
             kernel_regions.append(.{
                 .range = virtual_range,
@@ -905,10 +859,6 @@ pub const init = struct {
             }
         }
 
-        if (direct_map.containsAddress(.undefined_address)) {
-            std.debug.panic("direct map overlaps with the undefined address", .{});
-        }
-
         kernel_regions.append(.{
             .range = direct_map,
             .type = .direct_map,
@@ -917,10 +867,11 @@ pub const init = struct {
 
     fn registerHeaps(kernel_regions: *KernelMemoryRegion.List) void {
         const size_of_top_level = arch.paging.init.sizeOfTopLevelEntry();
+        const size_of_top_level_alignment = size_of_top_level.toAlignment();
 
         const kernel_heap_range = kernel_regions.findFreeRange(
             size_of_top_level,
-            size_of_top_level,
+            size_of_top_level_alignment,
         ) orelse
             @panic("no space in kernel memory layout for the kernel heap");
 
@@ -931,7 +882,7 @@ pub const init = struct {
 
         const special_heap_range = kernel_regions.findFreeRange(
             size_of_top_level,
-            size_of_top_level,
+            size_of_top_level_alignment,
         ) orelse
             @panic("no space in kernel memory layout for the special heap");
 
@@ -942,7 +893,7 @@ pub const init = struct {
 
         const kernel_stacks_range = kernel_regions.findFreeRange(
             size_of_top_level,
-            size_of_top_level,
+            size_of_top_level_alignment,
         ) orelse
             @panic("no space in kernel memory layout for the kernel stacks");
 
@@ -953,7 +904,7 @@ pub const init = struct {
 
         const kernel_address_space_range = kernel_regions.findFreeRange(
             size_of_top_level,
-            size_of_top_level,
+            size_of_top_level_alignment,
         ) orelse
             @panic("no space in kernel memory layout for the kernel address space");
 
@@ -967,7 +918,7 @@ pub const init = struct {
         const total_number_of_pages = blk: {
             var memory_iter = boot.memoryMap(.forward) catch @panic("no memory map");
 
-            var last_page: core.PhysicalAddress = .zero;
+            var last_page: addr.Physical = .zero;
 
             while (memory_iter.next()) |entry| {
                 last_page = entry.range.last();
@@ -979,8 +930,8 @@ pub const init = struct {
         const pages_range = kernel_regions.findFreeRange(
             core.Size.of(PhysicalPage)
                 .multiplyScalar(total_number_of_pages)
-                .alignForward(arch.paging.standard_page_size),
-            arch.paging.standard_page_size,
+                .alignForward(arch.paging.standard_page_size_alignment),
+            arch.paging.standard_page_size_alignment,
         ) orelse @panic("no space in kernel memory layout for the pages array");
 
         kernel_regions.append(.{
@@ -1001,8 +952,8 @@ pub const init = struct {
                 .direct_map,
                 => arch.paging.init.mapToPhysicalRangeAllPageSizes(
                     kernel_page_table,
-                    region.range,
-                    .fromAddr(.zero, region.range.size),
+                    region.range.toVirtualRange(),
+                    .from(.zero, region.range.size),
                     .{
                         .type = .kernel,
                         .protection = .read_write,
@@ -1016,11 +967,9 @@ pub const init = struct {
                 .sdf_section,
                 => arch.paging.init.mapToPhysicalRangeAllPageSizes(
                     kernel_page_table,
-                    region.range,
-                    .fromAddr(
-                        .fromInt(
-                            region.range.address.value - kernel.mem.init.kernelPhysicalToVirtualOffset().value,
-                        ),
+                    region.range.toVirtualRange(),
+                    .from(
+                        .from(region.range.address.value - init_globals.kernel_physical_to_virtual_offset.value),
                         region.range.size,
                     ),
                     switch (region.type) {
@@ -1038,7 +987,7 @@ pub const init = struct {
                 .kernel_address_space,
                 => arch.paging.init.fillTopLevel(
                     kernel_page_table,
-                    region.range,
+                    region.range.toVirtualRange(),
                     PhysicalPage.init.bootstrap_allocator,
                 ) catch |err| std.debug.panic("failed to map {f}: {t}", .{ region, err }),
 
@@ -1056,10 +1005,6 @@ pub const init = struct {
         return kernel_page_table;
     }
 
-    pub fn kernelPhysicalToVirtualOffset() core.Size {
-        return init_globals.kernel_physical_to_virtual_offset;
-    }
-
     const init_globals = struct {
         /// Offset from the virtual address of kernel sections to the physical address of the section.
         ///
@@ -1067,3 +1012,9 @@ pub const init = struct {
         var kernel_physical_to_virtual_offset: core.Size = undefined;
     };
 };
+
+comptime {
+    // check that neither the user or kernel address space ranges overlap with the undefined address
+    std.debug.assert(!kernel.config.user.user_address_space_range.toVirtualRange().containsAddress(.undefined_address));
+    std.debug.assert(!arch.paging.higher_half_range.containsAddress(.undefined_address));
+}

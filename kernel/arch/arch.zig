@@ -8,12 +8,14 @@
 
 const std = @import("std");
 
-const cascade = @import("cascade");
 const arch = @import("arch");
+const cascade = @import("cascade");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
 const Thread = kernel.user.Thread;
-const core = @import("core");
+const addr = kernel.addr;
+
 pub const current_arch = @import("cascade_architecture").arch;
 
 /// Architecture specific per-executor data.
@@ -151,7 +153,7 @@ pub const interrupts = struct {
         }
 
         /// Returns the instruction pointer of the context this interrupt was triggered from.
-        pub fn instructionPointer(self: InterruptFrame) usize {
+        pub fn instructionPointer(self: InterruptFrame) addr.Virtual {
             // TODO: this is used during panics, so if it is not implemented we will panic during a panic
             return getFunction(
                 current_functions.interrupts,
@@ -200,17 +202,19 @@ pub const interrupts = struct {
 pub const paging = struct {
     /// The standard page size for the architecture.
     pub const standard_page_size: core.Size = current_decls.paging.standard_page_size;
+    pub const standard_page_size_alignment: std.mem.Alignment = standard_page_size.toAlignment();
 
     /// The largest page size supported by the architecture.
     pub const largest_page_size: core.Size = current_decls.paging.largest_page_size;
+    pub const largest_page_size_alignment: std.mem.Alignment = largest_page_size.toAlignment();
 
-    /// The total size of the lower half.
+    /// The range of the entire lower half of the address space.
     ///
     /// This includes the zero page.
-    pub const lower_half_size: core.Size = current_decls.paging.lower_half_size;
+    pub const lower_half_range: addr.Virtual.Range = current_decls.paging.lower_half_range;
 
-    /// The virtual address of the start of the higher half.
-    pub const higher_half_start: core.VirtualAddress = current_decls.paging.higher_half_start;
+    /// The range of the entire higher half of the address space.
+    pub const higher_half_range: addr.Virtual.Range = current_decls.paging.higher_half_range;
 
     pub const PageTable = struct {
         physical_page: kernel.mem.PhysicalPage.Index,
@@ -259,7 +263,7 @@ pub const paging = struct {
         ///  - does not flush the TLB
         pub fn mapSinglePage(
             page_table: PageTable,
-            virtual_address: core.VirtualAddress,
+            virtual_address: addr.Virtual,
             physical_page: kernel.mem.PhysicalPage.Index,
             map_type: kernel.mem.MapType,
             physical_page_allocator: kernel.mem.PhysicalPage.Allocator,
@@ -285,7 +289,7 @@ pub const paging = struct {
         ///  - does not flush the TLB
         pub fn unmap(
             page_table: PageTable,
-            virtual_range: core.VirtualRange,
+            virtual_range: addr.Virtual.Range,
             backing_page_decision: core.CleanupDecision,
             top_level_decision: core.CleanupDecision,
             flush_batch: *kernel.mem.VirtualRangeBatch,
@@ -313,7 +317,7 @@ pub const paging = struct {
         ///  - does not flush the TLB
         pub fn changeProtection(
             page_table: PageTable,
-            virtual_range: core.VirtualRange,
+            virtual_range: addr.Virtual.Range,
             previous_map_type: kernel.mem.MapType,
             new_map_type: kernel.mem.MapType,
             flush_batch: *kernel.mem.VirtualRangeBatch,
@@ -329,7 +333,7 @@ pub const paging = struct {
     ///
     /// Caller must ensure:
     ///   - the `virtual_range` address and size must be aligned to the standard page size
-    pub fn flushCache(virtual_range: core.VirtualRange) callconv(core.inline_in_non_debug) void {
+    pub fn flushCache(virtual_range: addr.Virtual.Range) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.paging,
             "flushCache",
@@ -376,7 +380,7 @@ pub const paging = struct {
         ///  - does not rollback on error
         pub fn fillTopLevel(
             page_table: PageTable,
-            range: core.VirtualRange,
+            range: addr.Virtual.Range,
             physical_page_allocator: kernel.mem.PhysicalPage.Allocator,
         ) callconv(core.inline_in_non_debug) anyerror!void {
             return getFunction(
@@ -399,8 +403,8 @@ pub const paging = struct {
         ///  - does not rollback on error
         pub fn mapToPhysicalRangeAllPageSizes(
             page_table: PageTable,
-            virtual_range: core.VirtualRange,
-            physical_range: core.PhysicalRange,
+            virtual_range: addr.Virtual.Range,
+            physical_range: addr.Physical.Range,
             map_type: kernel.mem.MapType,
             physical_page_allocator: kernel.mem.PhysicalPage.Allocator,
         ) callconv(core.inline_in_non_debug) anyerror!void {
@@ -619,8 +623,8 @@ pub const user = struct {
     };
 
     pub const EnterUserspaceOptions = struct {
-        entry_point: core.VirtualAddress, // TODO: type for userspace addresses
-        stack_pointer: core.VirtualAddress,
+        entry_point: addr.Virtual.User,
+        stack_pointer: addr.Virtual.User,
     };
 
     /// Enter userspace for the first time in the current task.
@@ -892,7 +896,7 @@ pub const Functions = struct {
         ) std.debug.StackIterator = null,
 
         /// Returns the instruction pointer of the context this interrupt was triggered from.
-        instructionPointer: ?fn (interrupt_frame: *const current_decls.interrupts.InterruptFrame) usize = null,
+        instructionPointer: ?fn (interrupt_frame: *const current_decls.interrupts.InterruptFrame) addr.Virtual = null,
 
         init: struct {
             /// Ensure that any exceptions/faults that occur during early initialization are handled.
@@ -935,7 +939,7 @@ pub const Functions = struct {
         ///  - does not flush the TLB
         mapSinglePage: ?fn (
             page_table: *current_decls.paging.PageTable,
-            virtual_address: core.VirtualAddress,
+            virtual_address: kernel.addr.Virtual,
             physical_page: kernel.mem.PhysicalPage.Index,
             map_type: kernel.mem.MapType,
             physical_page_allocator: kernel.mem.PhysicalPage.Allocator,
@@ -950,7 +954,7 @@ pub const Functions = struct {
         ///  - does not flush the TLB
         unmap: ?fn (
             page_table: *current_decls.paging.PageTable,
-            virtual_range: core.VirtualRange,
+            virtual_range: addr.Virtual.Range,
             backing_page_decision: core.CleanupDecision,
             top_level_decision: core.CleanupDecision,
             flush_batch: *kernel.mem.VirtualRangeBatch,
@@ -966,7 +970,7 @@ pub const Functions = struct {
         ///  - does not flush the TLB
         changeProtection: ?fn (
             page_table: *current_decls.paging.PageTable,
-            virtual_range: core.VirtualRange,
+            virtual_range: addr.Virtual.Range,
             previous_map_type: kernel.mem.MapType,
             new_map_type: kernel.mem.MapType,
             flush_batch: *kernel.mem.VirtualRangeBatch,
@@ -976,7 +980,7 @@ pub const Functions = struct {
         ///
         /// Caller must ensure:
         ///   - the `virtual_range` address and size must be aligned to the standard page size
-        flushCache: ?fn (virtual_range: core.VirtualRange) void = null,
+        flushCache: ?fn (virtual_range: addr.Virtual.Range) void = null,
 
         /// Enable the kernel to access user memory.
         ///
@@ -1003,7 +1007,7 @@ pub const Functions = struct {
             ///  - does not rollback on error
             fillTopLevel: ?fn (
                 page_table: *current_decls.paging.PageTable,
-                range: core.VirtualRange,
+                range: addr.Virtual.Range,
                 physical_page_allocator: kernel.mem.PhysicalPage.Allocator,
             ) anyerror!void = null,
 
@@ -1021,8 +1025,8 @@ pub const Functions = struct {
             ///  - does not rollback on error
             mapToPhysicalRangeAllPageSizes: ?fn (
                 page_table: *current_decls.paging.PageTable,
-                virtual_range: core.VirtualRange,
-                physical_range: core.PhysicalRange,
+                virtual_range: addr.Virtual.Range,
+                physical_range: addr.Physical.Range,
                 map_type: kernel.mem.MapType,
                 physical_page_allocator: kernel.mem.PhysicalPage.Allocator,
             ) anyerror!void = null,
@@ -1224,13 +1228,13 @@ pub const Decls = struct {
         /// The largest page size supported by the architecture.
         largest_page_size: core.Size,
 
-        /// The total size of the lower half.
+        /// The range of the entire lower half of the address space.
         ///
         /// This includes the zero page.
-        lower_half_size: core.Size,
+        lower_half_range: addr.Virtual.Range,
 
-        /// The virtual address of the start of the higher half.
-        higher_half_start: core.VirtualAddress,
+        /// The range of the entire higher half of the address space.
+        higher_half_range: addr.Virtual.Range,
 
         PageTable: type,
     },

@@ -4,9 +4,10 @@
 const std = @import("std");
 
 const arch = @import("arch");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
-const core = @import("core");
+const addr = kernel.addr;
 
 pub const log = @import("log.zig");
 
@@ -186,7 +187,7 @@ const formatting = struct {
         var stack_iter = interrupt_frame.createStackIterator();
 
         while (stack_iter.next()) |address| {
-            try printSourceAtAddress(writer, address, symbol_source);
+            try printSourceAtAddress(writer, .from(address), symbol_source);
         }
     }
 
@@ -214,7 +215,7 @@ const formatting = struct {
         var stack_iter: std.debug.StackIterator = .init(return_address, @frameAddress());
 
         while (stack_iter.next()) |address| {
-            try printSourceAtAddress(writer, address, symbol_source);
+            try printSourceAtAddress(writer, .from(address), symbol_source);
         }
     }
 
@@ -234,31 +235,50 @@ const formatting = struct {
             const return_address = stack_trace.instruction_addresses[frame_index];
             if (first_addr_opt == null) first_addr_opt = return_address;
 
-            try printSourceAtAddress(writer, return_address, symbol_source);
+            try printSourceAtAddress(writer, .from(return_address), symbol_source);
         }
     }
 
     const indent = "  ";
 
-    fn printSourceAtAddress(writer: *std.Io.Writer, address: usize, opt_symbol_source: ?SymbolSource) !void {
-        if (address == 0) return;
+    fn printSourceAtAddress(writer: *std.Io.Writer, address: addr.Virtual, opt_symbol_source: ?SymbolSource) !void {
+        if (address.equal(.zero)) return;
 
-        if (address < arch.paging.higher_half_start.value) {
-            try writer.print(
-                comptime indent ++ "0x{x:0>16} - address in the lower half\n",
-                .{address},
-            );
-            return;
-        }
+        const raw_kernel_address = switch (address.getType()) {
+            .kernel => address.toKernel(),
+            .user => {
+                try writer.print(
+                    comptime indent ++ "0x{x:0>16} - address in the lower half\n",
+                    .{address.value},
+                );
+                return;
+            },
+            .invalid => {
+                try writer.print(
+                    comptime indent ++ "0x{x:0>16} - invalid address\n",
+                    .{address.value},
+                );
+                return;
+            },
+        };
 
-        // we can't use `VirtualAddress` here as it is possible this subtraction results in a non-canonical address
-        const kernel_source_address = address - kernel.mem.kernelVirtualOffset().value;
+        const candidate_kernel_source_address = raw_kernel_address.applyKernelOffset();
+        const kernel_source_address = switch (candidate_kernel_source_address.getType()) {
+            .kernel => candidate_kernel_source_address.toKernel(),
+            else => {
+                try writer.print(
+                    comptime indent ++ "before: 0x{x:0>16} - after: 0x{x:0>16} - invalid address after applying kernel offset\n",
+                    .{ address.value, candidate_kernel_source_address.value },
+                );
+                return;
+            },
+        };
 
         const symbol = blk: {
             const symbol_source = opt_symbol_source orelse break :blk null;
             break :blk symbol_source.getSymbol(kernel_source_address);
         } orelse {
-            try writer.print(comptime indent ++ "0x{x:0>16} - ???\n", .{kernel_source_address});
+            try writer.print(comptime indent ++ "0x{x:0>16} - ???\n", .{kernel_source_address.value});
             return;
         };
 
@@ -377,10 +397,10 @@ const SymbolSource = struct {
         };
     }
 
-    pub fn getSymbol(symbol_source: SymbolSource, address: usize) ?Symbol {
-        const start_state = symbol_source.location_lookup.getStartState(address) catch return null;
+    pub fn getSymbol(symbol_source: SymbolSource, address: addr.Virtual.Kernel) ?Symbol {
+        const start_state = symbol_source.location_lookup.getStartState(address.value) catch return null;
 
-        const location = symbol_source.location_program.getLocation(start_state, address) catch return null;
+        const location = symbol_source.location_program.getLocation(start_state, address.value) catch return null;
 
         const file = symbol_source.file_table.getFile(location.file_index) orelse return null;
 

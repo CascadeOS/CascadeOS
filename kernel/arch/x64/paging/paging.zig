@@ -4,9 +4,10 @@
 const std = @import("std");
 
 const arch = @import("arch");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
-const core = @import("core");
+const addr = kernel.addr;
 
 const x64 = @import("../x64.zig");
 pub const PageFaultErrorCode = @import("PageFaultErrorCode.zig").PageFaultErrorCode;
@@ -17,10 +18,10 @@ const log = kernel.debug.log.scoped(.paging);
 /// Flushes the cache for the given virtual range on the current executor.
 ///
 /// The `virtual_range` address and size must be aligned to the standard page size.
-pub fn flushCache(virtual_range: core.VirtualRange) void {
+pub fn flushCache(virtual_range: addr.Virtual.Range) void {
     if (core.is_debug) {
-        std.debug.assert(virtual_range.address.isAligned(PageTable.small_page_size));
-        std.debug.assert(virtual_range.size.isAligned(PageTable.small_page_size));
+        std.debug.assert(virtual_range.address.aligned(PageTable.small_page_size_alignment));
+        std.debug.assert(virtual_range.size.aligned(PageTable.small_page_size_alignment));
     }
 
     var current_virtual_address = virtual_range.address;

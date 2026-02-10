@@ -269,7 +269,7 @@ const globals = struct {
                         .name = kernel.mem.AddressSpace.Name.fromSlice(
                             temp_name.constSlice(),
                         ) catch unreachable, // ensured in `kernel.config`
-                        .range = kernel.config.user.user_address_space_range,
+                        .range = kernel.config.user.user_address_space_range.toVirtualRange(),
                         .page_table = page_table,
                         .context = .{ .user = process },
                     }) catch |err| {

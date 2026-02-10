@@ -4,20 +4,21 @@
 const std = @import("std");
 
 const arch = @import("arch");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
 const acpi = kernel.acpi;
-const core = @import("core");
+const addr = kernel.addr;
 
 const uacpi = @import("uacpi.zig");
 
 const log = kernel.debug.log.scoped(.uacpi_kernel_api);
 
 /// Returns the PHYSICAL address of the RSDP structure via *out_rsdp_address.
-export fn uacpi_kernel_get_rsdp(out_rsdp_address: *core.PhysicalAddress) uacpi.Status {
+export fn uacpi_kernel_get_rsdp(out_rsdp_address: *addr.Physical) uacpi.Status {
     log.verbose("uacpi_kernel_get_rsdp called", .{});
 
-    out_rsdp_address.* = kernel.mem.physicalFromDirectMap(.fromPtr(acpi.rsdpTable())) catch return .internal_error;
+    out_rsdp_address.* = addr.Physical.fromDirectMap(.from(@intFromPtr(acpi.rsdpTable()))) catch return .internal_error;
 
     return .ok;
 }
@@ -268,12 +269,12 @@ export fn uacpi_kernel_io_write32(
 ///              Let's assume the returned virtual address for the mapping is 0xF000.
 ///           5. Add the original offset within page 0xABC (from step 1) to the resulting virtual address
 ///              0xF000 + 0xABC => 0xFABC. Return it to uACPI.
-export fn uacpi_kernel_map(addr: core.PhysicalAddress, len: usize) [*]u8 {
+export fn uacpi_kernel_map(physical_address: addr.Physical, len: usize) [*]u8 {
     log.verbose("uacpi_kernel_map called", .{});
 
     _ = len;
 
-    return kernel.mem.directMapFromPhysical(addr).toPtr([*]u8);
+    return physical_address.toDirectMap().ptr([*]u8);
 }
 
 /// Unmap a virtual memory range at 'addr' with a length of 'len' bytes.
@@ -281,10 +282,10 @@ export fn uacpi_kernel_map(addr: core.PhysicalAddress, len: usize) [*]u8 {
 /// NOTE: 'addr' may be misaligned, see the comment above 'uacpi_kernel_map'.
 ///       Similar steps to uacpi_kernel_map can be taken to retrieve the virtual address originally returned by the VMM
 ///       for this mapping as well as its true length.
-export fn uacpi_kernel_unmap(addr: [*]u8, len: usize) void {
+export fn uacpi_kernel_unmap(ptr: [*]u8, len: usize) void {
     log.verbose("uacpi_kernel_unmap called", .{});
 
-    _ = addr;
+    _ = ptr;
     _ = len;
 }
 

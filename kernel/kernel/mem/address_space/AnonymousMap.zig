@@ -17,10 +17,11 @@
 const std = @import("std");
 
 const arch = @import("arch");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
 const Cache = kernel.mem.cache.Cache;
-const core = @import("core");
+const addr = kernel.addr;
 
 const AddressSpace = @import("AddressSpace.zig");
 const AnonymousPage = @import("AnonymousPage.zig");
@@ -45,7 +46,7 @@ anonymous_page_chunks: AnonymousPageChunkMap = .{},
 // shared: bool, // TODO: properly support shared anonymous maps
 
 pub fn create(size: core.Size) error{OutOfMemory}!*AnonymousMap {
-    if (core.is_debug) std.debug.assert(size.isAligned(arch.paging.standard_page_size));
+    if (core.is_debug) std.debug.assert(size.aligned(arch.paging.standard_page_size_alignment));
 
     const anonymous_map = globals.anonymous_map_cache.allocate() catch return error.OutOfMemory;
 
@@ -131,7 +132,7 @@ fn destroy(
 pub fn copy(
     address_space: *AddressSpace,
     entry: *Entry,
-    faulting_address: core.VirtualAddress,
+    faulting_address: addr.Virtual,
 ) error{OutOfMemory}!void {
     _ = faulting_address;
 
@@ -164,13 +165,13 @@ pub const Reference = struct {
     /// The anonymous map must be locked by the caller. (read or write)
     ///
     /// Called `amap_lookups` in OpenBSD uvm, but this implementation only returns a single page.
-    pub fn lookup(reference: Reference, entry: *const Entry, faulting_address: core.VirtualAddress) ?*AnonymousPage {
+    pub fn lookup(reference: Reference, entry: *const Entry, faulting_address: addr.Virtual) ?*AnonymousPage {
         if (core.is_debug) {
             std.debug.assert(reference.anonymous_map != null);
-            std.debug.assert(reference.start_offset.isAligned(arch.paging.standard_page_size));
+            std.debug.assert(reference.start_offset.aligned(arch.paging.standard_page_size_alignment));
             std.debug.assert(entry.anonymous_map_reference.anonymous_map == reference.anonymous_map);
             std.debug.assert(entry.anonymous_map_reference.start_offset.equal(reference.start_offset));
-            std.debug.assert(faulting_address.isAligned(arch.paging.standard_page_size));
+            std.debug.assert(faulting_address.aligned(arch.paging.standard_page_size_alignment));
             std.debug.assert(entry.range.containsAddress(faulting_address));
         }
 
@@ -195,7 +196,7 @@ pub const Reference = struct {
     pub fn add(
         reference: Reference,
         entry: *const Entry,
-        faulting_address: core.VirtualAddress,
+        faulting_address: addr.Virtual,
         anonymous_page: *AnonymousPage,
         operation: AddOperation,
     ) error{OutOfMemory}!void {
@@ -203,7 +204,7 @@ pub const Reference = struct {
             std.debug.assert(reference.anonymous_map != null);
             std.debug.assert(entry.anonymous_map_reference.anonymous_map == reference.anonymous_map);
             std.debug.assert(entry.anonymous_map_reference.start_offset.equal(reference.start_offset));
-            std.debug.assert(faulting_address.isAligned(arch.paging.standard_page_size));
+            std.debug.assert(faulting_address.aligned(arch.paging.standard_page_size_alignment));
             std.debug.assert(entry.range.containsAddress(faulting_address));
         }
 
@@ -232,11 +233,11 @@ pub const Reference = struct {
     /// Returns the page offset of the given address in the given entry.
     ///
     /// Asserts that the address is within the entry's range.
-    fn targetIndex(entry: *const Entry, reference: Reference, faulting_address: core.VirtualAddress) u32 {
+    fn targetIndex(entry: *const Entry, reference: Reference, faulting_address: addr.Virtual) u32 {
         if (core.is_debug) std.debug.assert(entry.range.containsAddress(faulting_address));
 
         return @intCast(
-            faulting_address.difference(entry.range.address).divide(arch.paging.standard_page_size) +
+            entry.range.address.difference(faulting_address).divide(arch.paging.standard_page_size) +
                 reference.start_offset.divide(arch.paging.standard_page_size),
         );
     }

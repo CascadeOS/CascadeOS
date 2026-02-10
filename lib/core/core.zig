@@ -4,11 +4,6 @@
 const std = @import("std");
 const builtin = @import("builtin");
 
-const address = @import("address.zig");
-pub const PhysicalAddress = address.PhysicalAddress;
-pub const PhysicalRange = address.PhysicalRange;
-pub const VirtualAddress = address.VirtualAddress;
-pub const VirtualRange = address.VirtualRange;
 pub const containers = @import("containers.zig");
 pub const Duration = @import("duration.zig").Duration;
 pub const Size = @import("size.zig").Size;

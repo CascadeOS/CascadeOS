@@ -4,9 +4,10 @@
 const std = @import("std");
 
 const arch = @import("arch");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
-const core = @import("core");
+const addr = kernel.addr;
 const kernel_options = @import("kernel_options");
 
 pub const cascade_version = kernel_options.cascade_version;
@@ -19,7 +20,7 @@ pub const executor = struct {
 
 pub const mem = struct {
     // This must be kept in sync with the linker scripts.
-    pub const kernel_base_address: core.VirtualAddress = .fromInt(0xffffffff80000000);
+    pub const kernel_base_address: addr.Virtual.Kernel = .from(0xffffffff80000000);
 
     pub const maximum_number_of_memory_map_entries = 128;
 
@@ -53,14 +54,9 @@ pub const user = struct {
     // the process name is also used as the name of its address space
     pub const address_space_name_length = process_name_length;
 
-    pub const user_address_space_range: core.VirtualRange = .{
-        // don't allow the zero page to be mapped
-        .address = core.VirtualAddress.zero.moveForward(arch.paging.standard_page_size),
-        .size = arch.paging.lower_half_size.subtract(arch.paging.standard_page_size),
-    };
-
-    comptime {
-        // No special handing of the undefined address is required as it does not overlap with the user address space range.
-        std.debug.assert(!user_address_space_range.containsAddress(.undefined_address));
-    }
+    // don't allow the zero page to be mapped
+    pub const user_address_space_range: addr.Virtual.Range.User = .from(
+        arch.paging.lower_half_range.address.moveForward(arch.paging.standard_page_size).toUser(),
+        arch.paging.lower_half_range.size.subtract(arch.paging.standard_page_size),
+    );
 };

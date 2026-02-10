@@ -97,8 +97,8 @@ pub const decls: arch.Decls = .{
         // TODO: most of these values are copied from the x64, so all of them need to be checked
         .standard_page_size = .from(4, .kib),
         .largest_page_size = .from(1, .gib),
-        .lower_half_size = .from(128, .tib),
-        .higher_half_start = .fromInt(0xffff800000000000),
+        .lower_half_range = .from(.zero, .from(128, .tib)),
+        .higher_half_range = .from(.from(0xffff800000000000), .from(128, .tib)),
         .PageTable = extern struct {},
     },
 

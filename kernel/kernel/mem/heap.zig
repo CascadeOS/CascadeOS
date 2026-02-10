@@ -10,6 +10,7 @@ const kernel = @import("kernel");
 const Task = kernel.Task;
 const resource_arena = kernel.mem.resource_arena;
 const core = @import("core");
+const addr = kernel.addr;
 
 const log = kernel.debug.log.scoped(.heap);
 
@@ -28,7 +29,7 @@ pub const AllocateError = error{
     OutOfMemory,
 };
 
-pub fn allocate(size: core.Size) AllocateError!core.VirtualRange {
+pub fn allocate(size: core.Size) AllocateError!addr.Virtual.Range.Kernel {
     const allocation = globals.heap_arena.allocate(size.value, .instant_fit) catch |err| {
         @branchHint(.unlikely);
         return switch (err) {
@@ -39,7 +40,7 @@ pub fn allocate(size: core.Size) AllocateError!core.VirtualRange {
 
     var virtual_range = allocation.toVirtualRange();
 
-    if (core.is_debug) @memset(virtual_range.toByteSlice(), undefined);
+    if (core.is_debug) @memset(virtual_range.byteSlice(), undefined);
 
     // the range returned by the heap arena will be aligned to the quantum size, but we want to return the size requested
     virtual_range.size = size;
@@ -47,11 +48,11 @@ pub fn allocate(size: core.Size) AllocateError!core.VirtualRange {
     return virtual_range;
 }
 
-pub fn deallocate(range: core.VirtualRange) void {
+pub fn deallocate(range: addr.Virtual.Range.Kernel) void {
     globals.heap_arena.deallocate(
-        .fromVirtualRange(.fromAddr(
+        .fromVirtualRange(.from(
             range.address,
-            range.size.alignForward(allocator_impl.heap_arena_quantum_size),
+            range.size.alignForward(allocator_impl.heap_arena_quantum_size_alignment),
         )),
     );
 }
@@ -64,13 +65,13 @@ pub fn deallocate(range: core.VirtualRange) void {
 /// - `physical_range.address` must be aligned to `arch.paging.standard_page_size`.
 pub fn allocateSpecial(
     size: core.Size,
-    physical_range: core.PhysicalRange,
+    physical_range: addr.Physical.Range,
     map_type: kernel.mem.MapType,
-) AllocateError!core.VirtualRange {
+) AllocateError!addr.Virtual.Range.Kernel {
     if (core.is_debug) {
         std.debug.assert(size.equal(physical_range.size));
-        std.debug.assert(size.isAligned(arch.paging.standard_page_size));
-        std.debug.assert(physical_range.address.isAligned(arch.paging.standard_page_size));
+        std.debug.assert(size.aligned(arch.paging.standard_page_size_alignment));
+        std.debug.assert(physical_range.address.aligned(arch.paging.standard_page_size_alignment));
     }
 
     const allocation = globals.special_heap_address_space_arena.allocate(
@@ -92,7 +93,7 @@ pub fn allocateSpecial(
 
     kernel.mem.mapRangeToPhysicalRange(
         kernel.mem.kernelPageTable(),
-        virtual_range,
+        virtual_range.toVirtualRange(),
         physical_range,
         map_type,
         .kernel,
@@ -113,13 +114,13 @@ pub fn allocateSpecial(
 ///
 /// **REQUIREMENTS**:
 /// - `virtual_range` must be a range that was previously allocated by `allocateSpecial`.
-pub fn deallocateSpecial(virtual_range: core.VirtualRange) void {
+pub fn deallocateSpecial(virtual_range: addr.Virtual.Range.Kernel) void {
     {
         globals.special_heap_page_table_mutex.lock();
         defer globals.special_heap_page_table_mutex.unlock();
 
         var unmap_batch: kernel.mem.VirtualRangeBatch = .{};
-        std.debug.assert(unmap_batch.append(virtual_range));
+        std.debug.assert(unmap_batch.append(virtual_range.toVirtualRange()));
 
         kernel.mem.unmap(
             kernel.mem.kernelPageTable(),
@@ -151,7 +152,7 @@ pub const c = struct {
             @branchHint(.unlikely);
             return null;
         };
-        return virtual_range.address.toPtr([*]u8);
+        return virtual_range.address.ptr([*]u8);
     }
 
     /// Free a block of memory allocated with 'mallocWithSizedFree'.
@@ -171,7 +172,7 @@ pub const c = struct {
         // this function assumes that the C code expects an alignment of 16 bytes or less
         comptime {
             std.debug.assert(allocator_impl.heap_arena_quantum >= 16);
-            std.debug.assert(@sizeOf(Allocation) == allocator_impl.heap_arena_quantum);
+            std.debug.assert(allocator_impl.heap_arena_quantum_size.equal(.of(Allocation)));
         }
 
         const allocation = globals.heap_arena.allocate(
@@ -182,7 +183,7 @@ pub const c = struct {
             return null;
         };
 
-        if (core.is_debug) @memset(allocation.toVirtualRange().toByteSlice(), undefined);
+        if (core.is_debug) @memset(allocation.toVirtualRange().byteSlice(), undefined);
 
         const base_ptr: [*]u8 = @ptrFromInt(allocation.base);
         const result_ptr = base_ptr + @sizeOf(Allocation);
@@ -226,7 +227,7 @@ const allocator_impl = struct {
         };
 
         // no need to set to `undefined` as the allocator interface will do it for us
-        return allocation.toVirtualRange().address.toPtr([*]u8);
+        return allocation.toVirtualRange().address.ptr([*]u8);
     }
 
     fn resize(
@@ -276,8 +277,8 @@ const allocator_impl = struct {
         globals.heap_arena.deallocate(
             .fromVirtualRange(
                 .{
-                    .address = .fromPtr(memory.ptr),
-                    .size = core.Size.from(memory.len, .byte).alignForward(heap_arena_quantum_size),
+                    .address = .from(@intFromPtr(memory.ptr)),
+                    .size = core.Size.from(memory.len, .byte).alignForward(heap_arena_quantum_size_alignment),
                 },
             ),
         );
@@ -306,7 +307,7 @@ const allocator_impl = struct {
 
             kernel.mem.mapRangeAndBackWithPhysicalPages(
                 kernel.mem.kernelPageTable(),
-                virtual_range,
+                virtual_range.toVirtualRange(),
                 .{ .type = .kernel, .protection = .read_write },
                 .kernel,
                 .keep,
@@ -318,7 +319,7 @@ const allocator_impl = struct {
         }
         errdefer comptime unreachable;
 
-        if (core.is_debug) @memset(virtual_range.toByteSlice(), undefined);
+        if (core.is_debug) @memset(virtual_range.byteSlice(), undefined);
 
         return allocation;
     }
@@ -333,7 +334,7 @@ const allocator_impl = struct {
 
         {
             var unmap_batch: kernel.mem.VirtualRangeBatch = .{};
-            unmap_batch.appendMergeIfFull(allocation.toVirtualRange());
+            unmap_batch.appendMergeIfFull(allocation.toVirtualRange().toVirtualRange());
 
             globals.heap_page_table_mutex.lock();
             defer globals.heap_page_table_mutex.unlock();
@@ -353,7 +354,9 @@ const allocator_impl = struct {
 
     const heap_arena_quantum: usize = 16;
     const heap_arena_quantum_caches: usize = 512 / heap_arena_quantum; // cache up to 512 bytes
+
     const heap_arena_quantum_size: core.Size = .from(heap_arena_quantum, .byte);
+    const heap_arena_quantum_size_alignment = heap_arena_quantum_size.toAlignment();
 };
 
 const globals = struct {

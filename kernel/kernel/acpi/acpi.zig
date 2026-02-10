@@ -4,10 +4,11 @@
 const std = @import("std");
 
 const arch = @import("arch");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
 const acpi = kernel.acpi;
-const core = @import("core");
+const addr = kernel.addr;
 
 pub const Address = @import("Address.zig").Address;
 pub const tables = @import("tables/tables.zig");
@@ -55,8 +56,8 @@ pub const init = struct {
         };
 
         const rsdp = switch (boot.rsdp() orelse return) {
-            .physical => |addr| kernel.mem.directMapFromPhysical(addr).toPtr(*const tables.RSDP),
-            .virtual => |addr| addr.toPtr(*const tables.RSDP),
+            .physical => |phys_addr| phys_addr.toDirectMap().ptr(*const tables.RSDP),
+            .virtual => |virt_addr| virt_addr.ptr(*const tables.RSDP),
         };
         if (!rsdp.isValid()) return error.InvalidRSDP;
         globals.rsdp = rsdp;
@@ -68,8 +69,7 @@ pub const init = struct {
     pub fn logAcpiTables() !void {
         if (!init_log.levelEnabled(.debug) or !init_globals.acpi_present) return;
 
-        const sdt_header = kernel.mem.directMapFromPhysical(globals.rsdp.sdtAddress())
-            .toPtr(*const tables.SharedHeader);
+        const sdt_header = globals.rsdp.sdtAddress().toDirectMap().ptr(*const tables.SharedHeader);
 
         if (!sdt_header.isValid()) return error.InvalidSDT;
 
@@ -194,19 +194,19 @@ pub const init = struct {
             else
                 table_iterator.nextTablePhysicalAddressImpl(u32);
 
-            return kernel.mem
-                .directMapFromPhysical(opt_phys_addr orelse return null)
-                .toPtr(*const tables.SharedHeader);
+            const phys_addr = opt_phys_addr orelse return null;
+
+            return phys_addr.toDirectMap().ptr(*const tables.SharedHeader);
         }
 
-        fn nextTablePhysicalAddressImpl(table_iterator: *TableIterator, comptime T: type) ?core.PhysicalAddress {
+        fn nextTablePhysicalAddressImpl(table_iterator: *TableIterator, comptime T: type) ?addr.Physical {
             if (@intFromPtr(table_iterator.ptr) + @sizeOf(T) >= @intFromPtr(table_iterator.end_ptr)) return null;
 
             const physical_address = std.mem.readInt(T, @ptrCast(table_iterator.ptr), .little);
 
             table_iterator.ptr += @sizeOf(T);
 
-            return core.PhysicalAddress.fromInt(physical_address);
+            return .from(physical_address);
         }
     };
 
