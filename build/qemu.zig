@@ -199,21 +199,8 @@ fn createQemuStep(
         },
         .x64 => {
             if (options.no_acpi) {
-                const x64_no_acpi_step = try b.allocator.create(std.Build.Step);
-                x64_no_acpi_step.* =
-                    .init(.{
-                        .id = .custom,
-                        .name = "x64_no_acpi",
-                        .owner = b,
-                        .makeFn = struct {
-                            fn makeFn(_: *std.Build.Step, _: std.Build.Step.MakeOptions) !void {
-                                std.debug.print("ACPI cannot be disabled on x64\n", .{});
-                                std.process.exit(1);
-                            }
-                        }.makeFn,
-                    });
-
-                run_qemu.step.dependOn(x64_no_acpi_step);
+                std.debug.print("ACPI cannot be disabled on x64\n", .{});
+                std.process.exit(1);
             }
 
             run_qemu.addArgs(&.{ "-machine", "q35" });
