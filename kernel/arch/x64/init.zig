@@ -440,35 +440,20 @@ const DebugCon = struct {
         return x64.instructions.portReadU8(port) == port;
     }
 
-    fn writeStr(str: []const u8) void {
-        for (0..str.len) |i| {
-            const byte = str[i];
-
-            if (byte == '\n') {
-                @branchHint(.unlikely);
-
-                const newline_first_or_only = str.len == 1 or i == 0;
-
-                if (newline_first_or_only or str[i - 1] != '\r') {
-                    @branchHint(.likely);
-                    x64.instructions.portWriteU8(port, '\r');
-                }
-            }
-
-            x64.instructions.portWriteU8(port, byte);
-        }
+    fn writeStr(_: void, str: []const u8) void {
+        for (str) |byte| x64.instructions.portWriteU8(port, byte);
     }
 
     const output: arch.init.InitOutput.Output = .{
         .name = arch.init.InitOutput.Output.Name.fromSlice("debugcon") catch unreachable,
         .writeFn = struct {
             fn writeFn(_: *anyopaque, str: []const u8) void {
-                writeStr(str);
+                arch.init.InitOutput.Output.writeWithCarridgeReturns({}, writeStr, str);
             }
         }.writeFn,
         .splatFn = struct {
             fn splatFn(_: *anyopaque, str: []const u8, splat: usize) void {
-                for (0..splat) |_| writeStr(str);
+                for (0..splat) |_| arch.init.InitOutput.Output.writeWithCarridgeReturns({}, writeStr, str);
             }
         }.splatFn,
         .state = undefined,

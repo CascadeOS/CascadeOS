@@ -37,6 +37,18 @@ pub fn registerOutputsNoMemorySystem() void {
 
     globals.graphical_output = @import("framebuffer.zig").tryGetFramebufferOutput(false);
     if (globals.graphical_output) |*graphical_output| graphical_output.writeFn(graphical_output.state, cascade_starting_message);
+
+    if (log.levelEnabled(.debug)) {
+        if (globals.graphical_output) |*output| log.debug(
+            "before memory system - selected graphical output: {s}",
+            .{output.name.constSlice()},
+        );
+
+        if (globals.serial_output) |*output| log.debug(
+            "before memory system - selected serial output: {s}",
+            .{output.name.constSlice()},
+        );
+    }
 }
 
 /// Called after the memory system is initialized.
@@ -127,6 +139,26 @@ fn writeToOutputs(str: []const u8) void {
 fn splatToOutputs(str: []const u8, splat: usize) void {
     if (globals.graphical_output) |*output| output.splatFn(output.state, str, splat);
     if (globals.serial_output) |*output| output.splatFn(output.state, str, splat);
+}
+
+/// Replaces `\n' with `\r\n'.
+pub fn writeWithCarridgeReturns(
+    context: anytype,
+    comptime writeFn: fn (context: @TypeOf(context), str: []const u8) void,
+    full_str: []const u8,
+) void {
+    var str = full_str;
+
+    while (str.len != 0) {
+        const index_of_newline = std.mem.indexOfScalar(u8, str, '\n') orelse {
+            writeFn(context, str);
+            return;
+        };
+
+        writeFn(context, str[0..index_of_newline]);
+        writeFn(context, "\r\n");
+        str = str[index_of_newline + 1 ..];
+    }
 }
 
 const globals = struct {

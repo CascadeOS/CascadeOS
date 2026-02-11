@@ -9,6 +9,7 @@ const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
 const addr = kernel.addr;
+const Output = @import("Output.zig");
 
 const init_log = kernel.debug.log.scoped(.output_init);
 
@@ -17,14 +18,14 @@ const c = @cImport({
     @cInclude("flanterm_backends/fb.h");
 });
 
-pub fn tryGetFramebufferOutput(memory_system_available: bool) ?kernel.init.Output {
+pub fn tryGetFramebufferOutput(memory_system_available: bool) ?Output {
     return tryGetFramebufferOutputInner(memory_system_available) catch |err| {
         init_log.err("failed to initialize serial output: {}", .{err});
         return null;
     };
 }
 
-fn tryGetFramebufferOutputInner(memory_system_available: bool) !?kernel.init.Output {
+fn tryGetFramebufferOutputInner(memory_system_available: bool) !?Output {
     if (!memory_system_available) return null;
 
     const framebuffer = boot.framebuffer() orelse return null;
@@ -90,10 +91,11 @@ fn tryGetFramebufferOutputInner(memory_system_available: bool) !?kernel.init.Out
     ) orelse return error.FailedToInitializeFramebuffer;
 
     return .{
-        .name = arch.init.InitOutput.Output.Name.fromSlice("flanterm framebuffer") catch unreachable,
+        .name = Output.Name.fromSlice("flanterm framebuffer") catch unreachable,
         .writeFn = struct {
             fn writeFn(con: *anyopaque, str: []const u8) void {
-                c.flanterm_write(@ptrCast(@alignCast(con)), str.ptr, str.len);
+                const context: *c.flanterm_context = @ptrCast(@alignCast(con));
+                Output.writeWithCarridgeReturns(context, flantermWrite, str);
             }
         }.writeFn,
         .splatFn = struct {
@@ -104,6 +106,10 @@ fn tryGetFramebufferOutputInner(memory_system_available: bool) !?kernel.init.Out
         }.splatFn,
         .state = flanterm_context,
     };
+}
+
+fn flantermWrite(context: *c.flanterm_context, str: []const u8) void {
+    c.flanterm_write(context, str.ptr, str.len);
 }
 
 const font = @embedFile("simple.font");

@@ -4,9 +4,11 @@
 const std = @import("std");
 
 const arch = @import("arch");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
-const core = @import("core");
+
+const Output = @import("Output.zig");
 
 pub const Uart = union(enum) {
     io_port_16550: IoPort16550,
@@ -16,7 +18,7 @@ pub const Uart = union(enum) {
 
     pl011: PL011,
 
-    pub fn output(uart: *Uart) kernel.init.Output {
+    pub fn output(uart: *Uart) Output {
         switch (uart.*) {
             inline else => |*u| return u.output(),
         }
@@ -291,92 +293,47 @@ fn Uart16X50(comptime mode: Mode, comptime fifo_mode: enum { disabled, enabled }
             };
         }
 
-        fn writeSlice(uart: UartT, str: []const u8) void {
-            if (fifo_mode == .enabled) {
-                var i: usize = 0;
+        fn writeStr(uart: UartT, str: []const u8) void {
+            switch (fifo_mode) {
+                .enabled => {
+                    var i: usize = 0;
 
-                var last_byte_carridge_return = false;
+                    while (i < str.len) {
+                        uart.waitForOutputReady();
 
-                while (i < str.len) {
-                    uart.waitForOutputReady();
+                        // FIFO is empty meaning we can write 16 bytes
+                        var bytes_to_write = @min(str.len - i, 16);
 
-                    // FIFO is empty meaning we can write 16 bytes
-                    var bytes_to_write = @min(str.len - i, 16);
-
-                    while (bytes_to_write > 0) {
-                        const byte = str[i];
-
-                        switch (byte) {
-                            '\r' => {
-                                @branchHint(.unlikely);
-                                last_byte_carridge_return = true;
-                            },
-                            '\n' => {
-                                @branchHint(.unlikely);
-
-                                if (!last_byte_carridge_return) {
-                                    @branchHint(.likely);
-
-                                    writeRegister(uart.write_register, '\r');
-                                    bytes_to_write -= 1;
-
-                                    if (bytes_to_write == 0) {
-                                        @branchHint(.unlikely);
-
-                                        last_byte_carridge_return = true;
-
-                                        break;
-                                    }
-                                }
-
-                                last_byte_carridge_return = false;
-                            },
-                            else => {
-                                @branchHint(.likely);
-                                last_byte_carridge_return = false;
-                            },
+                        while (bytes_to_write > 0) {
+                            writeRegister(uart.write_register, str[i]);
+                            bytes_to_write -= 1;
+                            i += 1;
                         }
-
+                    }
+                },
+                .disabled => {
+                    for (str) |byte| {
+                        uart.waitForOutputReady();
                         writeRegister(uart.write_register, byte);
-                        bytes_to_write -= 1;
-                        i += 1;
                     }
-                }
-            } else {
-                for (0..str.len) |i| {
-                    const byte = str[i];
-
-                    if (byte == '\n') {
-                        @branchHint(.unlikely);
-
-                        const newline_first_or_only = str.len == 1 or i == 0;
-
-                        if (newline_first_or_only or str[i - 1] != '\r') {
-                            @branchHint(.likely);
-                            uart.waitForOutputReady();
-                            writeRegister(uart.write_register, '\r');
-                        }
-                    }
-
-                    uart.waitForOutputReady();
-                    writeRegister(uart.write_register, byte);
-                }
+                },
             }
         }
 
-        pub fn output(uart: *UartT) kernel.init.Output {
+        pub fn output(uart: *UartT) Output {
             return .{
-                .name = arch.init.InitOutput.Output.Name.fromSlice("uart16X50") catch unreachable,
+                .name = Output.Name.fromSlice("uart16X50") catch unreachable,
                 .writeFn = struct {
                     fn writeFn(state: *anyopaque, str: []const u8) void {
                         const inner_uart: *UartT = @ptrCast(@alignCast(state));
-                        inner_uart.writeSlice(str);
+                        Output.writeWithCarridgeReturns(inner_uart.*, writeStr, str);
                     }
                 }.writeFn,
                 .splatFn = struct {
                     fn splatFn(state: *anyopaque, str: []const u8, splat: usize) void {
-                        const inner_uart: *UartT = @ptrCast(@alignCast(state));
-                        for (0..splat) |_| inner_uart.writeSlice(str);
+                        const inner_uart_ptr: *UartT = @ptrCast(@alignCast(state));
+                        const inner_uart: UartT = inner_uart_ptr.*;
+                        for (0..splat) |_| Output.writeWithCarridgeReturns(inner_uart, writeStr, str);
                     }
                 }.splatFn,
                 .state = uart,
@@ -599,10 +556,8 @@ pub const PL011 = struct {
         };
     }
 
-    fn writeSlice(pl011: PL011, str: []const u8) void {
+    fn writeStr(pl011: PL011, str: []const u8) void {
         var i: usize = 0;
-
-        var last_byte_carridge_return = false;
 
         while (i < str.len) {
             pl011.waitForOutputReady();
@@ -611,59 +566,27 @@ pub const PL011 = struct {
             var bytes_to_write = @min(str.len - i, 32);
 
             while (bytes_to_write > 0) {
-                const byte = str[i];
-
-                switch (byte) {
-                    '\r' => {
-                        @branchHint(.unlikely);
-                        last_byte_carridge_return = true;
-                    },
-                    '\n' => {
-                        @branchHint(.unlikely);
-
-                        if (!last_byte_carridge_return) {
-                            @branchHint(.likely);
-
-                            writeRegister(pl011.write_register, '\r');
-                            bytes_to_write -= 1;
-
-                            if (bytes_to_write == 0) {
-                                @branchHint(.unlikely);
-
-                                last_byte_carridge_return = true;
-
-                                break;
-                            }
-                        }
-
-                        last_byte_carridge_return = false;
-                    },
-                    else => {
-                        @branchHint(.likely);
-                        last_byte_carridge_return = false;
-                    },
-                }
-
-                writeRegister(pl011.write_register, byte);
+                writeRegister(pl011.write_register, str[i]);
                 bytes_to_write -= 1;
                 i += 1;
             }
         }
     }
 
-    pub fn output(pl011: *PL011) kernel.init.Output {
+    pub fn output(pl011: *PL011) Output {
         return .{
-            .name = arch.init.InitOutput.Output.Name.fromSlice("pl011") catch unreachable,
+            .name = Output.Name.fromSlice("pl011") catch unreachable,
             .writeFn = struct {
                 fn writeFn(state: *anyopaque, str: []const u8) void {
-                    const uart: *PL011 = @ptrCast(@alignCast(state));
-                    uart.writeSlice(str);
+                    const uart_ptr: *PL011 = @ptrCast(@alignCast(state));
+                    Output.writeWithCarridgeReturns(uart_ptr.*, writeStr, str);
                 }
             }.writeFn,
             .splatFn = struct {
                 fn splatFn(state: *anyopaque, str: []const u8, splat: usize) void {
-                    const uart: *PL011 = @ptrCast(@alignCast(state));
-                    for (0..splat) |_| uart.writeSlice(str);
+                    const uart_ptr: *PL011 = @ptrCast(@alignCast(state));
+                    const uart = uart_ptr.*;
+                    for (0..splat) |_| Output.writeWithCarridgeReturns(uart, writeStr, str);
                 }
             }.splatFn,
             .state = pl011,
