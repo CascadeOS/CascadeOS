@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-NON-AI-MIT AND 0BSD
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
-// SPDX-FileCopyrightText: 2022-2025 Mintsuki and contributors (https://github.com/limine-bootloader/limine-protocol/blob/trunk/LICENSE)
+// SPDX-FileCopyrightText: 2022-2026 Mintsuki and contributors (https://codeberg.org/Limine/limine-protocol/src/branch/trunk/LICENSE)
 
 //! This module contains the definitions of the Limine protocol as of 8a888d7ab3b274fad1a357a922e799fc2ff20729.
 //!
-//! [PROTOCOL DOC](https://github.com/limine-bootloader/limine-protocol/blob/8a888d7ab3b274fad1a357a922e799fc2ff20729/PROTOCOL.md)
+//! [PROTOCOL DOC](https://codeberg.org/Limine/limine-protocol/src/commit/42e836e30242c2c14f889fd76c6f9a57b0c18ec2/PROTOCOL.md)
 
 const std = @import("std");
 
