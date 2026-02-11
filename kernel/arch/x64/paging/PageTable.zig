@@ -35,6 +35,8 @@ pub const PageTable = extern struct {
     pub const level_4_address_space_size = core.Size.from(512, .gib);
     const level_4_address_space_size_alignment = level_4_address_space_size.toAlignment();
 
+    pub const half_address_space_size: core.Size = .from(128, .tib);
+
     pub fn sizeOfTopLevelEntry() core.Size {
         // TODO: Only correct for 4 level paging
         return level_4_address_space_size;

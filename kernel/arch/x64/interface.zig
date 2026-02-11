@@ -164,10 +164,12 @@ pub const decls: arch.Decls = .{
     },
 
     .paging = .{
-        .standard_page_size = .from(4, .kib),
-        .largest_page_size = .from(1, .gib),
-        .lower_half_range = .from(.zero, .from(128, .tib)),
-        .higher_half_range = .from(.from(0xffff800000000000), .from(128, .tib)),
+        .standard_page_size = x64.paging.PageTable.small_page_size,
+        .largest_page_size = x64.paging.PageTable.large_page_size,
+        .kernel_memory_range = .from(
+            .from(0xffff800000000000),
+            x64.paging.PageTable.half_address_space_size,
+        ),
         .PageTable = x64.paging.PageTable,
     },
 
@@ -183,6 +185,10 @@ pub const decls: arch.Decls = .{
     .user = .{
         .PerThread = x64.user.PerThread,
         .SyscallFrame = x64.user.SyscallFrame,
+        .user_memory_range = .from(
+            addr.Virtual.zero.moveForward(x64.paging.PageTable.small_page_size),
+            x64.paging.PageTable.half_address_space_size.subtract(x64.paging.PageTable.small_page_size),
+        ),
     },
 
     .io = .{

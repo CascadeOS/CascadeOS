@@ -30,9 +30,9 @@ pub const Virtual = extern union {
     };
 
     pub fn getType(address: Virtual) Type {
-        if (arch.paging.higher_half_range.containsAddress(address))
+        if (arch.paging.kernel_memory_range.containsAddress(address))
             return .kernel
-        else if (arch.paging.lower_half_range.containsAddress(address))
+        else if (arch.user.user_memory_range.containsAddress(address))
             return .user
         else {
             @branchHint(.cold);
@@ -41,12 +41,12 @@ pub const Virtual = extern union {
     }
 
     pub inline fn toKernel(address: Virtual) Kernel {
-        if (core.is_debug) std.debug.assert(arch.paging.higher_half_range.containsAddress(address));
+        if (core.is_debug) std.debug.assert(arch.paging.kernel_memory_range.containsAddress(address));
         return address.kernel;
     }
 
     pub inline fn toUser(address: Virtual) User {
-        if (core.is_debug) std.debug.assert(arch.paging.lower_half_range.containsAddress(address));
+        if (core.is_debug) std.debug.assert(arch.user.user_memory_range.containsAddress(address));
         return address.user;
     }
 
@@ -189,9 +189,9 @@ pub const Virtual = extern union {
         }
 
         pub fn getType(range: Range) Virtual.Type {
-            if (arch.paging.higher_half_range.fullyContains(range))
+            if (arch.paging.kernel_memory_range.fullyContains(range))
                 return .kernel
-            else if (arch.paging.lower_half_range.fullyContains(range))
+            else if (arch.user.user_memory_range.fullyContains(range))
                 return .user
             else {
                 @branchHint(.cold);

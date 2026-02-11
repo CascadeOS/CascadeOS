@@ -4,9 +4,10 @@
 const std = @import("std");
 
 const arch = @import("arch");
+const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
-const core = @import("core");
+const addr = kernel.addr;
 
 const riscv = @import("riscv.zig");
 
@@ -96,6 +97,9 @@ pub const functions: arch.Functions = .{
     },
 };
 
+const standard_page_size: core.Size = .from(4, .kib);
+const half_address_space_size: core.Size = .from(128, .tib);
+
 pub const decls: arch.Decls = .{
     .PerExecutor = struct { hartid: u32 },
 
@@ -106,10 +110,12 @@ pub const decls: arch.Decls = .{
 
     .paging = .{
         // TODO: most of these values are copied from the x64, so all of them need to be checked
-        .standard_page_size = .from(4, .kib),
+        .standard_page_size = standard_page_size,
         .largest_page_size = .from(1, .gib),
-        .lower_half_range = .from(.zero, .from(128, .tib)),
-        .higher_half_range = .from(.from(0xffff800000000000), .from(128, .tib)),
+        .kernel_memory_range = .from(
+            .from(0xffff800000000000),
+            half_address_space_size,
+        ),
         .PageTable = extern struct {},
     },
 
@@ -125,6 +131,10 @@ pub const decls: arch.Decls = .{
     .user = .{
         .PerThread = struct {},
         .SyscallFrame = struct {},
+        .user_memory_range = .from(
+            addr.Virtual.zero.moveForward(standard_page_size),
+            half_address_space_size.subtract(standard_page_size),
+        ),
     },
 
     .io = .{

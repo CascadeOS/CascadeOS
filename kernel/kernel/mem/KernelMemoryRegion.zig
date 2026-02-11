@@ -96,7 +96,7 @@ pub const List = struct {
 
         const regions = list.constSlice();
 
-        var current_address = arch.paging.higher_half_range.address.toKernel();
+        var current_address = arch.paging.kernel_memory_range.address.toKernel();
         current_address.alignForwardInPlace(alignment);
 
         var i: usize = 0;

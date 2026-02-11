@@ -320,7 +320,7 @@ fn onKernelPageFault(
                         @branchHint(.cold);
                         kernel.debug.interruptSourcePanic(
                             interrupt_frame,
-                            "kernel page fault in lower half\n{f}",
+                            "kernel page fault in user memory range\n{f}",
                             .{page_fault_details},
                         );
                         unreachable;
@@ -1012,9 +1012,3 @@ pub const init = struct {
         var kernel_physical_to_virtual_offset: core.Size = undefined;
     };
 };
-
-comptime {
-    // check that neither the user or kernel address space ranges overlap with the undefined address
-    std.debug.assert(!kernel.config.user.user_address_space_range.toVirtualRange().containsAddress(.undefined_address));
-    std.debug.assert(!arch.paging.higher_half_range.containsAddress(.undefined_address));
-}

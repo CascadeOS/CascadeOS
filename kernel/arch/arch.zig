@@ -208,13 +208,17 @@ pub const paging = struct {
     pub const largest_page_size: core.Size = current_decls.paging.largest_page_size;
     pub const largest_page_size_alignment: std.mem.Alignment = largest_page_size.toAlignment();
 
-    /// The range of the entire lower half of the address space.
+    /// The range of the address space that is considered kernel memory.
     ///
-    /// This includes the zero page.
-    pub const lower_half_range: addr.Virtual.Range = current_decls.paging.lower_half_range;
+    /// Usually the higher half of the address space.
+    ///
+    /// This must not include either the zero nor undefined address.
+    pub const kernel_memory_range: addr.Virtual.Range = current_decls.paging.kernel_memory_range;
 
-    /// The range of the entire higher half of the address space.
-    pub const higher_half_range: addr.Virtual.Range = current_decls.paging.higher_half_range;
+    comptime {
+        std.debug.assert(!kernel_memory_range.containsAddress(.zero));
+        std.debug.assert(!kernel_memory_range.containsAddress(.undefined_address));
+    }
 
     pub const PageTable = struct {
         physical_page: kernel.mem.PhysicalPage.Index,
@@ -542,6 +546,18 @@ pub const scheduling = struct {
 pub const user = struct {
     /// Architecture specific per-thread data.
     pub const PerThread = current_decls.user.PerThread;
+
+    /// The range of the address space that is considered user memory.
+    ///
+    /// Usually the lower half of the address space.
+    ///
+    /// This must not include either the zero nor undefined address.
+    pub const user_memory_range: addr.Virtual.Range = current_decls.user.user_memory_range;
+
+    comptime {
+        std.debug.assert(!user_memory_range.containsAddress(.zero));
+        std.debug.assert(!user_memory_range.containsAddress(.undefined_address));
+    }
 
     /// Create the `PerThread` data of a thread.
     ///
@@ -1228,13 +1244,12 @@ pub const Decls = struct {
         /// The largest page size supported by the architecture.
         largest_page_size: core.Size,
 
-        /// The range of the entire lower half of the address space.
+        /// The range of the address space that is considered kernel memory.
         ///
-        /// This includes the zero page.
-        lower_half_range: addr.Virtual.Range,
-
-        /// The range of the entire higher half of the address space.
-        higher_half_range: addr.Virtual.Range,
+        /// Usually the higher half of the address space.
+        ///
+        /// This must not include either the zero nor undefined address.
+        kernel_memory_range: addr.Virtual.Range,
 
         PageTable: type,
     },
@@ -1254,6 +1269,13 @@ pub const Decls = struct {
         PerThread: type,
 
         SyscallFrame: type,
+
+        /// The range of the address space that is considered user memory.
+        ///
+        /// Usually the lower half of the address space.
+        ///
+        /// This must not include either the zero nor undefined address.
+        user_memory_range: addr.Virtual.Range,
     },
 
     io: struct {

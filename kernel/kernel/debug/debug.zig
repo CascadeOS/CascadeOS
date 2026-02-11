@@ -248,7 +248,7 @@ const formatting = struct {
             .kernel => address.toKernel(),
             .user => {
                 try writer.print(
-                    comptime indent ++ "0x{x:0>16} - address in the lower half\n",
+                    comptime indent ++ "0x{x:0>16} - address in the user memory range\n",
                     .{address.value},
                 );
                 return;

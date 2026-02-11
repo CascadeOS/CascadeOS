@@ -53,10 +53,4 @@ pub const user = struct {
     pub const process_name_length = 64;
     // the process name is also used as the name of its address space
     pub const address_space_name_length = process_name_length;
-
-    // don't allow the zero page to be mapped
-    pub const user_address_space_range: addr.Virtual.Range.User = .from(
-        arch.paging.lower_half_range.address.moveForward(arch.paging.standard_page_size).toUser(),
-        arch.paging.lower_half_range.size.subtract(arch.paging.standard_page_size),
-    );
 };
