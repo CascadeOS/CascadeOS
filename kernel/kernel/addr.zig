@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-NON-AI-MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-// This file is really misses `usingnamespace`.
-// The "mixins" in this file have signatures where they are exposed only to help ZLS realize they are "methods".
+// This file is really missing `usingnamespace`.
+// The "mixins" in this file have signatures only to help ZLS realize they are "methods".
 
 const std = @import("std");
 
