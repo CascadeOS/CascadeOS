@@ -25,7 +25,7 @@ pub fn getFunction(address: Address) ?*volatile Function {
 
         return ecam.config_space.address
             .moveForward(.from(config_space_offset, .byte))
-            .ptr(*volatile Function);
+            .toPtr(*volatile Function);
     }
 
     return null;

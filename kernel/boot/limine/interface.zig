@@ -233,7 +233,7 @@ pub fn framebuffer() ?boot.Framebuffer {
     std.debug.assert(buffer.memory_model == .rgb);
 
     return .{
-        .ptr = buffer.address.ptr([*]volatile u32),
+        .ptr = buffer.address.toPtr([*]volatile u32),
         .width = buffer.width,
         .height = buffer.height,
         .pitch = buffer.pitch,

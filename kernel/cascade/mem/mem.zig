@@ -684,11 +684,7 @@ pub const init = struct {
         const base_address = boot.kernelBaseAddress() orelse @panic("no kernel base address");
         globals.virtual_base_address = base_address.virtual;
 
-        const kernel_virtual_offset = core.Size.from(
-            base_address.virtual.value - cascade.config.mem.kernel_base_address.value,
-            .byte,
-        );
-        globals.kernel_virtual_offset = kernel_virtual_offset;
+        globals.kernel_virtual_offset = cascade.config.mem.kernel_base_address.difference(base_address.virtual);
 
         init_globals.kernel_physical_to_virtual_offset = core.Size.from(
             base_address.virtual.value - base_address.physical.value,
@@ -807,18 +803,18 @@ pub const init = struct {
             KernelMemoryRegion.Type,
         } = &.{
             .{
-                .from(@intFromPtr(&linker_symbols.__text_start)),
-                .from(@intFromPtr(&linker_symbols.__text_end)),
+                .fromPtr(&linker_symbols.__text_start),
+                .fromPtr(&linker_symbols.__text_end),
                 .executable_section,
             },
             .{
-                .from(@intFromPtr(&linker_symbols.__rodata_start)),
-                .from(@intFromPtr(&linker_symbols.__rodata_end)),
+                .fromPtr(&linker_symbols.__rodata_start),
+                .fromPtr(&linker_symbols.__rodata_end),
                 .readonly_section,
             },
             .{
-                .from(@intFromPtr(&linker_symbols.__data_start)),
-                .from(@intFromPtr(&linker_symbols.__data_end)),
+                .fromPtr(&linker_symbols.__data_start),
+                .fromPtr(&linker_symbols.__data_end),
                 .writeable_section,
             },
             .{

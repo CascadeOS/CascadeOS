@@ -411,7 +411,7 @@ pub const RawCache = struct {
                         const physical_page = cascade.mem.PhysicalPage.allocator.allocate() catch
                             return AllocateError.SlabAllocationFailed;
 
-                        const slab_base_ptr = physical_page.baseAddress().toDirectMap().ptr([*]u8);
+                        const slab_base_ptr = physical_page.baseAddress().toDirectMap().toPtr([*]u8);
 
                         if (core.is_debug) @memset(slab_base_ptr[0..arch.paging.standard_page_size.value], undefined);
 
@@ -427,7 +427,7 @@ pub const RawCache = struct {
                     .pmm => {
                         var deallocate_page_list: cascade.mem.PhysicalPage.List = .{};
                         deallocate_page_list.prepend(.fromAddress(
-                            cascade.PhysicalAddress.fromDirectMap(.from(@intFromPtr(slab_base_ptr))) catch unreachable,
+                            cascade.PhysicalAddress.fromDirectMap(.fromPtr(slab_base_ptr)),
                         ));
                         cascade.mem.PhysicalPage.allocator.deallocate(deallocate_page_list);
                     },
@@ -664,7 +664,7 @@ pub const RawCache = struct {
                     .pmm => {
                         var deallocate_page_list: cascade.mem.PhysicalPage.List = .{};
                         deallocate_page_list.prepend(.fromAddress(
-                            cascade.PhysicalAddress.fromDirectMap(.from(@intFromPtr(slab_base_ptr))) catch unreachable,
+                            cascade.PhysicalAddress.fromDirectMap(.fromPtr(slab_base_ptr)),
                         ));
                         cascade.mem.PhysicalPage.allocator.deallocate(deallocate_page_list);
                     },

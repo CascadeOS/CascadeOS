@@ -151,7 +151,7 @@ pub const c = struct {
             @branchHint(.unlikely);
             return null;
         };
-        return virtual_range.address.ptr([*]u8);
+        return virtual_range.address.toPtr([*]u8);
     }
 
     /// Free a block of memory allocated with 'mallocWithSizedFree'.
@@ -226,7 +226,7 @@ const allocator_impl = struct {
         };
 
         // no need to set to `undefined` as the allocator interface will do it for us
-        return allocation.toVirtualRange().address.ptr([*]u8);
+        return allocation.toVirtualRange().address.toPtr([*]u8);
     }
 
     fn resize(
@@ -276,7 +276,7 @@ const allocator_impl = struct {
         globals.heap_arena.deallocate(
             .fromVirtualRange(
                 .{
-                    .address = .from(@intFromPtr(memory.ptr)),
+                    .address = .fromPtr(memory.ptr),
                     .size = core.Size.from(memory.len, .byte).alignForward(heap_arena_quantum_size_alignment),
                 },
             ),

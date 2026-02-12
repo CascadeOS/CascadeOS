@@ -325,7 +325,7 @@ pub const init = struct {
                 try cascade.mem.mapRangeAndBackWithPhysicalPages(
                     kernel_page_table,
                     .from(
-                        current_range_start.toVirtual(),
+                        current_range_start.toVirtualAddress(),
                         current_range_start.difference(current_range_end),
                     ),
                     .{ .protection = .read_write, .type = .kernel },
@@ -348,7 +348,7 @@ pub const init = struct {
             try cascade.mem.mapRangeAndBackWithPhysicalPages(
                 kernel_page_table,
                 .from(
-                    current_range_start.toVirtual(),
+                    current_range_start.toVirtualAddress(),
                     current_range_start.difference(current_range_end),
                 ),
                 .{ .protection = .read_write, .type = .kernel },

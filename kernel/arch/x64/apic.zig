@@ -83,7 +83,7 @@ pub const init = struct {
             );
 
             globals.lapic = .{
-                .xapic = register_space_range.address.ptr([*]volatile u8),
+                .xapic = register_space_range.address.toPtr([*]volatile u8),
             };
         }
 

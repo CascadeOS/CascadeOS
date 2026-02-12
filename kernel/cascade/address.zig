@@ -12,12 +12,16 @@ const cascade = @import("cascade");
 const Task = cascade.Task;
 
 pub const VirtualAddress = extern union {
-    kernel: KernelVirtualAddress,
-    user: UserVirtualAddress,
+    _kernel: KernelVirtualAddress,
+    _user: UserVirtualAddress,
     value: usize,
 
     pub const zero: VirtualAddress = .from(0);
     pub const undefined_address: VirtualAddress = .from(0xAAAAAAAAAAAAAAAA);
+
+    pub inline fn from(value: usize) VirtualAddress {
+        return .{ .value = value };
+    }
 
     pub const Type = enum {
         kernel,
@@ -25,6 +29,7 @@ pub const VirtualAddress = extern union {
         invalid,
     };
 
+    /// Returns the type of memory this address points to.
     pub fn getType(address: VirtualAddress) Type {
         if (arch.paging.kernel_memory_range.containsAddress(address))
             return .kernel
@@ -36,17 +41,24 @@ pub const VirtualAddress = extern union {
         }
     }
 
+    /// Turn a virtual address into a kernel virtual address.
+    ///
+    /// **REQUIREMENTS**:
+    /// - The address must be in the kernel memory range.
     pub inline fn toKernel(address: VirtualAddress) KernelVirtualAddress {
         if (core.is_debug) std.debug.assert(arch.paging.kernel_memory_range.containsAddress(address));
-        return address.kernel;
+        return address._kernel;
     }
 
+    /// Turn a virtual address into a user virtual address.
+    ///
+    /// **REQUIREMENTS**:
+    /// - The address must be in the user memory range.
     pub inline fn toUser(address: VirtualAddress) UserVirtualAddress {
         if (core.is_debug) std.debug.assert(arch.user.user_memory_range.containsAddress(address));
-        return address.user;
+        return address._user;
     }
 
-    pub const from: fn (value: usize) callconv(.@"inline") @This() = Mixin.from;
     pub const aligned: fn (address: @This(), alignment: std.mem.Alignment) callconv(.@"inline") bool = Mixin.aligned;
     pub const alignForward: fn (address: @This(), alignment: std.mem.Alignment) callconv(.@"inline") @This() = Mixin.alignForward;
     pub const alignForwardInPlace: fn (address: *@This(), alignment: std.mem.Alignment) callconv(.@"inline") void = Mixin.alignForwardInPlace;
@@ -65,27 +77,45 @@ pub const VirtualAddress = extern union {
     pub const format: fn (address: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void = Mixin.format;
 
     const Mixin = AddressMixin(@This());
+
+    comptime {
+        core.testing.expectSize(VirtualAddress, .of(usize));
+    }
 };
 
 pub const KernelVirtualAddress = extern struct {
     value: usize,
 
-    pub inline fn ptr(address: KernelVirtualAddress, comptime PtrT: type) PtrT {
+    /// Creates a new kernel virtual address from a raw value.
+    ///
+    /// **REQUIREMENTS**:
+    /// - The address must be within the kernel memory range.
+    pub inline fn from(value: usize) KernelVirtualAddress {
+        const address: KernelVirtualAddress = .{ .value = value };
+        if (core.is_debug) std.debug.assert(arch.paging.kernel_memory_range.containsAddress(address.toVirtualAddress()));
+        return address;
+    }
+
+    pub inline fn fromPtr(ptr: anytype) KernelVirtualAddress {
+        comptime std.debug.assert(@typeInfo(@TypeOf(ptr)) == .pointer);
+        return .{ .value = @intFromPtr(ptr) };
+    }
+
+    pub inline fn toPtr(address: KernelVirtualAddress, comptime PtrT: type) PtrT {
         return @ptrFromInt(address.value);
     }
 
-    pub inline fn toVirtual(address: KernelVirtualAddress) VirtualAddress {
-        return .{ .kernel = address };
+    pub inline fn toVirtualAddress(address: KernelVirtualAddress) VirtualAddress {
+        return .{ ._kernel = address };
     }
 
     /// Shifts an address to account for any applied virtual offset applied to the kernel (KASLR).
     ///
-    /// The resulting address might no longer be a vaild kernel address, use `getType` to check.
+    /// The resulting address might no longer be a vaild kernel address, use `VirtualAddress.getType` to check.
     pub inline fn applyKernelOffset(address: KernelVirtualAddress) VirtualAddress {
-        return address.moveBackward(cascade.mem.globals.kernel_virtual_offset).toVirtual();
+        return address.toVirtualAddress().moveBackward(cascade.mem.globals.kernel_virtual_offset);
     }
 
-    pub const from: fn (value: usize) callconv(.@"inline") @This() = Mixin.from;
     pub const aligned: fn (address: @This(), alignment: std.mem.Alignment) callconv(.@"inline") bool = Mixin.aligned;
     pub const alignForward: fn (address: @This(), alignment: std.mem.Alignment) callconv(.@"inline") @This() = Mixin.alignForward;
     pub const alignForwardInPlace: fn (address: *@This(), alignment: std.mem.Alignment) callconv(.@"inline") void = Mixin.alignForwardInPlace;
@@ -113,17 +143,24 @@ pub const KernelVirtualAddress = extern struct {
 pub const UserVirtualAddress = extern struct {
     value: usize,
 
-    pub const zero: UserVirtualAddress = .{ .value = 0 };
+    /// Creates a new user virtual address from a raw value.
+    ///
+    /// **REQUIREMENTS**:
+    /// - The address must be within the user memory range.
+    pub inline fn from(value: usize) UserVirtualAddress {
+        const address: UserVirtualAddress = .{ .value = value };
+        if (core.is_debug) std.debug.assert(arch.user.user_memory_range.containsAddress(address.toVirtualAddress()));
+        return address;
+    }
 
     pub inline fn ptr(address: UserVirtualAddress, comptime PtrT: type) PtrT {
         return @ptrFromInt(address.value);
     }
 
-    pub inline fn toVirtual(address: UserVirtualAddress) VirtualAddress {
-        return .{ .user = address };
+    pub inline fn toVirtualAddress(address: UserVirtualAddress) VirtualAddress {
+        return .{ ._user = address };
     }
 
-    pub const from: fn (value: usize) callconv(.@"inline") @This() = Mixin.from;
     pub const aligned: fn (address: @This(), alignment: std.mem.Alignment) callconv(.@"inline") bool = Mixin.aligned;
     pub const alignForward: fn (address: @This(), alignment: std.mem.Alignment) callconv(.@"inline") @This() = Mixin.alignForward;
     pub const alignForwardInPlace: fn (address: *@This(), alignment: std.mem.Alignment) callconv(.@"inline") void = Mixin.alignForwardInPlace;
@@ -153,21 +190,28 @@ pub const PhysicalAddress = extern struct {
 
     pub const zero: PhysicalAddress = .from(0);
 
-    /// Returns the physical address of this virtual address if it is in the direct map.
-    pub fn fromDirectMap(address: KernelVirtualAddress) error{AddressNotInDirectMap}!PhysicalAddress {
-        if (!cascade.mem.globals.direct_map.containsAddress(address)) {
-            @branchHint(.cold);
-            return error.AddressNotInDirectMap;
-        }
-        return .{ .value = address.value - cascade.mem.globals.direct_map.address.value };
+    pub inline fn from(value: usize) PhysicalAddress {
+        return .{ .value = value };
     }
 
-    /// Returns the virtual address corresponding to this physical address in the direct map.
-    pub fn toDirectMap(physical_address: PhysicalAddress) KernelVirtualAddress {
+    /// Returns the physical address of this direct map virtual address.
+    ///
+    /// **REQUIREMENTS**:
+    /// - The provided `address` is in the direct map.
+    pub inline fn fromDirectMap(direct_map_address: KernelVirtualAddress) PhysicalAddress {
+        if (core.is_debug) std.debug.assert(cascade.mem.globals.direct_map.containsAddress(direct_map_address));
+        return .{ .value = direct_map_address.value - cascade.mem.globals.direct_map.address.value };
+    }
+
+    /// Returns the direct map virtual address corresponding to this physical address.
+    ///
+    /// **REQUIREMENTS**:
+    /// - The provided `address` is covered by the direct map.
+    pub inline fn toDirectMap(physical_address: PhysicalAddress) KernelVirtualAddress {
+        if (core.is_debug) std.debug.assert(physical_address.value < cascade.mem.globals.direct_map.size.value);
         return .{ .value = physical_address.value + cascade.mem.globals.direct_map.address.value };
     }
 
-    pub const from: fn (value: usize) callconv(.@"inline") @This() = Mixin.from;
     pub const aligned: fn (address: @This(), alignment: std.mem.Alignment) callconv(.@"inline") bool = Mixin.aligned;
     pub const alignForward: fn (address: @This(), alignment: std.mem.Alignment) callconv(.@"inline") @This() = Mixin.alignForward;
     pub const alignForwardInPlace: fn (address: *@This(), alignment: std.mem.Alignment) callconv(.@"inline") void = Mixin.alignForwardInPlace;
@@ -196,6 +240,13 @@ pub const VirtualRange = struct {
     address: Address,
     size: core.Size,
 
+    pub inline fn from(address: Address, size: core.Size) VirtualRange {
+        return .{ .address = address, .size = size };
+    }
+
+    /// Returns the type of memory this range is in.
+    ///
+    /// If the range is not fully contained in either kernel or user memory, returns `.invalid`.
     pub fn getType(range: VirtualRange) VirtualAddress.Type {
         if (arch.paging.kernel_memory_range.fullyContains(range))
             return .kernel
@@ -207,15 +258,30 @@ pub const VirtualRange = struct {
         }
     }
 
+    /// Converts this range to a kernel range.
+    ///
+    /// **REQUIREMENTS**:
+    /// - The range must be fully contained in kernel memory.
     pub inline fn toKernel(range: VirtualRange) KernelVirtualRange {
-        return .from(range.address.toKernel(), range.size);
+        if (core.is_debug) std.debug.assert(arch.paging.kernel_memory_range.fullyContains(range));
+        return .{
+            .address = range.address._kernel,
+            .size = range.size,
+        };
     }
 
+    /// Converts this range to a user range.
+    ///
+    /// **REQUIREMENTS**:
+    /// - The range must be fully contained in user memory.
     pub inline fn toUser(range: VirtualRange) UserVirtualRange {
-        return .from(range.address.toUser(), range.size);
+        if (core.is_debug) std.debug.assert(arch.user.user_memory_range.fullyContains(range));
+        return .{
+            .address = range.address._user,
+            .size = range.size,
+        };
     }
 
-    pub const from: fn (address: Address, size: core.Size) callconv(.@"inline") @This() = Mixin.from;
     pub const last: fn (range: @This()) Address = Mixin.last;
     pub const after: fn (range: @This()) callconv(.@"inline") Address = Mixin.after;
     pub const anyOverlap: fn (range: @This(), other: @This()) bool = Mixin.anyOverlap;
@@ -232,22 +298,39 @@ pub const KernelVirtualRange = struct {
     address: Address,
     size: core.Size,
 
+    /// Creates a range from an address and size.
+    ///
+    /// **REQUIREMENTS**:
+    /// - The range must be fully contained in kernel memory.
+    pub inline fn from(address: Address, size: core.Size) KernelVirtualRange {
+        const range: KernelVirtualRange = .{ .address = address, .size = size };
+        if (core.is_debug) std.debug.assert(arch.paging.kernel_memory_range.fullyContains(range.toVirtualRange()));
+        return range;
+    }
+
+    /// Creates a range from a slice.
+    ///
+    /// **REQUIREMENTS**:
+    /// - The slice must be fully contained in kernel memory.
     pub inline fn fromSlice(comptime T: type, slice: []const T) KernelVirtualRange {
-        return .from(
+        return VirtualRange.from(
             .from(@intFromPtr(slice.ptr)),
             core.Size.of(T).multiplyScalar(slice.len),
-        );
+        ).toKernel();
     }
 
     pub inline fn toVirtualRange(range: KernelVirtualRange) VirtualRange {
-        return .from(.from(range.address.value), range.size);
+        return .{
+            .address = .{ ._kernel = range.address },
+            .size = range.size,
+        };
     }
 
+    /// Returns a mutable slice of bytes in this range.
     pub inline fn byteSlice(range: KernelVirtualRange) []u8 {
-        return range.address.ptr([*]u8)[0..range.size.value];
+        return range.address.toPtr([*]u8)[0..range.size.value];
     }
 
-    pub const from: fn (address: Address, size: core.Size) callconv(.@"inline") @This() = Mixin.from;
     pub const last: fn (range: @This()) Address = Mixin.last;
     pub const after: fn (range: @This()) callconv(.@"inline") Address = Mixin.after;
     pub const anyOverlap: fn (range: @This(), other: @This()) bool = Mixin.anyOverlap;
@@ -264,16 +347,32 @@ pub const UserVirtualRange = struct {
     address: Address,
     size: core.Size,
 
-    pub inline fn toVirtualRange(range: UserVirtualRange) VirtualRange {
-        return .from(.from(range.address.value), range.size);
+    /// Creates a range from an address and size.
+    ///
+    /// **REQUIREMENTS**:
+    /// - The range must be fully contained in user memory.
+    pub inline fn from(address: Address, size: core.Size) UserVirtualRange {
+        const range: UserVirtualRange = .{ .address = address, .size = size };
+        if (core.is_debug) std.debug.assert(arch.user.user_memory_range.fullyContains(range.toVirtualRange()));
+        return range;
     }
 
+    pub inline fn toVirtualRange(range: UserVirtualRange) VirtualRange {
+        return .{
+            .address = .{ ._user = range.address },
+            .size = range.size,
+        };
+    }
+
+    /// Returns a mutable slice of bytes in this range.
+    ///
+    /// **REQUIREMENTS**:
+    /// - The current task must have enabled access to user memory.
     pub inline fn byteSlice(range: UserVirtualRange) []u8 {
         if (core.is_debug) std.debug.assert(Task.Current.get().task.enable_access_to_user_memory_count != 0);
         return range.address.ptr([*]u8)[0..range.size.value];
     }
 
-    pub const from: fn (address: Address, size: core.Size) callconv(.@"inline") @This() = Mixin.from;
     pub const last: fn (range: @This()) Address = Mixin.last;
     pub const after: fn (range: @This()) callconv(.@"inline") Address = Mixin.after;
     pub const anyOverlap: fn (range: @This(), other: @This()) bool = Mixin.anyOverlap;
@@ -290,15 +389,39 @@ pub const PhysicalRange = struct {
     address: Address,
     size: core.Size,
 
-    /// Returns a virtual range corresponding to this physical range in the direct map.
-    pub fn toDirectMap(range: PhysicalRange) VirtualRange {
+    pub inline fn from(address: Address, size: core.Size) PhysicalRange {
+        return .{ .address = address, .size = size };
+    }
+
+    /// Returns the physical range corresponding to the given direct map virtual range.
+    ///
+    /// **REQUIREMENTS**:
+    /// - `direct_map_range` must be fully contained within the direct map.
+    pub inline fn fromDirectMap(direct_map_range: VirtualRange) PhysicalRange {
+        if (core.is_debug) std.debug.assert(cascade.mem.globals.direct_map.fullyContains(direct_map_range));
         return .{
-            .address = range.address.toDirectMap(),
-            .size = range.size,
+            .address = .{
+                .value = direct_map_range.address.value - cascade.mem.globals.direct_map.address.value,
+            },
+            .size = direct_map_range.size,
         };
     }
 
-    pub const from: fn (address: Address, size: core.Size) callconv(.@"inline") @This() = Mixin.from;
+    /// Returns the direct map virtual range corresponding to this physical range.
+    ///
+    /// **REQUIREMENTS**:
+    /// - `range` must be fully covered by the direct map.
+    pub inline fn toDirectMap(range: PhysicalRange) VirtualRange {
+        const direct_map_range: VirtualRange = .{
+            .address = .{
+                .value = range.address.value - cascade.mem.globals.direct_map.address.value,
+            },
+            .size = range.size,
+        };
+        if (core.is_debug) std.debug.assert(cascade.mem.globals.direct_map.fullyContains(direct_map_range));
+        return direct_map_range;
+    }
+
     pub const last: fn (range: @This()) Address = Mixin.last;
     pub const after: fn (range: @This()) callconv(.@"inline") Address = Mixin.after;
     pub const anyOverlap: fn (range: @This(), other: @This()) bool = Mixin.anyOverlap;
@@ -313,16 +436,12 @@ pub const PhysicalRange = struct {
 
 fn AddressMixin(comptime Address: type) type {
     return struct {
-        inline fn from(value: usize) Address {
-            return .{ .value = value };
-        }
-
         inline fn aligned(address: Address, alignment: std.mem.Alignment) bool {
             return alignment.check(address.value);
         }
 
         inline fn alignForward(address: Address, alignment: std.mem.Alignment) Address {
-            return .from(alignment.forward(address.value));
+            return .{ .value = alignment.forward(address.value) };
         }
 
         inline fn alignForwardInPlace(address: *Address, alignment: std.mem.Alignment) void {
@@ -330,7 +449,7 @@ fn AddressMixin(comptime Address: type) type {
         }
 
         inline fn alignBackward(address: Address, alignment: std.mem.Alignment) Address {
-            return .from(alignment.backward(address.value));
+            return .{ .value = alignment.backward(address.value) };
         }
 
         inline fn alignBackwardInPlace(address: *Address, alignment: std.mem.Alignment) void {
@@ -338,7 +457,7 @@ fn AddressMixin(comptime Address: type) type {
         }
 
         inline fn moveForward(address: Address, size: core.Size) Address {
-            return .from(address.value + size.value);
+            return .{ .value = address.value + size.value };
         }
 
         inline fn moveForwardInPlace(address: *Address, size: core.Size) void {
@@ -346,7 +465,7 @@ fn AddressMixin(comptime Address: type) type {
         }
 
         inline fn moveBackward(address: Address, size: core.Size) Address {
-            return .from(address.value - size.value);
+            return .{ .value = address.value - size.value };
         }
 
         inline fn moveBackwardInPlace(address: *Address, size: core.Size) void {
@@ -410,10 +529,6 @@ fn AddressMixin(comptime Address: type) type {
 
 fn RangeMixin(comptime Range: type) type {
     return struct {
-        inline fn from(address: Address, size: core.Size) Range {
-            return .{ .address = address, .size = size };
-        }
-
         /// Returns the last address in this range.
         ///
         /// If the range's size is zero, returns the start address of the range.

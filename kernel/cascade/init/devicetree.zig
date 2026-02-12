@@ -60,7 +60,7 @@ fn tryGetSerialOutputInner(memory_system_available: bool) !uart.Uart {
 
 fn getDeviceTree() ?DeviceTree {
     const address = boot.deviceTreeBlob() orelse return null;
-    const ptr = address.ptr([*]align(8) const u8);
+    const ptr = address.toPtr([*]align(8) const u8);
     return DeviceTree.fromPtr(ptr) catch |err| {
         log.warn("failed to parse device tree blob: {t}", .{err});
         return null;
@@ -158,7 +158,7 @@ fn getSerialOutputFromNS16550a(dt: DeviceTree, node: DeviceTree.Node, memory_sys
     errdefer cascade.mem.heap.deallocateSpecial(register_range);
 
     const device = try uart.Memory16550.create(
-        register_range.address.ptr([*]volatile u8),
+        register_range.address.toPtr([*]volatile u8),
         .{
             .clock_frequency = @enumFromInt(clock_frequency),
             .baud_rate = .@"115200",
@@ -242,7 +242,7 @@ fn getSerialOutputFromPL011(dt: DeviceTree, node: DeviceTree.Node, memory_system
     errdefer cascade.mem.heap.deallocateSpecial(register_range);
 
     const device = try uart.PL011.create(
-        register_range.address.ptr([*]volatile u32),
+        register_range.address.toPtr([*]volatile u32),
         .{
             .clock_frequency = @enumFromInt(clock_frequency),
             .baud_rate = .@"115200",

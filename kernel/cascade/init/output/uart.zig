@@ -71,7 +71,7 @@ pub fn tryGetSerialOutput16X50(
             errdefer cascade.mem.heap.deallocateSpecial(register_range);
 
             const device = try UartT.create(
-                register_range.address.ptr([*]volatile u8),
+                register_range.address.toPtr([*]volatile u8),
                 baud,
             );
 
@@ -126,7 +126,7 @@ pub fn tryGetSerialOutputPL011(
     errdefer cascade.mem.heap.deallocateSpecial(register_range);
 
     const device = try PL011.create(
-        register_range.address.ptr([*]volatile u32),
+        register_range.address.toPtr([*]volatile u32),
         baud,
     );
 

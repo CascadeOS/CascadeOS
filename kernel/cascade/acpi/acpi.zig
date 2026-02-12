@@ -55,8 +55,8 @@ pub const init = struct {
         };
 
         const rsdp = switch (boot.rsdp() orelse return) {
-            .physical => |phys_addr| phys_addr.toDirectMap().ptr(*const tables.RSDP),
-            .virtual => |virt_addr| virt_addr.ptr(*const tables.RSDP),
+            .physical => |phys_addr| phys_addr.toDirectMap().toPtr(*const tables.RSDP),
+            .virtual => |virt_addr| virt_addr.toPtr(*const tables.RSDP),
         };
         if (!rsdp.isValid()) return error.InvalidRSDP;
         globals.rsdp = rsdp;
@@ -68,7 +68,7 @@ pub const init = struct {
     pub fn logAcpiTables() !void {
         if (!init_log.levelEnabled(.debug) or !init_globals.acpi_present) return;
 
-        const sdt_header = globals.rsdp.sdtAddress().toDirectMap().ptr(*const tables.SharedHeader);
+        const sdt_header = globals.rsdp.sdtAddress().toDirectMap().toPtr(*const tables.SharedHeader);
 
         if (!sdt_header.isValid()) return error.InvalidSDT;
 
@@ -195,7 +195,7 @@ pub const init = struct {
 
             const phys_addr = opt_phys_addr orelse return null;
 
-            return phys_addr.toDirectMap().ptr(*const tables.SharedHeader);
+            return phys_addr.toDirectMap().toPtr(*const tables.SharedHeader);
         }
 
         fn nextTablePhysicalAddressImpl(table_iterator: *TableIterator, comptime T: type) ?cascade.PhysicalAddress {

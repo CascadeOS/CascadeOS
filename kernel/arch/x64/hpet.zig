@@ -109,7 +109,7 @@ pub const init = struct {
             },
         );
 
-        return register_region_range.address.ptr([*]volatile u64);
+        return register_region_range.address.toPtr([*]volatile u64);
     }
 };
 

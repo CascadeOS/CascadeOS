@@ -17,7 +17,9 @@ const log = cascade.debug.log.scoped(.uacpi_kernel_api);
 export fn uacpi_kernel_get_rsdp(out_rsdp_address: *cascade.PhysicalAddress) uacpi.Status {
     log.verbose("uacpi_kernel_get_rsdp called", .{});
 
-    out_rsdp_address.* = cascade.PhysicalAddress.fromDirectMap(.from(@intFromPtr(acpi.rsdpTable()))) catch return .internal_error;
+    out_rsdp_address.* = cascade.PhysicalAddress.fromDirectMap(
+        .fromPtr(acpi.rsdpTable()),
+    );
 
     return .ok;
 }
@@ -273,7 +275,7 @@ export fn uacpi_kernel_map(physical_address: cascade.PhysicalAddress, len: usize
 
     _ = len;
 
-    return physical_address.toDirectMap().ptr([*]u8);
+    return physical_address.toDirectMap().toPtr([*]u8);
 }
 
 /// Unmap a virtual memory range at 'addr' with a length of 'len' bytes.

@@ -170,8 +170,8 @@ const IOAPIC = struct {
 
     pub fn init(base_address: cascade.KernelVirtualAddress, gsi_base: u32) IOAPIC {
         var ioapic: IOAPIC = .{
-            .ioregsel = base_address.ptr(*volatile u32),
-            .iowin = base_address.moveForward(.from(0x10, .byte)).ptr(*volatile u32),
+            .ioregsel = base_address.toPtr(*volatile u32),
+            .iowin = base_address.moveForward(.from(0x10, .byte)).toPtr(*volatile u32),
             .gsi_base = gsi_base,
             .number_of_redirection_entries = undefined,
         };

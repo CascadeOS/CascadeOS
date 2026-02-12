@@ -335,8 +335,11 @@ fn loadHelloWorld() !void {
 
     const header = try cascade.user.elf.Header.parse(hello_world_elf);
 
-    const entry_point: cascade.UserVirtualAddress = .from(header.entry);
-    if (entry_point.equal(.zero)) return error.EntryPointIsZero;
+    const entry_point = blk: {
+        const possible_entry_point: cascade.VirtualAddress = .from(header.entry);
+        if (possible_entry_point.getType() != .user) return error.InvalidEntryPoint;
+        break :blk possible_entry_point.toUser();
+    };
 
     const program_header_table: []const u8 = blk: {
         const program_header_table_location = header.programHeaderTableLocation();
@@ -349,7 +352,7 @@ fn loadHelloWorld() !void {
     // TODO: this only makes sense for an embedded program, not if it is loaded from disk
     while (try iter.next()) |loadable_region| {
         _ = try process.address_space.map(.{
-            .base = loadable_region.map_range.address.toVirtual(),
+            .base = loadable_region.map_range.address.toVirtualAddress(),
             .size = loadable_region.map_range.size,
             .protection = .read_write,
             .type = .zero_fill,

@@ -57,7 +57,7 @@ pub const PageTable = extern struct {
     /// **REQUIREMENTS**:
     /// - The provided physical page must be accessible in the direct map.
     pub fn create(physical_page: cascade.mem.PhysicalPage.Index) *PageTable {
-        const page_table = physical_page.baseAddress().toDirectMap().ptr(*PageTable);
+        const page_table = physical_page.baseAddress().toDirectMap().toPtr(*PageTable);
         page_table.zero();
         return page_table;
     }
@@ -682,7 +682,7 @@ pub const PageTable = extern struct {
         ) error{ NotPresent, HugePage }!*PageTable {
             if (!entry.present.read()) return error.NotPresent;
             if (entry.huge.read()) return error.HugePage;
-            return entry.getAddress4kib().toDirectMap().ptr(*PageTable);
+            return entry.getAddress4kib().toDirectMap().toPtr(*PageTable);
         }
 
         fn applyMapType(
@@ -1184,7 +1184,7 @@ fn ensureNextTable(
         errdefer comptime unreachable;
 
         const physical_address = physical_page.baseAddress();
-        physical_address.toDirectMap().ptr(*PageTable).zero();
+        physical_address.toDirectMap().toPtr(*PageTable).zero();
 
         entry.setAddress4kib(physical_address);
         entry.present.write(true);
@@ -1200,7 +1200,7 @@ fn ensureNextTable(
     };
 
     return .{
-        next_level_physical_address.toDirectMap().ptr(*PageTable),
+        next_level_physical_address.toDirectMap().toPtr(*PageTable),
         created_table,
     };
 }

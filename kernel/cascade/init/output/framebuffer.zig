@@ -30,9 +30,7 @@ fn tryGetFramebufferOutputInner(memory_system_available: bool) !?Output {
 
     const framebuffer = boot.framebuffer() orelse return null;
 
-    const physical_address: cascade.PhysicalAddress = try .fromDirectMap(
-        .from(@intFromPtr(@volatileCast(framebuffer.ptr))),
-    );
+    const physical_address: cascade.PhysicalAddress = .fromDirectMap(.fromPtr(framebuffer.ptr));
 
     if (!physical_address.aligned(arch.paging.standard_page_size_alignment)) @panic("framebuffer is not aligned");
 
@@ -63,7 +61,7 @@ fn tryGetFramebufferOutputInner(memory_system_available: bool) !?Output {
                 cascade.mem.heap.c.sizedFree(@ptrCast(raw_ptr), size);
             }
         }.flantermFree,
-        virtual_range.address.ptr([*]u32),
+        virtual_range.address.toPtr([*]u32),
         framebuffer.width,
         framebuffer.height,
         framebuffer.pitch,

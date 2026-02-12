@@ -57,7 +57,7 @@ pub fn push(stack: *Stack, value: usize) error{StackOverflow}!void {
     const new_stack_pointer: cascade.KernelVirtualAddress = stack.stack_pointer.moveBackward(.of(usize));
     if (new_stack_pointer.lessThan(stack.usable_range.address)) return error.StackOverflow;
 
-    const ptr: *usize = new_stack_pointer.ptr(*usize);
+    const ptr: *usize = new_stack_pointer.toPtr(*usize);
     ptr.* = value;
 
     stack.stack_pointer = new_stack_pointer;

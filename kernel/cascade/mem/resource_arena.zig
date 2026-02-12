@@ -134,7 +134,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                             @panic("heap quantum cache allocation failed");
                         pages.prepend(page);
 
-                        const page_caches = page.baseAddress().toDirectMap().ptr(*[QUANTUM_CACHES_PER_PAGE]RawCache);
+                        const page_caches = page.baseAddress().toDirectMap().toPtr(*[QUANTUM_CACHES_PER_PAGE]RawCache);
 
                         for (page_caches) |*cache| {
                             caches_created += 1;
@@ -965,7 +965,7 @@ pub const Allocation = struct {
 
     pub inline fn toVirtualRange(self: Allocation) cascade.KernelVirtualRange {
         return .{
-            .address = .from(self.base),
+            .address = .{ .value = self.base },
             .size = .from(self.len, .byte),
         };
     }

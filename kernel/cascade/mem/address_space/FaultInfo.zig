@@ -389,7 +389,7 @@ fn promote(
         .zero_fill => {
             log.verbose("zero filling anonymous page", .{});
             const mapped_page = allocated_physical_page.baseAddress().toDirectMap()
-                .ptr(*align(arch.paging.standard_page_size.value) volatile [arch.paging.standard_page_size.value]u8);
+                .toPtr(*align(arch.paging.standard_page_size.value) volatile [arch.paging.standard_page_size.value]u8);
             @memset(mapped_page, 0);
         },
         .physical_page => @panic("NOT IMPLEMENTED"), // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L545
