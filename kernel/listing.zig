@@ -8,7 +8,7 @@ pub const components: []const KernelComponent = &.{
         .name = "arch",
         .component_dependencies = &.{"kernel"},
         .library_dependencies = &.{
-            .{ .name = "cascade" },
+            .{ .name = "cascade", .import_name = "user_cascade" },
             .{ .name = "core" },
             .{ .name = "bitjuggle" },
         },
@@ -26,7 +26,7 @@ pub const components: []const KernelComponent = &.{
         .name = "kernel",
         .component_dependencies = &.{ "arch", "boot" },
         .library_dependencies = &.{
-            .{ .name = "cascade" },
+            .{ .name = "cascade", .import_name = "user_cascade" },
             .{ .name = "core" },
             .{ .name = "sdf" },
         },

@@ -9,12 +9,12 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const cascade = @import("cascade");
 const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
 const Thread = kernel.user.Thread;
 const addr = kernel.addr;
+const user_cascade = @import("user_cascade");
 
 pub const current_arch = @import("cascade_architecture").arch;
 
@@ -601,7 +601,7 @@ pub const user = struct {
         arch_specific: *current_decls.user.SyscallFrame,
 
         /// Get the syscall this frame represents.
-        pub fn syscall(syscall_frame: SyscallFrame) callconv(core.inline_in_non_debug) ?cascade.Syscall {
+        pub fn syscall(syscall_frame: SyscallFrame) callconv(core.inline_in_non_debug) ?user_cascade.Syscall {
             return getFunction(
                 current_functions.user,
                 "syscallFromSyscallFrame",
@@ -1079,7 +1079,7 @@ pub const Functions = struct {
         /// Get the syscall this frame represents.
         syscallFromSyscallFrame: ?fn (
             syscall_frame: *const current_decls.user.SyscallFrame,
-        ) callconv(.@"inline") ?cascade.Syscall = null,
+        ) callconv(.@"inline") ?user_cascade.Syscall = null,
 
         /// Get an argument from this frame.
         argFromSyscallFrame: ?fn (

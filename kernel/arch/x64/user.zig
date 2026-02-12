@@ -4,13 +4,13 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const cascade = @import("cascade");
 const core = @import("core");
 const kernel = @import("kernel");
 const Task = kernel.Task;
 const Process = kernel.user.Process;
 const Thread = kernel.user.Thread;
 const addr = kernel.addr;
+const user_cascade = @import("user_cascade");
 
 const x64 = @import("x64.zig");
 
@@ -265,8 +265,8 @@ pub const SyscallFrame = extern struct {
         return &syscall_frame.arch_specific;
     }
 
-    pub inline fn syscall(syscall_frame: *const SyscallFrame) ?cascade.Syscall {
-        return std.enums.fromInt(cascade.Syscall, syscall_frame.rdi);
+    pub inline fn syscall(syscall_frame: *const SyscallFrame) ?user_cascade.Syscall {
+        return std.enums.fromInt(user_cascade.Syscall, syscall_frame.rdi);
     }
 
     pub inline fn arg(syscall_frame: *const SyscallFrame, comptime argument: arch.user.SyscallFrame.Arg) usize {
