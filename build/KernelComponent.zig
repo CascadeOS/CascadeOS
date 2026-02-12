@@ -17,7 +17,7 @@ name: []const u8,
 component_dependencies: []const []const u8 = &.{},
 
 /// The libraries that this component can access via `@import`.
-library_dependencies: []const []const u8 = &.{},
+library_dependencies: []const LibraryDependency = &.{},
 
 configuration: ?*const fn (
     b: *std.Build,
@@ -31,3 +31,8 @@ configuration: ?*const fn (
 ///
 /// This is intended to be used by the `cascade` component.
 provide_source_file_modules: bool = false,
+
+pub const LibraryDependency = struct {
+    name: []const u8,
+    import_name: ?[]const u8 = null,
+};

@@ -320,16 +320,16 @@ fn getAllRequiredLibraries(
 
     for (components.values()) |component| {
         for (component.kernel_component.library_dependencies) |dep| {
-            if (required_libraries.contains(dep)) continue;
+            if (required_libraries.contains(dep.name)) continue;
 
-            const library = all_libraries.get(dep) orelse {
+            const library = all_libraries.get(dep.name) orelse {
                 std.debug.panic(
                     "kernel component '{s}' depends on non-existant library '{s}'",
-                    .{ component.kernel_component.name, dep },
+                    .{ component.kernel_component.name, dep.name },
                 );
             };
 
-            try required_libraries.putNoClobber(b.allocator, dep, library);
+            try required_libraries.putNoClobber(b.allocator, dep.name, library);
         }
     }
 
@@ -365,15 +365,15 @@ fn configureComponents(
 
         // library dependencies
         for (kernel_component.library_dependencies) |dep| {
-            const library = libraries.get(dep) orelse {
+            const library = libraries.get(dep.name) orelse {
                 std.debug.panic(
                     "kernel component '{s}' depends on non-existant library '{s}'",
-                    .{ kernel_component.name, dep },
+                    .{ kernel_component.name, dep.name },
                 );
             };
 
             module.addImport(
-                dep,
+                dep.import_name orelse dep.name,
                 library.cascade_modules.get(architecture) orelse unreachable,
             );
         }
