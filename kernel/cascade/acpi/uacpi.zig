@@ -16,7 +16,6 @@ const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
 const acpi = cascade.acpi;
-const addr = cascade.addr;
 
 /// Set up early access to the table subsystem. What this means is:
 /// - uacpi_table_find() and similar API becomes usable before the call to
@@ -269,7 +268,7 @@ pub fn setInterfaceQueryHandler(handler: InterfaceHandler) !void {
 ///
 /// - 'addr32' is the real mode entry-point address
 /// - 'addr64' is the protected mode entry-point address
-pub fn setWakingVector(addr32: addr.Physical, addr64: addr.Physical) !void {
+pub fn setWakingVector(addr32: cascade.PhysicalAddress, addr64: cascade.PhysicalAddress) !void {
     const ret: Status = @enumFromInt(c_uacpi.uacpi_set_waking_vector(
         @bitCast(addr32),
         @bitCast(addr64),
@@ -2372,7 +2371,7 @@ pub const Object = opaque {
 
 pub const Table = extern struct {
     table: extern union {
-        virtual_address: addr.Virtual.Kernel,
+        virtual_address: cascade.KernelVirtualAddress,
         ptr: *anyopaque,
         header: *acpi.tables.SharedHeader,
     },
@@ -2437,7 +2436,7 @@ pub const Table = extern struct {
     /// The table is optionally returned via 'out_table'.
     ///
     /// Manual calls to `install` are not subject to filtering via the table installation callback (if any).
-    pub fn installVirtual(address: addr.Virtual.Kernel, out_table: ?*Table) !void {
+    pub fn installVirtual(address: cascade.KernelVirtualAddress, out_table: ?*Table) !void {
         const ret: Status = @enumFromInt(c_uacpi.uacpi_table_install(
             address.toPtr(?*anyopaque),
             @ptrCast(out_table),
@@ -2452,7 +2451,7 @@ pub const Table = extern struct {
     /// The table is optionally returned via 'out_table'.
     ///
     /// Manual calls to `install` are not subject to filtering via the table installation callback (if any).
-    pub fn installPhysical(address: addr.Physical, out_table: ?*Table) !void {
+    pub fn installPhysical(address: cascade.PhysicalAddress, out_table: ?*Table) !void {
         const ret: Status = @enumFromInt(c_uacpi.uacpi_table_install_physical(
             @bitCast(address),
             @ptrCast(out_table),
@@ -3897,7 +3896,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             user_context: ?*UserContextT,
             region_context: ?*anyopaque,
             addr: extern union {
-                address: addr.Physical,
+                address: cascade.PhysicalAddress,
                 offset: u64,
             },
             value: u64,
@@ -4047,7 +4046,7 @@ inline fn makeInterfaceHandlerWrapper(
 }
 
 comptime {
-    std.debug.assert(@sizeOf(addr.Physical) == @sizeOf(c_uacpi.uacpi_phys_addr));
+    std.debug.assert(@sizeOf(cascade.PhysicalAddress) == @sizeOf(c_uacpi.uacpi_phys_addr));
     std.debug.assert(@sizeOf(acpi.Address) == @sizeOf(c_uacpi.acpi_gas));
 }
 

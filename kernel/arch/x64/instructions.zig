@@ -7,7 +7,6 @@ const arch = @import("arch");
 const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
-const addr = cascade.addr;
 
 const x64 = @import("x64.zig");
 
@@ -74,7 +73,7 @@ pub inline fn disableInterruptsAndHalt() noreturn {
     }
 }
 
-pub inline fn invlpg(address: addr.Virtual) void {
+pub inline fn invlpg(address: cascade.VirtualAddress) void {
     asm volatile ("invlpg (%[address])"
         :
         : [address] "r" (address.value),

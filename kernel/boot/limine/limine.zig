@@ -11,7 +11,7 @@ const std = @import("std");
 const boot = @import("boot");
 const core = @import("core");
 const cascade = @import("cascade");
-const addr = cascade.addr;
+
 const UUID = @import("uuid").UUID;
 
 /// Base protocol revisions change certain behaviours of the Limine boot protocol outside any specific feature.
@@ -212,7 +212,7 @@ pub const HHDM = extern struct {
         revision: u64,
 
         /// the virtual address of the beginning of the higher half direct map
-        address: addr.Virtual.Kernel,
+        address: cascade.KernelVirtualAddress,
 
         pub inline fn format(response: *const Response, writer: *std.Io.Writer) !void {
             try writer.print("HHDM({f})", .{response.address});
@@ -241,7 +241,7 @@ pub const Framebuffer = extern struct {
     };
 
     pub const LimineFramebuffer = extern struct {
-        address: addr.Virtual.Kernel,
+        address: cascade.KernelVirtualAddress,
         /// Width and height of the framebuffer in pixels
         width: u64,
         height: u64,
@@ -261,7 +261,7 @@ pub const Framebuffer = extern struct {
         _edid_size: core.Size,
 
         /// Points to the screen's EDID blob, if available, else zero.
-        _edid: addr.Virtual.Kernel,
+        _edid: cascade.KernelVirtualAddress,
 
         /// Response revision 1 required
         _video_mode_count: u64,
@@ -272,7 +272,7 @@ pub const Framebuffer = extern struct {
         pub fn edid(limine_framebuffer: *const LimineFramebuffer) ?[]const u8 {
             if (limine_framebuffer._edid.equal(.zero)) return null;
 
-            return addr.Virtual.Range.Kernel.from(
+            return cascade.KernelVirtualRange.from(
                 limine_framebuffer._edid,
                 limine_framebuffer._edid_size,
             ).byteSlice();
@@ -824,7 +824,7 @@ pub const Memmap = extern struct {
 
     pub const Entry = extern struct {
         /// Physical address of the base of the memory section
-        base: addr.Physical,
+        base: cascade.PhysicalAddress,
 
         /// Length of the memory section
         length: core.Size,
@@ -1115,7 +1115,7 @@ pub const EFIMemoryMap = extern struct {
         revision: u64,
 
         /// Address (HHDM, in bootloader reclaimable memory) of the EFI memory map.
-        memmap: addr.Virtual.Kernel,
+        memmap: cascade.KernelVirtualAddress,
 
         /// Size in bytes of the EFI memory map.
         memmap_size: core.Size,
@@ -1183,10 +1183,10 @@ pub const ExecutableAddress = extern struct {
         revision: u64,
 
         /// The physical base address of the executable.
-        physical_base: addr.Physical,
+        physical_base: cascade.PhysicalAddress,
 
         /// The virtual base address of the executable.
-        virtual_base: addr.Virtual.Kernel,
+        virtual_base: cascade.KernelVirtualAddress,
 
         pub fn print(response: *const Response, writer: *std.Io.Writer, indent: usize) !void {
             const new_indent = indent + 2;
@@ -1226,7 +1226,7 @@ pub const DeviceTreeBlob = extern struct {
         revision: u64,
 
         /// Virtual (HHDM) pointer to the device tree blob, in bootloader reclaimable memory.
-        address: addr.Virtual.Kernel,
+        address: cascade.KernelVirtualAddress,
 
         pub inline fn format(response: *const Response, writer: *std.Io.Writer) !void {
             try writer.print("DeviceTreeBlob({f})", .{response.address});
@@ -1280,7 +1280,7 @@ pub const File = extern struct {
     revision: u64,
 
     /// The address of the file. This is always at least 4KiB aligned.
-    address: addr.Virtual.Kernel,
+    address: cascade.KernelVirtualAddress,
 
     /// The size of the file.
     ///
@@ -1335,7 +1335,7 @@ pub const File = extern struct {
     }
 
     pub fn getContents(file: *const File) []const u8 {
-        return addr.Virtual.Range.Kernel.from(file.address, file.size).byteSlice();
+        return cascade.KernelVirtualRange.from(file.address, file.size).byteSlice();
     }
 
     pub fn print(file: *const File, writer: *std.Io.Writer, indent: usize) !void {

@@ -9,7 +9,7 @@ const cascade = @import("cascade");
 const Task = cascade.Task;
 const Process = cascade.user.Process;
 const Thread = cascade.user.Thread;
-const addr = cascade.addr;
+
 const user_cascade = @import("user_cascade");
 
 const x64 = @import("x64.zig");
@@ -189,13 +189,13 @@ pub fn enterUserspace(options: arch.user.EnterUserspaceOptions) noreturn {
 }
 
 const EnterUserspaceFrame = extern struct {
-    rip: addr.Virtual.User,
+    rip: cascade.UserVirtualAddress,
     cs: extern union {
         full: u64,
         selector: x64.Gdt.Selector,
     } = .{ .selector = .user_code },
     rflags: x64.registers.RFlags = user_rflags,
-    rsp: addr.Virtual.User,
+    rsp: cascade.UserVirtualAddress,
     ss: extern union {
         full: u64,
         selector: x64.Gdt.Selector,
@@ -258,8 +258,8 @@ pub const SyscallFrame = extern struct {
     /// r11
     rflags: x64.registers.RFlags,
     /// rcx
-    rip: addr.Virtual,
-    rsp: addr.Virtual,
+    rip: cascade.VirtualAddress,
+    rsp: cascade.VirtualAddress,
 
     pub inline fn from(syscall_frame: arch.user.SyscallFrame) *SyscallFrame {
         return &syscall_frame.arch_specific;

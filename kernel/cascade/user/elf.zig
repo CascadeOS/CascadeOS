@@ -15,7 +15,6 @@ const builtin = @import("builtin");
 const arch = @import("arch");
 const core = @import("core");
 const cascade = @import("cascade");
-const addr = cascade.addr;
 
 const log = cascade.debug.log.scoped(.user);
 
@@ -498,7 +497,7 @@ pub const ProgramHeader = struct {
 };
 
 pub const LoadableRegion = struct {
-    map_range: addr.Virtual.Range.User,
+    map_range: cascade.UserVirtualRange,
 
     destination_offset: usize,
     source_base: usize,
@@ -518,7 +517,7 @@ pub const LoadableRegion = struct {
                 if (program_header.type != .load) continue;
                 if (program_header.memory_size == 0) continue; // can this even happen with a loadable segment?
 
-                const raw_segment_base: addr.Virtual = .from(program_header.virtual_address);
+                const raw_segment_base: cascade.VirtualAddress = .from(program_header.virtual_address);
                 const raw_range_base = raw_segment_base.alignBackward(arch.paging.standard_page_size_alignment);
 
                 const segment_offset_size = raw_range_base.difference(raw_segment_base);
@@ -528,7 +527,7 @@ pub const LoadableRegion = struct {
                     .add(segment_offset_size)
                     .alignForward(arch.paging.standard_page_size_alignment);
 
-                const raw_map_range: addr.Virtual.Range = .from(raw_segment_base, range_size);
+                const raw_map_range: cascade.VirtualRange = .from(raw_segment_base, range_size);
                 if (raw_map_range.getType() != .user) {
                     log.warn("program header has invalid user virtual address range: {f}", .{program_header});
                     return error.ProgramHeaderInvalidVirtualAddress;

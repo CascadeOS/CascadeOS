@@ -7,7 +7,6 @@ const arch = @import("arch");
 const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
-const addr = cascade.addr;
 
 const limine_interface = @import("limine/interface.zig");
 
@@ -20,8 +19,8 @@ pub fn kernelBaseAddress() ?KernelBaseAddress {
 }
 
 pub const KernelBaseAddress = struct {
-    virtual: addr.Virtual.Kernel,
-    physical: addr.Physical,
+    virtual: cascade.KernelVirtualAddress,
+    physical: cascade.PhysicalAddress,
 };
 
 /// Returns an iterator over the memory map entries, iterating in the given direction.
@@ -55,7 +54,7 @@ pub const MemoryMap = struct {
 
     /// An entry in the memory map provided by the bootloader.
     pub const Entry = struct {
-        range: addr.Physical.Range,
+        range: cascade.PhysicalRange,
         type: Type,
 
         pub const Type = enum {
@@ -100,7 +99,7 @@ pub const MemoryMap = struct {
 };
 
 /// Returns the direct map address provided by the bootloader, if any.
-pub fn directMapAddress() ?addr.Virtual.Kernel {
+pub fn directMapAddress() ?cascade.KernelVirtualAddress {
     return switch (bootloader_api) {
         .limine => limine_interface.directMapAddress(),
         .unknown => null,
@@ -108,12 +107,12 @@ pub fn directMapAddress() ?addr.Virtual.Kernel {
 }
 
 pub const Address = union(enum) {
-    physical: addr.Physical,
-    virtual: addr.Virtual.Kernel,
+    physical: cascade.PhysicalAddress,
+    virtual: cascade.KernelVirtualAddress,
 
     pub const Raw = extern union {
-        physical: addr.Physical,
-        virtual: addr.Virtual.Kernel,
+        physical: cascade.PhysicalAddress,
+        virtual: cascade.KernelVirtualAddress,
     };
 };
 
@@ -245,7 +244,7 @@ pub fn framebuffer() ?Framebuffer {
 }
 
 /// Returns the device tree blob provided by the bootloader, if any.
-pub fn deviceTreeBlob() ?addr.Virtual.Kernel {
+pub fn deviceTreeBlob() ?cascade.KernelVirtualAddress {
     return switch (bootloader_api) {
         .limine => limine_interface.deviceTreeBlob(),
         .unknown => null,

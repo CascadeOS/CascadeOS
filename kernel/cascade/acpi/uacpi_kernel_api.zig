@@ -8,17 +8,16 @@ const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
 const acpi = cascade.acpi;
-const addr = cascade.addr;
 
 const uacpi = @import("uacpi.zig");
 
 const log = cascade.debug.log.scoped(.uacpi_kernel_api);
 
 /// Returns the PHYSICAL address of the RSDP structure via *out_rsdp_address.
-export fn uacpi_kernel_get_rsdp(out_rsdp_address: *addr.Physical) uacpi.Status {
+export fn uacpi_kernel_get_rsdp(out_rsdp_address: *cascade.PhysicalAddress) uacpi.Status {
     log.verbose("uacpi_kernel_get_rsdp called", .{});
 
-    out_rsdp_address.* = addr.Physical.fromDirectMap(.from(@intFromPtr(acpi.rsdpTable()))) catch return .internal_error;
+    out_rsdp_address.* = cascade.PhysicalAddress.fromDirectMap(.from(@intFromPtr(acpi.rsdpTable()))) catch return .internal_error;
 
     return .ok;
 }
@@ -269,7 +268,7 @@ export fn uacpi_kernel_io_write32(
 ///              Let's assume the returned virtual address for the mapping is 0xF000.
 ///           5. Add the original offset within page 0xABC (from step 1) to the resulting virtual address
 ///              0xF000 + 0xABC => 0xFABC. Return it to uACPI.
-export fn uacpi_kernel_map(physical_address: addr.Physical, len: usize) [*]u8 {
+export fn uacpi_kernel_map(physical_address: cascade.PhysicalAddress, len: usize) [*]u8 {
     log.verbose("uacpi_kernel_map called", .{});
 
     _ = len;

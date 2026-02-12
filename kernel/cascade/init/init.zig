@@ -8,7 +8,6 @@ const boot = @import("boot");
 const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
-const addr = cascade.addr;
 
 pub const Output = @import("output/Output.zig");
 
@@ -336,7 +335,7 @@ fn loadHelloWorld() !void {
 
     const header = try cascade.user.elf.Header.parse(hello_world_elf);
 
-    const entry_point: addr.Virtual.User = .from(header.entry);
+    const entry_point: cascade.UserVirtualAddress = .from(header.entry);
     if (entry_point.equal(.zero)) return error.EntryPointIsZero;
 
     const program_header_table: []const u8 = blk: {

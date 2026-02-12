@@ -7,7 +7,6 @@ const arch = @import("arch");
 const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
-const addr = cascade.addr;
 
 pub const log = @import("log.zig");
 
@@ -241,7 +240,7 @@ const formatting = struct {
 
     const indent = "  ";
 
-    fn printSourceAtAddress(writer: *std.Io.Writer, address: addr.Virtual, opt_symbol_source: ?SymbolSource) !void {
+    fn printSourceAtAddress(writer: *std.Io.Writer, address: cascade.VirtualAddress, opt_symbol_source: ?SymbolSource) !void {
         if (address.equal(.zero)) return;
 
         const raw_kernel_address = switch (address.getType()) {
@@ -397,7 +396,7 @@ const SymbolSource = struct {
         };
     }
 
-    pub fn getSymbol(symbol_source: SymbolSource, address: addr.Virtual.Kernel) ?Symbol {
+    pub fn getSymbol(symbol_source: SymbolSource, address: cascade.KernelVirtualAddress) ?Symbol {
         const start_state = symbol_source.location_lookup.getStartState(address.value) catch return null;
 
         const location = symbol_source.location_program.getLocation(start_state, address.value) catch return null;

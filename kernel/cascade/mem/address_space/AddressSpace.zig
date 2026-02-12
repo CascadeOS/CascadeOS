@@ -22,7 +22,6 @@ const cascade = @import("cascade");
 const Task = cascade.Task;
 const Protection = cascade.mem.MapType.Protection;
 const Process = cascade.user.Process;
-const addr = cascade.addr;
 
 pub const AnonymousMap = @import("AnonymousMap.zig");
 pub const AnonymousPage = @import("AnonymousPage.zig");
@@ -36,7 +35,7 @@ const AddressSpace = @This();
 
 _name: Name,
 
-range: addr.Virtual.Range,
+range: cascade.VirtualRange,
 
 context: cascade.Context,
 
@@ -63,7 +62,7 @@ entries_version: u32,
 pub const InitOptions = struct {
     name: Name,
 
-    range: addr.Virtual.Range,
+    range: cascade.VirtualRange,
 
     page_table: arch.paging.PageTable,
 
@@ -153,7 +152,7 @@ pub const MapOptions = struct {
     ///
     /// Caller must ensure:
     ///  - the size is aligned to the standard page size
-    base: ?addr.Virtual = null,
+    base: ?cascade.VirtualAddress = null,
 
     /// The size of the range to map.
     ///
@@ -207,7 +206,7 @@ pub const MapError = error{
 pub fn map(
     address_space: *AddressSpace,
     options: MapOptions,
-) MapError!addr.Virtual.Range {
+) MapError!cascade.VirtualRange {
     errdefer |err| log.debug("{s}: map failed {t}", .{ address_space.name(), err });
 
     if (log.levelEnabled(.verbose)) {
@@ -363,12 +362,12 @@ pub fn map(
 }
 
 const FreeRange = struct {
-    range: addr.Virtual.Range,
+    range: cascade.VirtualRange,
     insertion_index: usize,
 };
 
 /// If the given range is free, return the range.
-fn findExactFreeRange(address_space: *AddressSpace, range: addr.Virtual.Range) ?FreeRange {
+fn findExactFreeRange(address_space: *AddressSpace, range: cascade.VirtualRange) ?FreeRange {
     const entries = address_space.entries.items;
 
     const index = std.sort.lowerBound(
@@ -409,7 +408,7 @@ fn findFreeRange(address_space: *AddressSpace, size: core.Size) ?FreeRange {
     // TODO: we could seperately track the free ranges in the address space
 
     var candidate_insertion_index: usize = 0;
-    var candidate_range: addr.Virtual.Range = .from(address_space.range.address, size);
+    var candidate_range: cascade.VirtualRange = .from(address_space.range.address, size);
     var candidate_range_last_address = candidate_range.last();
 
     for (address_space.entries.items) |entry| {
@@ -529,7 +528,7 @@ pub const ChangeProtectionError = error{
 ///  - the size and address of the range are aligned to the standard page size
 pub fn changeProtection(
     address_space: *AddressSpace,
-    range: addr.Virtual.Range,
+    range: cascade.VirtualRange,
     change: ChangeProtection,
 ) ChangeProtectionError!void {
     errdefer |err| log.debug("{s}: change protection failed {t}", .{ address_space.name(), err });
@@ -716,7 +715,7 @@ const ChangeProtectionResult = struct {
 fn performChangeProtection(
     address_space: *AddressSpace,
     entry_range: EntryRange,
-    range: addr.Virtual.Range,
+    range: cascade.VirtualRange,
     request: ChangeProtection.Request,
     preallocated_entries: *PreallocatedEntries,
 ) ChangeProtectionResult {
@@ -879,7 +878,7 @@ pub const UnmapError = error{
 ///
 /// Caller must ensure:
 ///  - the size and address of the range are aligned to the standard page size
-pub fn unmap(address_space: *AddressSpace, range: addr.Virtual.Range) UnmapError!void {
+pub fn unmap(address_space: *AddressSpace, range: cascade.VirtualRange) UnmapError!void {
     errdefer |err| log.debug("{s}: unmap failed {t}", .{ address_space.name(), err });
 
     log.verbose("{s}: unmap {f}", .{ address_space.name(), range });
@@ -986,7 +985,7 @@ const UnmapResult = struct {
 fn performUnmap(
     address_space: *AddressSpace,
     entry_range: EntryRange,
-    range: addr.Virtual.Range,
+    range: cascade.VirtualRange,
     preallocated_entries: *PreallocatedEntries,
 ) UnmapResult {
     var result: UnmapResult = .none;
@@ -1199,13 +1198,13 @@ pub const Name = core.containers.BoundedArray(u8, cascade.config.user.address_sp
 ///
 /// Caller must ensure:
 ///  - the address space entries are atleast read locked
-pub fn entryIndexByAddress(address_space: *const AddressSpace, address: addr.Virtual) ?usize {
+pub fn entryIndexByAddress(address_space: *const AddressSpace, address: cascade.VirtualAddress) ?usize {
     if (core.is_debug) std.debug.assert(address_space.entries_lock.isReadLocked() or address_space.entries_lock.isWriteLocked());
     return innerEntryIndexByAddress(address_space.entries.items, address);
 }
 
 // Exists so that a subslice of entries can be searched unlike with `entryIndexByAddress` which searches the entire slice.
-inline fn innerEntryIndexByAddress(entries: []const *const Entry, address: addr.Virtual) ?usize {
+inline fn innerEntryIndexByAddress(entries: []const *const Entry, address: cascade.VirtualAddress) ?usize {
     return std.sort.binarySearch(
         *const Entry,
         entries,
@@ -1214,7 +1213,7 @@ inline fn innerEntryIndexByAddress(entries: []const *const Entry, address: addr.
     );
 }
 
-fn entryAddressCompare(virtual_address: addr.Virtual, entry: *const Entry) std.math.Order {
+fn entryAddressCompare(virtual_address: cascade.VirtualAddress, entry: *const Entry) std.math.Order {
     return entry.range.containsAddressOrder(virtual_address);
 }
 
@@ -1234,7 +1233,7 @@ const EntryRange = struct {
             entry_range.end_overlap;
     }
 
-    pub fn rangeIterator(entry_range: EntryRange, range: addr.Virtual.Range, entries: []const *const Entry) RangeIterator {
+    pub fn rangeIterator(entry_range: EntryRange, range: cascade.VirtualRange, entries: []const *const Entry) RangeIterator {
         return .{
             .entry_range = entry_range,
             .range = range,
@@ -1245,12 +1244,12 @@ const EntryRange = struct {
 
     const RangeIterator = struct {
         entry_range: EntryRange,
-        range: addr.Virtual.Range,
+        range: cascade.VirtualRange,
         entries: []const *const Entry,
 
         index: usize,
 
-        pub fn next(iter: *RangeIterator) ?addr.Virtual.Range {
+        pub fn next(iter: *RangeIterator) ?cascade.VirtualRange {
             const entry_range = &iter.entry_range;
             const end_index = entry_range.start + entry_range.length;
 
@@ -1293,7 +1292,7 @@ const EntryRange = struct {
 
     pub fn rangeAndProtectionIterator(
         entry_range: EntryRange,
-        range: addr.Virtual.Range,
+        range: cascade.VirtualRange,
         entries: []const *const Entry,
     ) RangeAndProtectionIterator {
         return .{
@@ -1306,13 +1305,13 @@ const EntryRange = struct {
 
     const RangeAndProtectionIterator = struct {
         entry_range: EntryRange,
-        range: addr.Virtual.Range,
+        range: cascade.VirtualRange,
         entries: []const *const Entry,
 
         index: usize,
 
         const VirtualRangeWithProtection = struct {
-            virtual_range: addr.Virtual.Range,
+            virtual_range: cascade.VirtualRange,
             protection: cascade.mem.MapType.Protection,
         };
 
@@ -1373,7 +1372,7 @@ const EntryRange = struct {
 /// Return the start index and length of the entries that overlap the given range.
 ///
 /// Also determines if the first and last entries overlap the start and end of the range.
-fn entryRange(address_space: *const AddressSpace, range: addr.Virtual.Range) ?EntryRange {
+fn entryRange(address_space: *const AddressSpace, range: cascade.VirtualRange) ?EntryRange {
     const entries = address_space.entries.items;
 
     var entry_range: EntryRange = blk: {

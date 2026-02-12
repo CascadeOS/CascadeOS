@@ -21,7 +21,6 @@ const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
 const PhysicalPage = cascade.mem.PhysicalPage;
-const addr = cascade.addr;
 
 const AddressSpace = @import("AddressSpace.zig");
 const AnonymousMap = @import("AnonymousMap.zig");
@@ -39,7 +38,7 @@ address_space: *AddressSpace,
 access_type: cascade.mem.PageFaultDetails.AccessType,
 
 /// The address that caused the fault rouded down to the nearest page.
-faulting_address: addr.Virtual,
+faulting_address: cascade.VirtualAddress,
 
 entry: *Entry = undefined,
 entries_version: u32 = undefined,

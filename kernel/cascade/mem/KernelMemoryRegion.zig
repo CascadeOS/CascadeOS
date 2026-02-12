@@ -8,11 +8,10 @@ const cascade = @import("cascade");
 const Task = cascade.Task;
 const MapType = cascade.mem.MapType;
 const core = @import("core");
-const addr = cascade.addr;
 
 const KernelMemoryRegion = @This();
 
-range: addr.Virtual.Range.Kernel,
+range: cascade.KernelVirtualRange,
 type: Type,
 
 pub const Type = enum {
@@ -58,7 +57,7 @@ pub const List = struct {
     }
 
     /// Find the region containing the given address.
-    pub fn containingAddress(list: *const List, address: addr.Virtual.Kernel) ?KernelMemoryRegion.Type {
+    pub fn containingAddress(list: *const List, address: cascade.KernelVirtualAddress) ?KernelMemoryRegion.Type {
         for (list.values.constSlice()) |region| {
             if (region.range.containsAddress(address)) return region.type;
         }
@@ -90,7 +89,7 @@ pub const List = struct {
         list: *List,
         size: core.Size,
         alignment: std.mem.Alignment,
-    ) ?addr.Virtual.Range.Kernel {
+    ) ?cascade.KernelVirtualRange {
         // needs the regions to be sorted
         list.sort();
 

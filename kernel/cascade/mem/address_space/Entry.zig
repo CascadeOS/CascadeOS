@@ -22,7 +22,6 @@ const Task = cascade.Task;
 const Cache = cascade.mem.cache.Cache;
 const Protection = cascade.mem.MapType.Protection;
 const core = @import("core");
-const addr = cascade.addr;
 
 const AnonymousMap = @import("AnonymousMap.zig");
 const Object = @import("Object.zig");
@@ -31,7 +30,7 @@ const log = cascade.debug.log.scoped(.address_space);
 
 const Entry = @This();
 
-range: addr.Virtual.Range,
+range: cascade.VirtualRange,
 
 protection: Protection,
 max_protection: Protection,

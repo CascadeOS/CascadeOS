@@ -9,7 +9,6 @@ const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
 const MapType = cascade.mem.MapType;
-const addr = cascade.addr;
 
 const x64 = @import("../x64.zig");
 
@@ -66,7 +65,7 @@ pub const PageTable = extern struct {
     /// Maps a 4 KiB page.
     pub fn map4KiB(
         level4_table: *PageTable,
-        virtual_address: addr.Virtual,
+        virtual_address: cascade.VirtualAddress,
         phys_page: cascade.mem.PhysicalPage.Index,
         map_type: MapType,
         physical_page_allocator: cascade.mem.PhysicalPage.Allocator,
@@ -139,7 +138,7 @@ pub const PageTable = extern struct {
     ///  - does not flush the TLB
     pub fn unmap(
         level4_table: *PageTable,
-        virtual_range: addr.Virtual.Range,
+        virtual_range: cascade.VirtualRange,
         backing_page_decision: core.CleanupDecision,
         top_level_decision: core.CleanupDecision,
         flush_batch: *cascade.mem.VirtualRangeBatch,
@@ -160,7 +159,7 @@ pub const PageTable = extern struct {
 
         var level4_index = p4Index(current_virtual_address);
 
-        var opt_in_progress_range: ?addr.Virtual.Range = null;
+        var opt_in_progress_range: ?cascade.VirtualRange = null;
 
         while (level4_index <= last_virtual_address_p4_index) : (level4_index += 1) {
             const level4_entry = level4_table.entries[level4_index].load();
@@ -286,7 +285,7 @@ pub const PageTable = extern struct {
 
     pub fn changeProtection(
         level4_table: *PageTable,
-        virtual_range: addr.Virtual.Range,
+        virtual_range: cascade.VirtualRange,
         previous_map_type: MapType,
         new_map_type: MapType,
         flush_batch: *cascade.mem.VirtualRangeBatch,
@@ -309,7 +308,7 @@ pub const PageTable = extern struct {
         var level4_index = p4Index(current_virtual_address);
 
         // if `need_to_flush` is false then this will never be non-null
-        var opt_in_progress_range: ?addr.Virtual.Range = null;
+        var opt_in_progress_range: ?cascade.VirtualRange = null;
 
         while (level4_index <= last_virtual_address_p4_index) : (level4_index += 1) {
             const level4_entry = level4_table.entries[level4_index].load();
@@ -435,7 +434,7 @@ pub const PageTable = extern struct {
     fn setEntry(
         page_table: *PageTable,
         index: usize,
-        physical_address: addr.Physical,
+        physical_address: cascade.PhysicalAddress,
         map_type: MapType,
         page_type: PageType,
     ) error{AlreadyMapped}!void {
@@ -643,29 +642,29 @@ pub const PageTable = extern struct {
             return entry._raw.isZero();
         }
 
-        fn getAddress4kib(entry: Entry) addr.Physical {
+        fn getAddress4kib(entry: Entry) cascade.PhysicalAddress {
             return .{ .value = entry._address_4kib_aligned.readNoShiftFullSize() };
         }
 
-        fn setAddress4kib(entry: *Entry, address: addr.Physical) void {
+        fn setAddress4kib(entry: *Entry, address: cascade.PhysicalAddress) void {
             if (core.is_debug) std.debug.assert(address.aligned(small_page_size_alignment));
             entry._address_4kib_aligned.writeNoShiftFullSize(address.value);
         }
 
-        fn getAddress2mib(entry: Entry) addr.Physical {
+        fn getAddress2mib(entry: Entry) cascade.PhysicalAddress {
             return .{ .value = entry._address_2mib_aligned.readNoShiftFullSize() };
         }
 
-        fn setAddress2mib(entry: *Entry, address: addr.Physical) void {
+        fn setAddress2mib(entry: *Entry, address: cascade.PhysicalAddress) void {
             if (core.is_debug) std.debug.assert(address.aligned(medium_page_size_alignment));
             entry._address_2mib_aligned.writeNoShiftFullSize(address.value);
         }
 
-        fn getAddress1gib(entry: Entry) addr.Physical {
+        fn getAddress1gib(entry: Entry) cascade.PhysicalAddress {
             return .{ .value = entry._address_1gib_aligned.readNoShiftFullSize() };
         }
 
-        fn setAddress1gib(entry: *Entry, address: addr.Physical) void {
+        fn setAddress1gib(entry: *Entry, address: cascade.PhysicalAddress) void {
             if (core.is_debug) std.debug.assert(address.aligned(large_page_size_alignment));
             entry._address_1gib_aligned.writeNoShiftFullSize(address.value);
         }
@@ -679,7 +678,7 @@ pub const PageTable = extern struct {
         /// Otherwise returns a pointer to the next page table level.
         fn getNextLevel(
             entry: Entry,
-            // comptime virtualFromPhysical: fn (addr.Physical) addr.Virtual.Kernel,
+            // comptime virtualFromPhysical: fn (cascade.PhysicalAddress) cascade.KernelVirtualAddress,
         ) error{ NotPresent, HugePage }!*PageTable {
             if (!entry.present.read()) return error.NotPresent;
             if (entry.huge.read()) return error.HugePage;
@@ -897,7 +896,7 @@ pub const PageTable = extern struct {
             // The level 4 part is sign extended to ensure the address is cannonical.
             const level4_part = signExtendAddress(level4_index << level_4_shift);
 
-            try writer.print("level 4 [{}] {f}    Flags: ", .{ level4_index, addr.Virtual.from(level4_part) });
+            try writer.print("level 4 [{}] {f}    Flags: ", .{ level4_index, cascade.VirtualAddress.from(level4_part) });
             try level4_entry.printDirectoryEntryFlags(writer);
             try writer.writeByte('\n');
 
@@ -910,7 +909,7 @@ pub const PageTable = extern struct {
                 const level3_part = level3_index << level_3_shift;
 
                 if (level3_entry.huge.read()) {
-                    const virtual = addr.Virtual.from(level4_part | level3_part);
+                    const virtual = cascade.VirtualAddress.from(level4_part | level3_part);
                     const physical = level3_entry.getAddress1gib();
                     try writer.print("  [{}] 1GIB {f} -> {f}    Flags: ", .{ level3_index, virtual, physical });
                     try level3_entry.printHugeEntryFlags(writer);
@@ -918,7 +917,7 @@ pub const PageTable = extern struct {
                     continue;
                 }
 
-                try writer.print("  level 3 [{}] {f}    Flags: ", .{ level3_index, addr.Virtual.from(level4_part | level3_part) });
+                try writer.print("  level 3 [{}] {f}    Flags: ", .{ level3_index, cascade.VirtualAddress.from(level4_part | level3_part) });
                 try level3_entry.printDirectoryEntryFlags(writer);
                 try writer.writeByte('\n');
 
@@ -931,7 +930,7 @@ pub const PageTable = extern struct {
                     const level2_part = level2_index << level_2_shift;
 
                     if (level2_entry.huge.read()) {
-                        const virtual = addr.Virtual.from(level4_part | level3_part | level2_part);
+                        const virtual = cascade.VirtualAddress.from(level4_part | level3_part | level2_part);
                         const physical = level2_entry.getAddress2mib();
                         try writer.print("    [{}] 2MIB {f} -> {f}    Flags: ", .{ level2_index, virtual, physical });
                         try level2_entry.printHugeEntryFlags(writer);
@@ -939,7 +938,7 @@ pub const PageTable = extern struct {
                         continue;
                     }
 
-                    try writer.print("    level 2 [{}] {f}    Flags: ", .{ level2_index, addr.Virtual.from(level4_part | level3_part | level2_part) });
+                    try writer.print("    level 2 [{}] {f}    Flags: ", .{ level2_index, cascade.VirtualAddress.from(level4_part | level3_part | level2_part) });
                     try level2_entry.printDirectoryEntryFlags(writer);
                     try writer.writeByte('\n');
 
@@ -961,7 +960,7 @@ pub const PageTable = extern struct {
 
                         const level1_part = level1_index << level_1_shift;
 
-                        const virtual = addr.Virtual.from(level4_part | level3_part | level2_part | level1_part);
+                        const virtual = cascade.VirtualAddress.from(level4_part | level3_part | level2_part | level1_part);
                         const physical = level1_entry.getAddress4kib();
                         try writer.print("      [{}] 4KIB {f} -> {f}    Flags: ", .{ level1_index, virtual, physical });
                         try level1_entry.printSmallEntryFlags(writer);
@@ -986,7 +985,7 @@ pub const PageTable = extern struct {
         ///  - does not rollback on error
         pub fn fillTopLevel(
             page_table: *PageTable,
-            range: addr.Virtual.Range,
+            range: cascade.VirtualRange,
             physical_page_allocator: cascade.mem.PhysicalPage.Allocator,
         ) !void {
             const size_of_top_level_entry = arch.paging.init.sizeOfTopLevelEntry();
@@ -1017,8 +1016,8 @@ pub const PageTable = extern struct {
         ///  - does not rollback on error
         pub fn mapToPhysicalRangeAllPageSizes(
             level4_table: *PageTable,
-            virtual_range: addr.Virtual.Range,
-            physical_range: addr.Physical.Range,
+            virtual_range: cascade.VirtualRange,
+            physical_range: cascade.PhysicalRange,
             map_type: MapType,
             physical_page_allocator: cascade.mem.PhysicalPage.Allocator,
         ) !void {
@@ -1208,19 +1207,19 @@ fn ensureNextTable(
 
 const PageType = enum { small, medium, large };
 
-inline fn p1Index(address: addr.Virtual) usize {
+inline fn p1Index(address: cascade.VirtualAddress) usize {
     return @as(u9, @truncate(address.value >> level_1_shift));
 }
 
-inline fn p2Index(address: addr.Virtual) usize {
+inline fn p2Index(address: cascade.VirtualAddress) usize {
     return @as(u9, @truncate(address.value >> level_2_shift));
 }
 
-inline fn p3Index(address: addr.Virtual) usize {
+inline fn p3Index(address: cascade.VirtualAddress) usize {
     return @as(u9, @truncate(address.value >> level_3_shift));
 }
 
-inline fn p4Index(address: addr.Virtual) usize {
+inline fn p4Index(address: cascade.VirtualAddress) usize {
     return @as(u9, @truncate(address.value >> level_4_shift));
 }
 

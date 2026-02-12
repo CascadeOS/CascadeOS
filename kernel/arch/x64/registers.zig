@@ -7,7 +7,6 @@ const arch = @import("arch");
 const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
-const addr = cascade.addr;
 
 const x64 = @import("x64.zig");
 
@@ -235,7 +234,7 @@ pub const Cr0 = packed struct(u64) {
 /// Stores the linear address that was accessed to result in the last page fault.
 pub const Cr2 = struct {
     /// Read the page fault linear address from the CR2 register.
-    pub inline fn readAddress() cascade.addr.Virtual {
+    pub inline fn readAddress() cascade.VirtualAddress {
         return .from(asm ("mov %%cr2, %[value]"
             : [value] "=r" (-> u64),
         ));
@@ -244,14 +243,14 @@ pub const Cr2 = struct {
 
 pub const Cr3 = struct {
     /// Reads the CR3 register and returns the page table address.
-    pub inline fn readAddress() addr.Physical {
+    pub inline fn readAddress() cascade.PhysicalAddress {
         return .from(asm ("mov %%cr3, %[value]"
             : [value] "=r" (-> u64),
         ) & 0xFFFF_FFFF_FFFF_F000);
     }
 
     /// Writes the CR3 register with the given page table address.
-    pub inline fn writeAddress(address: addr.Physical) void {
+    pub inline fn writeAddress(address: cascade.PhysicalAddress) void {
         asm volatile ("mov %[address], %%cr3"
             :
             : [address] "r" (address.value & 0xFFFF_FFFF_FFFF_F000),
@@ -1005,7 +1004,7 @@ pub fn MSR(comptime T: type, comptime register: u32) type {
 
 fn DebugAddressRegister(comptime register: enum { DR0, DR1, DR2, DR3 }) type {
     return struct {
-        pub fn read() addr.Virtual {
+        pub fn read() cascade.VirtualAddress {
             return switch (register) {
                 .DR0 => .from(asm ("mov %%dr0, %[value]"
                     : [value] "=r" (-> u64),
@@ -1022,7 +1021,7 @@ fn DebugAddressRegister(comptime register: enum { DR0, DR1, DR2, DR3 }) type {
             };
         }
 
-        pub fn write(address: addr.Virtual) void {
+        pub fn write(address: cascade.VirtualAddress) void {
             switch (register) {
                 .DR0 => asm volatile ("mov %[address], %%dr0"
                     :

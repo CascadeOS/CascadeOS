@@ -7,7 +7,6 @@ const arch = @import("arch");
 const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
-const addr = cascade.addr;
 
 const x64 = @import("x64.zig");
 
@@ -169,7 +168,7 @@ const IOAPIC = struct {
 
     pub const register_region_size = core.Size.of(u32).multiplyScalar(2);
 
-    pub fn init(base_address: addr.Virtual.Kernel, gsi_base: u32) IOAPIC {
+    pub fn init(base_address: cascade.KernelVirtualAddress, gsi_base: u32) IOAPIC {
         var ioapic: IOAPIC = .{
             .ioregsel = base_address.ptr(*volatile u32),
             .iowin = base_address.moveForward(.from(0x10, .byte)).ptr(*volatile u32),

@@ -8,7 +8,6 @@ const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
 const acpi = cascade.acpi;
-const addr = cascade.addr;
 
 /// PCI-Express Memory Mapped Configuration Table (MCFG)
 pub const MCFG = extern struct {
@@ -31,7 +30,7 @@ pub const MCFG = extern struct {
     pub const SIGNATURE_STRING = "MCFG";
 
     pub const BaseAllocation = extern struct {
-        base_address: addr.Physical align(1),
+        base_address: cascade.PhysicalAddress align(1),
 
         segment_group: u16 align(1),
 

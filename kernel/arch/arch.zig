@@ -13,7 +13,6 @@ const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
 const Thread = cascade.user.Thread;
-const addr = cascade.addr;
 const user_cascade = @import("user_cascade");
 
 pub const current_arch = @import("cascade_architecture").arch;
@@ -153,7 +152,7 @@ pub const interrupts = struct {
         }
 
         /// Returns the instruction pointer of the context this interrupt was triggered from.
-        pub fn instructionPointer(self: InterruptFrame) addr.Virtual {
+        pub fn instructionPointer(self: InterruptFrame) cascade.VirtualAddress {
             // TODO: this is used during panics, so if it is not implemented we will panic during a panic
             return getFunction(
                 current_functions.interrupts,
@@ -213,7 +212,7 @@ pub const paging = struct {
     /// Usually the higher half of the address space.
     ///
     /// This must not include either the zero nor undefined address.
-    pub const kernel_memory_range: addr.Virtual.Range = current_decls.paging.kernel_memory_range;
+    pub const kernel_memory_range: cascade.VirtualRange = current_decls.paging.kernel_memory_range;
 
     comptime {
         std.debug.assert(!kernel_memory_range.containsAddress(.zero));
@@ -267,7 +266,7 @@ pub const paging = struct {
         ///  - does not flush the TLB
         pub fn mapSinglePage(
             page_table: PageTable,
-            virtual_address: addr.Virtual,
+            virtual_address: cascade.VirtualAddress,
             physical_page: cascade.mem.PhysicalPage.Index,
             map_type: cascade.mem.MapType,
             physical_page_allocator: cascade.mem.PhysicalPage.Allocator,
@@ -293,7 +292,7 @@ pub const paging = struct {
         ///  - does not flush the TLB
         pub fn unmap(
             page_table: PageTable,
-            virtual_range: addr.Virtual.Range,
+            virtual_range: cascade.VirtualRange,
             backing_page_decision: core.CleanupDecision,
             top_level_decision: core.CleanupDecision,
             flush_batch: *cascade.mem.VirtualRangeBatch,
@@ -321,7 +320,7 @@ pub const paging = struct {
         ///  - does not flush the TLB
         pub fn changeProtection(
             page_table: PageTable,
-            virtual_range: addr.Virtual.Range,
+            virtual_range: cascade.VirtualRange,
             previous_map_type: cascade.mem.MapType,
             new_map_type: cascade.mem.MapType,
             flush_batch: *cascade.mem.VirtualRangeBatch,
@@ -337,7 +336,7 @@ pub const paging = struct {
     ///
     /// Caller must ensure:
     ///   - the `virtual_range` address and size must be aligned to the standard page size
-    pub fn flushCache(virtual_range: addr.Virtual.Range) callconv(core.inline_in_non_debug) void {
+    pub fn flushCache(virtual_range: cascade.VirtualRange) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.paging,
             "flushCache",
@@ -384,7 +383,7 @@ pub const paging = struct {
         ///  - does not rollback on error
         pub fn fillTopLevel(
             page_table: PageTable,
-            range: addr.Virtual.Range,
+            range: cascade.VirtualRange,
             physical_page_allocator: cascade.mem.PhysicalPage.Allocator,
         ) callconv(core.inline_in_non_debug) anyerror!void {
             return getFunction(
@@ -407,8 +406,8 @@ pub const paging = struct {
         ///  - does not rollback on error
         pub fn mapToPhysicalRangeAllPageSizes(
             page_table: PageTable,
-            virtual_range: addr.Virtual.Range,
-            physical_range: addr.Physical.Range,
+            virtual_range: cascade.VirtualRange,
+            physical_range: cascade.PhysicalRange,
             map_type: cascade.mem.MapType,
             physical_page_allocator: cascade.mem.PhysicalPage.Allocator,
         ) callconv(core.inline_in_non_debug) anyerror!void {
@@ -552,7 +551,7 @@ pub const user = struct {
     /// Usually the lower half of the address space.
     ///
     /// This must not include either the zero nor undefined address.
-    pub const user_memory_range: addr.Virtual.Range = current_decls.user.user_memory_range;
+    pub const user_memory_range: cascade.VirtualRange = current_decls.user.user_memory_range;
 
     comptime {
         std.debug.assert(!user_memory_range.containsAddress(.zero));
@@ -639,8 +638,8 @@ pub const user = struct {
     };
 
     pub const EnterUserspaceOptions = struct {
-        entry_point: addr.Virtual.User,
-        stack_pointer: addr.Virtual.User,
+        entry_point: cascade.UserVirtualAddress,
+        stack_pointer: cascade.UserVirtualAddress,
     };
 
     /// Enter userspace for the first time in the current task.
@@ -912,7 +911,7 @@ pub const Functions = struct {
         ) std.debug.StackIterator = null,
 
         /// Returns the instruction pointer of the context this interrupt was triggered from.
-        instructionPointer: ?fn (interrupt_frame: *const current_decls.interrupts.InterruptFrame) addr.Virtual = null,
+        instructionPointer: ?fn (interrupt_frame: *const current_decls.interrupts.InterruptFrame) cascade.VirtualAddress = null,
 
         init: struct {
             /// Ensure that any exceptions/faults that occur during early initialization are handled.
@@ -955,7 +954,7 @@ pub const Functions = struct {
         ///  - does not flush the TLB
         mapSinglePage: ?fn (
             page_table: *current_decls.paging.PageTable,
-            virtual_address: cascade.addr.Virtual,
+            virtual_address: cascade.VirtualAddress,
             physical_page: cascade.mem.PhysicalPage.Index,
             map_type: cascade.mem.MapType,
             physical_page_allocator: cascade.mem.PhysicalPage.Allocator,
@@ -970,7 +969,7 @@ pub const Functions = struct {
         ///  - does not flush the TLB
         unmap: ?fn (
             page_table: *current_decls.paging.PageTable,
-            virtual_range: addr.Virtual.Range,
+            virtual_range: cascade.VirtualRange,
             backing_page_decision: core.CleanupDecision,
             top_level_decision: core.CleanupDecision,
             flush_batch: *cascade.mem.VirtualRangeBatch,
@@ -986,7 +985,7 @@ pub const Functions = struct {
         ///  - does not flush the TLB
         changeProtection: ?fn (
             page_table: *current_decls.paging.PageTable,
-            virtual_range: addr.Virtual.Range,
+            virtual_range: cascade.VirtualRange,
             previous_map_type: cascade.mem.MapType,
             new_map_type: cascade.mem.MapType,
             flush_batch: *cascade.mem.VirtualRangeBatch,
@@ -996,7 +995,7 @@ pub const Functions = struct {
         ///
         /// Caller must ensure:
         ///   - the `virtual_range` address and size must be aligned to the standard page size
-        flushCache: ?fn (virtual_range: addr.Virtual.Range) void = null,
+        flushCache: ?fn (virtual_range: cascade.VirtualRange) void = null,
 
         /// Enable the kernel to access user memory.
         ///
@@ -1023,7 +1022,7 @@ pub const Functions = struct {
             ///  - does not rollback on error
             fillTopLevel: ?fn (
                 page_table: *current_decls.paging.PageTable,
-                range: addr.Virtual.Range,
+                range: cascade.VirtualRange,
                 physical_page_allocator: cascade.mem.PhysicalPage.Allocator,
             ) anyerror!void = null,
 
@@ -1041,8 +1040,8 @@ pub const Functions = struct {
             ///  - does not rollback on error
             mapToPhysicalRangeAllPageSizes: ?fn (
                 page_table: *current_decls.paging.PageTable,
-                virtual_range: addr.Virtual.Range,
-                physical_range: addr.Physical.Range,
+                virtual_range: cascade.VirtualRange,
+                physical_range: cascade.PhysicalRange,
                 map_type: cascade.mem.MapType,
                 physical_page_allocator: cascade.mem.PhysicalPage.Allocator,
             ) anyerror!void = null,
@@ -1249,7 +1248,7 @@ pub const Decls = struct {
         /// Usually the higher half of the address space.
         ///
         /// This must not include either the zero nor undefined address.
-        kernel_memory_range: addr.Virtual.Range,
+        kernel_memory_range: cascade.VirtualRange,
 
         PageTable: type,
     },
@@ -1275,7 +1274,7 @@ pub const Decls = struct {
         /// Usually the lower half of the address space.
         ///
         /// This must not include either the zero nor undefined address.
-        user_memory_range: addr.Virtual.Range,
+        user_memory_range: cascade.VirtualRange,
     },
 
     io: struct {

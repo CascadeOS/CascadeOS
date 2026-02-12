@@ -7,7 +7,6 @@ const arch = @import("arch");
 const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
-const addr = cascade.addr;
 
 const arm = @import("arm.zig");
 
@@ -121,7 +120,7 @@ pub const decls: arch.Decls = .{
         .PerThread = struct {},
         .SyscallFrame = struct {},
         .user_memory_range = .from(
-            addr.Virtual.zero.moveForward(standard_page_size),
+            cascade.VirtualAddress.zero.moveForward(standard_page_size),
             half_address_space_size.subtract(standard_page_size),
         ),
     },

@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-NON-AI-MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-// TODO: use `addr.Virtual.Kernel`, search for `.value`
+// TODO: use `cascade.KernelVirtualAddress`, search for `.value`
 
 const std = @import("std");
 
@@ -9,7 +9,6 @@ const arch = @import("arch");
 const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
-const addr = cascade.addr;
 
 const log = cascade.debug.log.scoped(.cache);
 
@@ -428,7 +427,7 @@ pub const RawCache = struct {
                     .pmm => {
                         var deallocate_page_list: cascade.mem.PhysicalPage.List = .{};
                         deallocate_page_list.prepend(.fromAddress(
-                            addr.Physical.fromDirectMap(.from(@intFromPtr(slab_base_ptr))) catch unreachable,
+                            cascade.PhysicalAddress.fromDirectMap(.from(@intFromPtr(slab_base_ptr))) catch unreachable,
                         ));
                         cascade.mem.PhysicalPage.allocator.deallocate(deallocate_page_list);
                     },
@@ -486,7 +485,7 @@ pub const RawCache = struct {
                 errdefer globals.slab_cache.deallocate(slab);
 
                 if (core.is_debug) {
-                    const virtual_range: addr.Virtual.Range.Kernel = .{
+                    const virtual_range: cascade.KernelVirtualRange = .{
                         .address = .from(slab.large_item_allocation.base),
                         .size = .from(slab.large_item_allocation.len, .byte),
                     };
@@ -665,7 +664,7 @@ pub const RawCache = struct {
                     .pmm => {
                         var deallocate_page_list: cascade.mem.PhysicalPage.List = .{};
                         deallocate_page_list.prepend(.fromAddress(
-                            addr.Physical.fromDirectMap(.from(@intFromPtr(slab_base_ptr))) catch unreachable,
+                            cascade.PhysicalAddress.fromDirectMap(.from(@intFromPtr(slab_base_ptr))) catch unreachable,
                         ));
                         cascade.mem.PhysicalPage.allocator.deallocate(deallocate_page_list);
                     },

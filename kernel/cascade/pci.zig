@@ -8,7 +8,6 @@ const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
 const acpi = cascade.acpi;
-const addr = cascade.addr;
 
 /// Returns a `Function` representing the PCI function at 'address'.
 pub fn getFunction(address: Address) ?*volatile Function {
@@ -357,7 +356,7 @@ pub const ECAM = struct {
     segment_group: u16,
     start_bus: u8,
     end_bus: u8,
-    config_space: addr.Virtual.Range.Kernel,
+    config_space: cascade.KernelVirtualRange,
 };
 
 const DEVICES_PER_BUS = 32;
@@ -396,7 +395,7 @@ pub const init = struct {
 
             const number_of_buses = base_allocation.end_pci_bus - base_allocation.start_pci_bus;
 
-            const ecam_config_space_physical_range: addr.Physical.Range = .from(
+            const ecam_config_space_physical_range: cascade.PhysicalRange = .from(
                 base_allocation.base_address,
                 Function.ConfigurationSpace.size
                     .multiplyScalar(FUNCTIONS_PER_DEVICE)

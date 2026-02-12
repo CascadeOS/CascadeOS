@@ -7,23 +7,22 @@ const arch = @import("arch");
 const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
-const addr = cascade.addr;
 
 const Stack = @This();
 
 /// The entire virtual range including the guard page.
-range: addr.Virtual.Range.Kernel,
+range: cascade.KernelVirtualRange,
 
 /// The usable range excluding the guard page.
-usable_range: addr.Virtual.Range.Kernel,
+usable_range: cascade.KernelVirtualRange,
 
 /// The current stack pointer.
-stack_pointer: addr.Virtual.Kernel,
+stack_pointer: cascade.KernelVirtualAddress,
 
 /// The top of the stack.
 ///
 /// This is not the same as `usable_range.after()` as a zero return address is pushed onto the top of the stack.
-top_stack_pointer: addr.Virtual.Kernel,
+top_stack_pointer: cascade.KernelVirtualAddress,
 
 /// Creates a stack from a range.
 ///
@@ -31,7 +30,7 @@ top_stack_pointer: addr.Virtual.Kernel,
 /// - `usable_range` must be atleast `@sizeOf(usize)` bytes.
 /// - `range` and `usable_range` must be aligned to 16 bytes.
 /// - `range` must fully contain `usable_range`.
-pub fn fromRange(range: addr.Virtual.Range.Kernel, usable_range: addr.Virtual.Range.Kernel) Stack {
+pub fn fromRange(range: cascade.KernelVirtualRange, usable_range: cascade.KernelVirtualRange) Stack {
     if (core.is_debug) {
         std.debug.assert(usable_range.size.greaterThanOrEqual(core.Size.of(usize)));
         std.debug.assert(range.fullyContains(usable_range));
@@ -55,7 +54,7 @@ pub fn fromRange(range: addr.Virtual.Range.Kernel, usable_range: addr.Virtual.Ra
 
 /// Pushes a value onto the stack.
 pub fn push(stack: *Stack, value: usize) error{StackOverflow}!void {
-    const new_stack_pointer: addr.Virtual.Kernel = stack.stack_pointer.moveBackward(.of(usize));
+    const new_stack_pointer: cascade.KernelVirtualAddress = stack.stack_pointer.moveBackward(.of(usize));
     if (new_stack_pointer.lessThan(stack.usable_range.address)) return error.StackOverflow;
 
     const ptr: *usize = new_stack_pointer.ptr(*usize);
@@ -67,7 +66,7 @@ pub fn push(stack: *Stack, value: usize) error{StackOverflow}!void {
 /// Returns true if there is space for `number` of `usize` values on the stack.
 pub fn spaceFor(stack: *const Stack, number: usize) bool {
     const size = core.Size.of(usize).multiplyScalar(number);
-    const new_stack_pointer: addr.Virtual.Kernel = stack.stack_pointer.moveBackward(size);
+    const new_stack_pointer: cascade.KernelVirtualAddress = stack.stack_pointer.moveBackward(size);
     if (new_stack_pointer.lessThan(stack.usable_range.address)) return false;
     return true;
 }
@@ -89,7 +88,7 @@ pub fn createStack() !Stack {
     errdefer globals.stack_arena.deallocate(stack_range);
 
     const range = stack_range.toVirtualRange();
-    const usable_range: addr.Virtual.Range.Kernel = .{
+    const usable_range: cascade.KernelVirtualRange = .{
         .address = range.address,
         .size = cascade.config.task.kernel_stack_size,
     };

@@ -8,7 +8,6 @@ const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
 const acpi = cascade.acpi;
-const addr = cascade.addr;
 
 pub const Address = @import("Address.zig").Address;
 pub const tables = @import("tables/tables.zig");
@@ -199,7 +198,7 @@ pub const init = struct {
             return phys_addr.toDirectMap().ptr(*const tables.SharedHeader);
         }
 
-        fn nextTablePhysicalAddressImpl(table_iterator: *TableIterator, comptime T: type) ?addr.Physical {
+        fn nextTablePhysicalAddressImpl(table_iterator: *TableIterator, comptime T: type) ?cascade.PhysicalAddress {
             if (@intFromPtr(table_iterator.ptr) + @sizeOf(T) >= @intFromPtr(table_iterator.end_ptr)) return null;
 
             const physical_address = std.mem.readInt(T, @ptrCast(table_iterator.ptr), .little);

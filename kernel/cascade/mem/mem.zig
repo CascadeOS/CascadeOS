@@ -8,7 +8,6 @@ const cascade = @import("cascade");
 const Task = cascade.Task;
 const Process = cascade.user.Process;
 const core = @import("core");
-const addr = cascade.addr;
 
 pub const AddressSpace = @import("address_space/AddressSpace.zig");
 pub const cache = @import("cache.zig");
@@ -41,7 +40,7 @@ pub inline fn kernelAddressSpace() *AddressSpace {
 /// - `map_type.protection` must not be `.none`
 pub fn mapSinglePage(
     page_table: arch.paging.PageTable,
-    virtual_address: addr.Virtual,
+    virtual_address: cascade.VirtualAddress,
     physical_page: PhysicalPage.Index,
     map_type: MapType,
     physical_page_allocator: PhysicalPage.Allocator,
@@ -70,7 +69,7 @@ pub fn mapSinglePage(
 /// - `map_type.protection` must not be `.none`
 pub fn mapRangeAndBackWithPhysicalPages(
     page_table: arch.paging.PageTable,
-    virtual_range: addr.Virtual.Range,
+    virtual_range: cascade.VirtualRange,
     map_type: MapType,
     flush_target: cascade.Context,
     top_level_decision: core.CleanupDecision,
@@ -139,8 +138,8 @@ pub fn mapRangeAndBackWithPhysicalPages(
 /// - `map_type.protection` must not be `.none`
 pub fn mapRangeToPhysicalRange(
     page_table: arch.paging.PageTable,
-    virtual_range: addr.Virtual.Range,
-    physical_range: addr.Physical.Range,
+    virtual_range: cascade.VirtualRange,
+    physical_range: cascade.PhysicalRange,
     map_type: MapType,
     flush_target: cascade.Context,
     top_level_decision: core.CleanupDecision,
@@ -396,7 +395,7 @@ fn onKernelPageFault(
 }
 
 pub const PageFaultDetails = struct {
-    faulting_address: addr.Virtual,
+    faulting_address: cascade.VirtualAddress,
     access_type: AccessType,
     fault_type: FaultType,
 
@@ -469,7 +468,7 @@ pub const MapError = error{
 /// `cascade.config.virtual_range_batching_seperation_to_merge_over`.
 pub const VirtualRangeBatch = struct {
     ranges: core.containers.BoundedArray(
-        addr.Virtual.Range,
+        cascade.VirtualRange,
         cascade.config.mem.virtual_ranges_to_batch,
     ) = .{},
 
@@ -482,7 +481,7 @@ pub const VirtualRangeBatch = struct {
     /// - `range.address` must be greater than or equal to the end of the last range in the batch
     /// - `range.address` must be aligned to `arch.paging.standard_page_size`
     /// - `range.size` must be aligned to `arch.paging.standard_page_size`
-    pub fn appendMergeIfFull(batch: *VirtualRangeBatch, range: addr.Virtual.Range) void {
+    pub fn appendMergeIfFull(batch: *VirtualRangeBatch, range: cascade.VirtualRange) void {
         if (core.is_debug) {
             std.debug.assert(range.address.aligned(arch.paging.standard_page_size_alignment));
             std.debug.assert(range.size.aligned(arch.paging.standard_page_size_alignment));
@@ -495,7 +494,7 @@ pub const VirtualRangeBatch = struct {
             },
             cascade.config.mem.virtual_ranges_to_batch => {
                 // we have hit the limit of virtual ranges to batch together so we always merge with the last range
-                const last: *addr.Virtual.Range = &batch.ranges.slice()[cascade.config.mem.virtual_ranges_to_batch - 1];
+                const last: *cascade.VirtualRange = &batch.ranges.slice()[cascade.config.mem.virtual_ranges_to_batch - 1];
 
                 if (core.is_debug) std.debug.assert(range.address.greaterThanOrEqual(last.after()));
 
@@ -504,7 +503,7 @@ pub const VirtualRangeBatch = struct {
             },
             else => |len| {
                 @branchHint(.likely);
-                const last: *addr.Virtual.Range = &batch.ranges.slice()[len - 1];
+                const last: *cascade.VirtualRange = &batch.ranges.slice()[len - 1];
 
                 if (core.is_debug) std.debug.assert(range.address.greaterThanOrEqual(last.after()));
 
@@ -529,7 +528,7 @@ pub const VirtualRangeBatch = struct {
     /// - `range.address` must be greater than or equal to the end of the last range in the batch
     /// - `range.address` must be aligned to `arch.paging.standard_page_size`
     /// - `range.size` must be aligned to `arch.paging.standard_page_size`
-    pub fn append(batch: *VirtualRangeBatch, range: addr.Virtual.Range) bool {
+    pub fn append(batch: *VirtualRangeBatch, range: cascade.VirtualRange) bool {
         if (core.is_debug) {
             std.debug.assert(range.address.aligned(arch.paging.standard_page_size_alignment));
             std.debug.assert(range.size.aligned(arch.paging.standard_page_size_alignment));
@@ -543,7 +542,7 @@ pub const VirtualRangeBatch = struct {
             return true;
         }
 
-        const last: *addr.Virtual.Range = &batch.ranges.slice()[len - 1];
+        const last: *cascade.VirtualRange = &batch.ranges.slice()[len - 1];
 
         if (core.is_debug) std.debug.assert(range.address.greaterThanOrEqual(last.after()));
 
@@ -584,7 +583,7 @@ pub const ChangeProtectionBatch = struct {
     ) = .{},
 
     pub const VirtualRangeWithMapType = struct {
-        virtual_range: addr.Virtual.Range,
+        virtual_range: cascade.VirtualRange,
         previous_map_type: MapType,
     };
 
@@ -658,7 +657,7 @@ pub const globals = struct {
     /// The virtual base address that the kernel was loaded at.
     ///
     /// Initialized during `init.determineEarlyMemoryLayout`.
-    var virtual_base_address: addr.Virtual.Kernel = undefined;
+    var virtual_base_address: cascade.KernelVirtualAddress = undefined;
 
     /// The offset from the requested ELF virtual base address to the address that the kernel was actually loaded at.
     ///
@@ -668,7 +667,7 @@ pub const globals = struct {
     /// Provides an identity mapping between virtual and physical addresses.
     ///
     /// Initialized during `init.determineEarlyMemoryLayout`.
-    pub var direct_map: addr.Virtual.Range.Kernel = undefined;
+    pub var direct_map: cascade.KernelVirtualRange = undefined;
 
     /// The layout of the memory regions of the cascade.
     ///
@@ -800,11 +799,11 @@ pub const init = struct {
         };
 
         const sdf_slice = cascade.debug.sdfSlice() catch &.{};
-        const sdf_range: addr.Virtual.Range.Kernel = .fromSlice(u8, sdf_slice);
+        const sdf_range: cascade.KernelVirtualRange = .fromSlice(u8, sdf_slice);
 
         const sections: []const struct {
-            addr.Virtual.Kernel,
-            addr.Virtual.Kernel,
+            cascade.KernelVirtualAddress,
+            cascade.KernelVirtualAddress,
             KernelMemoryRegion.Type,
         } = &.{
             .{
@@ -836,7 +835,7 @@ pub const init = struct {
 
             if (core.is_debug) std.debug.assert(end_address.greaterThan(start_address));
 
-            const virtual_range: addr.Virtual.Range.Kernel = .from(
+            const virtual_range: cascade.KernelVirtualRange = .from(
                 start_address,
                 core.Size.from(end_address.value - start_address.value, .byte)
                     .alignForward(arch.paging.standard_page_size_alignment),
@@ -918,7 +917,7 @@ pub const init = struct {
         const total_number_of_pages = blk: {
             var memory_iter = boot.memoryMap(.forward) catch @panic("no memory map");
 
-            var last_page: addr.Physical = .zero;
+            var last_page: cascade.PhysicalAddress = .zero;
 
             while (memory_iter.next()) |entry| {
                 last_page = entry.range.last();

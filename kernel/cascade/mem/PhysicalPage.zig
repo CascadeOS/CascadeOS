@@ -7,7 +7,6 @@ const arch = @import("arch");
 const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
-const addr = cascade.addr;
 
 const PhysicalPage = @This();
 
@@ -24,12 +23,12 @@ pub const Index = enum(u32) {
     _,
 
     /// Returns the physical page that contains the given physical address.
-    pub fn fromAddress(physical_address: addr.Physical) Index {
+    pub fn fromAddress(physical_address: cascade.PhysicalAddress) Index {
         return @enumFromInt(physical_address.value / arch.paging.standard_page_size.value);
     }
 
     /// Returns the base address of the given physical page.
-    pub fn baseAddress(index: Index) addr.Physical {
+    pub fn baseAddress(index: Index) cascade.PhysicalAddress {
         return .from(@intFromEnum(index) * arch.paging.standard_page_size.value);
     }
 };
@@ -58,7 +57,7 @@ fn allocate() Allocator.AllocateError!Index {
     );
 
     if (core.is_debug) {
-        const virtual_range: addr.Virtual.Range.Kernel = .from(
+        const virtual_range: cascade.KernelVirtualRange = .from(
             index.baseAddress().toDirectMap(),
             arch.paging.standard_page_size,
         );
@@ -286,26 +285,26 @@ pub const init = struct {
     /// Maps the pages array sparsely, only backing regions corresponding to usable physical memory.
     pub fn mapPagesArray(
         kernel_page_table: arch.paging.PageTable,
-        pages_array_range: addr.Virtual.Range.Kernel,
+        pages_array_range: cascade.KernelVirtualRange,
     ) !void {
         const pages_array_base = pages_array_range.address;
 
-        var opt_current_range_start: ?addr.Virtual.Kernel = null;
-        var current_range_end: addr.Virtual.Kernel = undefined;
+        var opt_current_range_start: ?cascade.KernelVirtualAddress = null;
+        var current_range_end: cascade.KernelVirtualAddress = undefined;
 
         var memory_iter = boot.memoryMap(.forward) catch @panic("no memory map");
 
         while (memory_iter.next()) |entry| {
             if (!entry.type.isUsable()) continue;
 
-            const entry_range_start: addr.Virtual.Kernel = pages_array_base
+            const entry_range_start: cascade.KernelVirtualAddress = pages_array_base
                 .moveForward(
                     core.Size.of(PhysicalPage)
                         .multiplyScalar(@intFromEnum(Index.fromAddress(entry.range.address))),
                 )
                 .alignBackward(arch.paging.standard_page_size_alignment);
 
-            const entry_range_end: addr.Virtual.Kernel = pages_array_base
+            const entry_range_end: cascade.KernelVirtualAddress = pages_array_base
                 .moveForward(
                     core.Size.of(PhysicalPage)
                         .multiplyScalar(@intFromEnum(Index.fromAddress(entry.range.last()))),
@@ -363,7 +362,7 @@ pub const init = struct {
     /// Initializes the normal physical page allocator and the pages array.
     ///
     /// Pulls all memory out of the bootstrap physical page allocator and uses it to populate the normal allocator.
-    pub fn initializePhysicalMemory(pages_range: addr.Virtual.Range.Kernel) void {
+    pub fn initializePhysicalMemory(pages_range: cascade.KernelVirtualRange) void {
         const pages: []PhysicalPage = @alignCast(std.mem.bytesAsSlice(
             PhysicalPage,
             pages_range.byteSlice(),

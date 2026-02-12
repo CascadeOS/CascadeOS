@@ -14,7 +14,6 @@ const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
 const RawCache = cascade.mem.cache.RawCache;
-const addr = cascade.addr;
 
 const log = cascade.debug.log.scoped(.resource_arena);
 
@@ -964,14 +963,14 @@ pub const Allocation = struct {
     base: usize,
     len: usize,
 
-    pub inline fn toVirtualRange(self: Allocation) addr.Virtual.Range.Kernel {
+    pub inline fn toVirtualRange(self: Allocation) cascade.KernelVirtualRange {
         return .{
             .address = .from(self.base),
             .size = .from(self.len, .byte),
         };
     }
 
-    pub inline fn fromVirtualRange(range: addr.Virtual.Range.Kernel) Allocation {
+    pub inline fn fromVirtualRange(range: cascade.KernelVirtualRange) Allocation {
         return .{
             .base = range.address.value,
             .len = range.size.value,

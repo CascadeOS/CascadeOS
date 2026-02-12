@@ -8,7 +8,7 @@ const boot = @import("boot");
 const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
-const addr = cascade.addr;
+
 const Output = @import("Output.zig");
 
 const init_log = cascade.debug.log.scoped(.output_init);
@@ -30,7 +30,7 @@ fn tryGetFramebufferOutputInner(memory_system_available: bool) !?Output {
 
     const framebuffer = boot.framebuffer() orelse return null;
 
-    const physical_address: addr.Physical = try .fromDirectMap(
+    const physical_address: cascade.PhysicalAddress = try .fromDirectMap(
         .from(@intFromPtr(@volatileCast(framebuffer.ptr))),
     );
 

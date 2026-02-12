@@ -7,7 +7,6 @@ const arch = @import("arch");
 const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
-const addr = cascade.addr;
 
 const x64 = @import("x64.zig");
 
@@ -37,7 +36,7 @@ pub const functions: arch.Functions = .{
             }
         }.createStackIterator,
         .instructionPointer = struct {
-            fn instructionPointer(interrupt_frame: *const x64.interrupts.InterruptFrame) addr.Virtual {
+            fn instructionPointer(interrupt_frame: *const x64.interrupts.InterruptFrame) cascade.VirtualAddress {
                 return interrupt_frame.rip;
             }
         }.instructionPointer,
@@ -186,7 +185,7 @@ pub const decls: arch.Decls = .{
         .PerThread = x64.user.PerThread,
         .SyscallFrame = x64.user.SyscallFrame,
         .user_memory_range = .from(
-            addr.Virtual.zero.moveForward(x64.paging.PageTable.small_page_size),
+            cascade.VirtualAddress.zero.moveForward(x64.paging.PageTable.small_page_size),
             x64.paging.PageTable.half_address_space_size.subtract(x64.paging.PageTable.small_page_size),
         ),
     },

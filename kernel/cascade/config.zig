@@ -7,7 +7,7 @@ const arch = @import("arch");
 const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
-const addr = cascade.addr;
+
 const kernel_options = @import("kernel_options");
 
 pub const cascade_version = kernel_options.cascade_version;
@@ -20,7 +20,7 @@ pub const executor = struct {
 
 pub const mem = struct {
     // This must be kept in sync with the linker scripts.
-    pub const kernel_base_address: addr.Virtual.Kernel = .from(0xffffffff80000000);
+    pub const kernel_base_address: cascade.KernelVirtualAddress = .from(0xffffffff80000000);
 
     pub const maximum_number_of_memory_map_entries = 128;
 

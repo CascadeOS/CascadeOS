@@ -8,7 +8,6 @@ const boot = @import("boot");
 const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
-const addr = cascade.addr;
 
 const limine = @import("limine.zig");
 
@@ -83,7 +82,7 @@ pub const MemoryMapIterator = struct {
     }
 };
 
-pub fn directMapAddress() ?addr.Virtual.Kernel {
+pub fn directMapAddress() ?cascade.KernelVirtualAddress {
     const resp = requests.hhdm.response orelse
         return null;
 
@@ -247,7 +246,7 @@ pub fn framebuffer() ?boot.Framebuffer {
     };
 }
 
-pub fn deviceTreeBlob() ?addr.Virtual.Kernel {
+pub fn deviceTreeBlob() ?cascade.KernelVirtualAddress {
     const resp = requests.device_tree_blob.response orelse
         return null;
     return resp.address;

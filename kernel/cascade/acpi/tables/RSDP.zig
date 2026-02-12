@@ -8,7 +8,6 @@ const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
 const acpi = cascade.acpi;
-const addr = cascade.addr;
 
 /// [ACPI 6.5 Specification Link](https://uefi.org/specs/ACPI/6.5/05_ACPI_Software_Programming_Model.html#root-system-description-pointer-rsdp-structure)
 pub const RSDP = extern struct {
@@ -50,7 +49,7 @@ pub const RSDP = extern struct {
     /// 64 bit physical address of the XSDT.
     ///
     /// This field is not available in the ACPI version 1.0 RSDP Structure.
-    xsdt_addr: addr.Physical align(1),
+    xsdt_addr: cascade.PhysicalAddress align(1),
 
     /// This is a checksum of the entire table, including both checksum fields.
     ///
@@ -61,7 +60,7 @@ pub const RSDP = extern struct {
 
     const BYTES_IN_ACPI_1_STRUCTURE = 20;
 
-    pub fn sdtAddress(rsdp: *const RSDP) addr.Physical {
+    pub fn sdtAddress(rsdp: *const RSDP) cascade.PhysicalAddress {
         return switch (rsdp.revision) {
             0 => .from(rsdp.rsdt_addr),
             2 => rsdp.xsdt_addr,

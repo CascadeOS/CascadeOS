@@ -4,7 +4,6 @@
 const std = @import("std");
 
 pub const acpi = @import("acpi/acpi.zig");
-pub const addr = @import("addr.zig");
 pub const config = @import("config.zig");
 pub const debug = @import("debug/debug.zig");
 pub const Executor = @import("Executor.zig");
@@ -15,6 +14,16 @@ pub const sync = @import("sync/sync.zig");
 pub const Task = @import("task/Task.zig");
 pub const time = @import("time.zig");
 pub const user = @import("user/user.zig");
+
+const address = @import("address.zig");
+pub const VirtualAddress = address.VirtualAddress;
+pub const KernelVirtualAddress = address.KernelVirtualAddress;
+pub const UserVirtualAddress = address.UserVirtualAddress;
+pub const PhysicalAddress = address.PhysicalAddress;
+pub const VirtualRange = address.VirtualRange;
+pub const KernelVirtualRange = address.KernelVirtualRange;
+pub const UserVirtualRange = address.UserVirtualRange;
+pub const PhysicalRange = address.PhysicalRange;
 
 pub const Context = union(Type) {
     kernel,

@@ -21,7 +21,6 @@ const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
 const Cache = cascade.mem.cache.Cache;
-const addr = cascade.addr;
 
 const AddressSpace = @import("AddressSpace.zig");
 const AnonymousPage = @import("AnonymousPage.zig");
@@ -132,7 +131,7 @@ fn destroy(
 pub fn copy(
     address_space: *AddressSpace,
     entry: *Entry,
-    faulting_address: addr.Virtual,
+    faulting_address: cascade.VirtualAddress,
 ) error{OutOfMemory}!void {
     _ = faulting_address;
 
@@ -165,7 +164,7 @@ pub const Reference = struct {
     /// The anonymous map must be locked by the caller. (read or write)
     ///
     /// Called `amap_lookups` in OpenBSD uvm, but this implementation only returns a single page.
-    pub fn lookup(reference: Reference, entry: *const Entry, faulting_address: addr.Virtual) ?*AnonymousPage {
+    pub fn lookup(reference: Reference, entry: *const Entry, faulting_address: cascade.VirtualAddress) ?*AnonymousPage {
         if (core.is_debug) {
             std.debug.assert(reference.anonymous_map != null);
             std.debug.assert(reference.start_offset.aligned(arch.paging.standard_page_size_alignment));
@@ -196,7 +195,7 @@ pub const Reference = struct {
     pub fn add(
         reference: Reference,
         entry: *const Entry,
-        faulting_address: addr.Virtual,
+        faulting_address: cascade.VirtualAddress,
         anonymous_page: *AnonymousPage,
         operation: AddOperation,
     ) error{OutOfMemory}!void {
@@ -233,7 +232,7 @@ pub const Reference = struct {
     /// Returns the page offset of the given address in the given entry.
     ///
     /// Asserts that the address is within the entry's range.
-    fn targetIndex(entry: *const Entry, reference: Reference, faulting_address: addr.Virtual) u32 {
+    fn targetIndex(entry: *const Entry, reference: Reference, faulting_address: cascade.VirtualAddress) u32 {
         if (core.is_debug) std.debug.assert(entry.range.containsAddress(faulting_address));
 
         return @intCast(

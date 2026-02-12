@@ -10,7 +10,6 @@ const cascade = @import("cascade");
 const Task = cascade.Task;
 const resource_arena = cascade.mem.resource_arena;
 const core = @import("core");
-const addr = cascade.addr;
 
 const log = cascade.debug.log.scoped(.heap);
 
@@ -29,7 +28,7 @@ pub const AllocateError = error{
     OutOfMemory,
 };
 
-pub fn allocate(size: core.Size) AllocateError!addr.Virtual.Range.Kernel {
+pub fn allocate(size: core.Size) AllocateError!cascade.KernelVirtualRange {
     const allocation = globals.heap_arena.allocate(size.value, .instant_fit) catch |err| {
         @branchHint(.unlikely);
         return switch (err) {
@@ -48,7 +47,7 @@ pub fn allocate(size: core.Size) AllocateError!addr.Virtual.Range.Kernel {
     return virtual_range;
 }
 
-pub fn deallocate(range: addr.Virtual.Range.Kernel) void {
+pub fn deallocate(range: cascade.KernelVirtualRange) void {
     globals.heap_arena.deallocate(
         .fromVirtualRange(.from(
             range.address,
@@ -65,9 +64,9 @@ pub fn deallocate(range: addr.Virtual.Range.Kernel) void {
 /// - `physical_range.address` must be aligned to `arch.paging.standard_page_size`.
 pub fn allocateSpecial(
     size: core.Size,
-    physical_range: addr.Physical.Range,
+    physical_range: cascade.PhysicalRange,
     map_type: cascade.mem.MapType,
-) AllocateError!addr.Virtual.Range.Kernel {
+) AllocateError!cascade.KernelVirtualRange {
     if (core.is_debug) {
         std.debug.assert(size.equal(physical_range.size));
         std.debug.assert(size.aligned(arch.paging.standard_page_size_alignment));
@@ -114,7 +113,7 @@ pub fn allocateSpecial(
 ///
 /// **REQUIREMENTS**:
 /// - `virtual_range` must be a range that was previously allocated by `allocateSpecial`.
-pub fn deallocateSpecial(virtual_range: addr.Virtual.Range.Kernel) void {
+pub fn deallocateSpecial(virtual_range: cascade.KernelVirtualRange) void {
     {
         globals.special_heap_page_table_mutex.lock();
         defer globals.special_heap_page_table_mutex.unlock();

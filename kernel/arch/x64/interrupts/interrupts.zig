@@ -9,7 +9,6 @@ const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
 const Thread = cascade.user.Thread;
-const addr = cascade.addr;
 
 const x64 = @import("../x64.zig");
 const Idt = @import("Idt.zig");
@@ -197,13 +196,13 @@ pub const InterruptFrame = extern struct {
         interrupt: Interrupt,
     },
     error_code: u64,
-    rip: addr.Virtual,
+    rip: cascade.VirtualAddress,
     cs: extern union {
         full: u64,
         selector: x64.Gdt.Selector,
     },
     rflags: x64.registers.RFlags,
-    rsp: addr.Virtual,
+    rsp: cascade.VirtualAddress,
     ss: extern union {
         full: u64,
         selector: x64.Gdt.Selector,
