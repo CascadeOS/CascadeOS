@@ -62,7 +62,7 @@ pub const VirtualAddress = extern union {
     pub const greaterThan: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).greaterThan;
     pub const greaterThanOrEqual: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).greaterThanOrEqual;
     pub const difference: fn (@This(), @This()) callconv(.@"inline") core.Size = AddressImpl(@This()).difference;
-    pub const format = addressFormat(@This(), "VirtualAddress");
+    pub const format = AddressImpl(@This()).format;
 };
 
 pub const KernelVirtualAddress = extern struct {
@@ -99,7 +99,7 @@ pub const KernelVirtualAddress = extern struct {
     pub const greaterThan: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).greaterThan;
     pub const greaterThanOrEqual: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).greaterThanOrEqual;
     pub const difference: fn (@This(), @This()) callconv(.@"inline") core.Size = AddressImpl(@This()).difference;
-    pub const format = addressFormat(@This(), "KernelVirtualAddress");
+    pub const format = AddressImpl(@This()).format;
 
     comptime {
         core.testing.expectSize(KernelVirtualAddress, .of(usize));
@@ -135,7 +135,7 @@ pub const UserVirtualAddress = extern struct {
     pub const greaterThan: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).greaterThan;
     pub const greaterThanOrEqual: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).greaterThanOrEqual;
     pub const difference: fn (@This(), @This()) callconv(.@"inline") core.Size = AddressImpl(@This()).difference;
-    pub const format = addressFormat(@This(), "UserVirtualAddress");
+    pub const format = AddressImpl(@This()).format;
 
     comptime {
         core.testing.expectSize(UserVirtualAddress, .of(usize));
@@ -177,7 +177,7 @@ pub const PhysicalAddress = extern struct {
     pub const greaterThan: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).greaterThan;
     pub const greaterThanOrEqual: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).greaterThanOrEqual;
     pub const difference: fn (@This(), @This()) callconv(.@"inline") core.Size = AddressImpl(@This()).difference;
-    pub const format = addressFormat(@This(), "PhysicalAddress");
+    pub const format = AddressImpl(@This()).format;
 
     comptime {
         core.testing.expectSize(PhysicalAddress, .of(usize));
@@ -214,7 +214,7 @@ pub const VirtualRange = struct {
     pub const fullyContains: fn (@This(), @This()) bool = RangeImpl(@This(), VirtualAddress).fullyContains;
     pub const containsAddress: fn (@This(), VirtualAddress) bool = RangeImpl(@This(), VirtualAddress).containsAddress;
     pub const containsAddressOrder: fn (@This(), VirtualAddress) std.math.Order = RangeImpl(@This(), VirtualAddress).containsAddressOrder;
-    pub const format = rangeFormat(@This(), "VirtualRange");
+    pub const format = RangeImpl(@This(), VirtualAddress).format;
 };
 
 pub const KernelVirtualRange = struct {
@@ -243,7 +243,7 @@ pub const KernelVirtualRange = struct {
     pub const fullyContains: fn (@This(), @This()) bool = RangeImpl(@This(), KernelVirtualAddress).fullyContains;
     pub const containsAddress: fn (@This(), KernelVirtualAddress) bool = RangeImpl(@This(), KernelVirtualAddress).containsAddress;
     pub const containsAddressOrder: fn (@This(), KernelVirtualAddress) std.math.Order = RangeImpl(@This(), KernelVirtualAddress).containsAddressOrder;
-    pub const format = rangeFormat(@This(), "KernelVirtualRange");
+    pub const format = RangeImpl(@This(), KernelVirtualAddress).format;
 };
 
 pub const UserVirtualRange = struct {
@@ -266,7 +266,7 @@ pub const UserVirtualRange = struct {
     pub const fullyContains: fn (@This(), @This()) bool = RangeImpl(@This(), UserVirtualAddress).fullyContains;
     pub const containsAddress: fn (@This(), UserVirtualAddress) bool = RangeImpl(@This(), UserVirtualAddress).containsAddress;
     pub const containsAddressOrder: fn (@This(), UserVirtualAddress) std.math.Order = RangeImpl(@This(), UserVirtualAddress).containsAddressOrder;
-    pub const format = rangeFormat(@This(), "UserVirtualRange");
+    pub const format = RangeImpl(@This(), UserVirtualAddress).format;
 };
 
 pub const PhysicalRange = struct {
@@ -274,7 +274,7 @@ pub const PhysicalRange = struct {
     size: core.Size,
 
     /// Returns a virtual range corresponding to this physical range in the direct map.
-    pub fn toDirectMap(range: PhysicalRange) VirtualAddress.KernelVirtualRange {
+    pub fn toDirectMap(range: PhysicalRange) VirtualRange {
         return .{
             .address = range.address.toDirectMap(),
             .size = range.size,
@@ -288,7 +288,7 @@ pub const PhysicalRange = struct {
     pub const fullyContains: fn (@This(), @This()) bool = RangeImpl(@This(), PhysicalAddress).fullyContains;
     pub const containsAddress: fn (@This(), PhysicalAddress) bool = RangeImpl(@This(), PhysicalAddress).containsAddress;
     pub const containsAddressOrder: fn (@This(), PhysicalAddress) std.math.Order = RangeImpl(@This(), PhysicalAddress).containsAddressOrder;
-    pub const format = rangeFormat(@This(), "PhysicalRange");
+    pub const format = RangeImpl(@This(), PhysicalAddress).format;
 };
 
 fn AddressImpl(comptime Address: type) type {
@@ -363,12 +363,16 @@ fn AddressImpl(comptime Address: type) type {
             if (core.is_debug) std.debug.assert(greaterThanOrEqual(other, address));
             return .from(other.value - address.value, .byte);
         }
-    };
-}
 
-fn addressFormat(comptime Address: type, comptime name: []const u8) fn (Address, *std.Io.Writer) std.Io.Writer.Error!void {
-    return struct {
-        pub fn format(address: Address, writer: *std.Io.Writer) !void {
+        fn format(address: Address, writer: *std.Io.Writer) !void {
+            const name = comptime switch (Address) {
+                VirtualAddress => "VirtualAddress",
+                KernelVirtualAddress => "KernelVirtualAddress",
+                UserVirtualAddress => "UserVirtualAddress",
+                PhysicalAddress => "PhysicalAddress",
+                else => unreachable,
+            };
+
             try writer.writeAll(comptime name ++ "{ 0x");
             try writer.printInt(
                 address.value,
@@ -381,7 +385,7 @@ fn addressFormat(comptime Address: type, comptime name: []const u8) fn (Address,
             );
             try writer.writeAll(" }");
         }
-    }.format;
+    };
 }
 
 fn RangeImpl(comptime Range: type, comptime Address: type) type {
@@ -425,12 +429,16 @@ fn RangeImpl(comptime Range: type, comptime Address: type) type {
             if (last(range).lessThan(address)) return .gt;
             return .eq;
         }
-    };
-}
 
-fn rangeFormat(comptime Range: type, comptime name: []const u8) fn (Range, *std.Io.Writer) std.Io.Writer.Error!void {
-    return struct {
         fn format(range: Range, writer: *std.Io.Writer) !void {
+            const name = comptime switch (Range) {
+                VirtualRange => "VirtualRange",
+                KernelVirtualRange => "KernelVirtualRange",
+                UserVirtualRange => "UserVirtualRange",
+                PhysicalRange => "PhysicalRange",
+                else => unreachable,
+            };
+
             try writer.writeAll(comptime name ++ "{ 0x");
             try writer.printInt(
                 range.address.value,
@@ -455,5 +463,5 @@ fn rangeFormat(comptime Range: type, comptime name: []const u8) fn (Range, *std.
             try range.size.format(writer);
             try writer.writeAll(" }");
         }
-    }.format;
+    };
 }
