@@ -46,23 +46,25 @@ pub const VirtualAddress = extern union {
         return address.user;
     }
 
-    pub const from: fn (address: usize) callconv(.@"inline") @This() = AddressImpl(@This()).from;
-    pub const aligned: fn (@This(), std.mem.Alignment) callconv(.@"inline") bool = AddressImpl(@This()).aligned;
-    pub const alignForward: fn (@This(), std.mem.Alignment) callconv(.@"inline") @This() = AddressImpl(@This()).alignForward;
-    pub const alignForwardInPlace: fn (*@This(), std.mem.Alignment) callconv(.@"inline") void = AddressImpl(@This()).alignForwardInPlace;
-    pub const alignBackward: fn (@This(), std.mem.Alignment) callconv(.@"inline") @This() = AddressImpl(@This()).alignBackward;
-    pub const alignBackwardInPlace: fn (*@This(), std.mem.Alignment) callconv(.@"inline") void = AddressImpl(@This()).alignBackwardInPlace;
-    pub const moveForward: fn (@This(), core.Size) callconv(.@"inline") @This() = AddressImpl(@This()).moveForward;
-    pub const moveForwardInPlace: fn (*@This(), core.Size) callconv(.@"inline") void = AddressImpl(@This()).moveForwardInPlace;
-    pub const moveBackward: fn (@This(), core.Size) callconv(.@"inline") @This() = AddressImpl(@This()).moveBackward;
-    pub const moveBackwardInPlace: fn (*@This(), core.Size) callconv(.@"inline") void = AddressImpl(@This()).moveBackwardInPlace;
-    pub const equal: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).equal;
-    pub const lessThan: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).lessThan;
-    pub const lessThanOrEqual: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).lessThanOrEqual;
-    pub const greaterThan: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).greaterThan;
-    pub const greaterThanOrEqual: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).greaterThanOrEqual;
-    pub const difference: fn (@This(), @This()) callconv(.@"inline") core.Size = AddressImpl(@This()).difference;
-    pub const format = AddressImpl(@This()).format;
+    pub const from: fn (value: usize) callconv(.@"inline") @This() = Mixin.from;
+    pub const aligned: fn (address: @This(), alignment: std.mem.Alignment) callconv(.@"inline") bool = Mixin.aligned;
+    pub const alignForward: fn (address: @This(), alignment: std.mem.Alignment) callconv(.@"inline") @This() = Mixin.alignForward;
+    pub const alignForwardInPlace: fn (address: *@This(), alignment: std.mem.Alignment) callconv(.@"inline") void = Mixin.alignForwardInPlace;
+    pub const alignBackward: fn (address: @This(), alignment: std.mem.Alignment) callconv(.@"inline") @This() = Mixin.alignBackward;
+    pub const alignBackwardInPlace: fn (address: *@This(), alignment: std.mem.Alignment) callconv(.@"inline") void = Mixin.alignBackwardInPlace;
+    pub const moveForward: fn (address: @This(), size: core.Size) callconv(.@"inline") @This() = Mixin.moveForward;
+    pub const moveForwardInPlace: fn (address: *@This(), size: core.Size) callconv(.@"inline") void = Mixin.moveForwardInPlace;
+    pub const moveBackward: fn (address: @This(), size: core.Size) callconv(.@"inline") @This() = Mixin.moveBackward;
+    pub const moveBackwardInPlace: fn (address: *@This(), size: core.Size) callconv(.@"inline") void = Mixin.moveBackwardInPlace;
+    pub const equal: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.equal;
+    pub const lessThan: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.lessThan;
+    pub const lessThanOrEqual: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.lessThanOrEqual;
+    pub const greaterThan: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.greaterThan;
+    pub const greaterThanOrEqual: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.greaterThanOrEqual;
+    pub const difference: fn (address: @This(), other: @This()) callconv(.@"inline") core.Size = Mixin.difference;
+    pub const format: fn (address: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void = Mixin.format;
+
+    const Mixin = AddressMixin(@This());
 };
 
 pub const KernelVirtualAddress = extern struct {
@@ -83,23 +85,25 @@ pub const KernelVirtualAddress = extern struct {
         return address.moveBackward(cascade.mem.globals.kernel_virtual_offset).toVirtual();
     }
 
-    pub const from: fn (address: usize) callconv(.@"inline") @This() = AddressImpl(@This()).from;
-    pub const aligned: fn (@This(), std.mem.Alignment) callconv(.@"inline") bool = AddressImpl(@This()).aligned;
-    pub const alignForward: fn (@This(), std.mem.Alignment) callconv(.@"inline") @This() = AddressImpl(@This()).alignForward;
-    pub const alignForwardInPlace: fn (*@This(), std.mem.Alignment) callconv(.@"inline") void = AddressImpl(@This()).alignForwardInPlace;
-    pub const alignBackward: fn (@This(), std.mem.Alignment) callconv(.@"inline") @This() = AddressImpl(@This()).alignBackward;
-    pub const alignBackwardInPlace: fn (*@This(), std.mem.Alignment) callconv(.@"inline") void = AddressImpl(@This()).alignBackwardInPlace;
-    pub const moveForward: fn (@This(), core.Size) callconv(.@"inline") @This() = AddressImpl(@This()).moveForward;
-    pub const moveForwardInPlace: fn (*@This(), core.Size) callconv(.@"inline") void = AddressImpl(@This()).moveForwardInPlace;
-    pub const moveBackward: fn (@This(), core.Size) callconv(.@"inline") @This() = AddressImpl(@This()).moveBackward;
-    pub const moveBackwardInPlace: fn (*@This(), core.Size) callconv(.@"inline") void = AddressImpl(@This()).moveBackwardInPlace;
-    pub const equal: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).equal;
-    pub const lessThan: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).lessThan;
-    pub const lessThanOrEqual: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).lessThanOrEqual;
-    pub const greaterThan: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).greaterThan;
-    pub const greaterThanOrEqual: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).greaterThanOrEqual;
-    pub const difference: fn (@This(), @This()) callconv(.@"inline") core.Size = AddressImpl(@This()).difference;
-    pub const format = AddressImpl(@This()).format;
+    pub const from: fn (value: usize) callconv(.@"inline") @This() = Mixin.from;
+    pub const aligned: fn (address: @This(), alignment: std.mem.Alignment) callconv(.@"inline") bool = Mixin.aligned;
+    pub const alignForward: fn (address: @This(), alignment: std.mem.Alignment) callconv(.@"inline") @This() = Mixin.alignForward;
+    pub const alignForwardInPlace: fn (address: *@This(), alignment: std.mem.Alignment) callconv(.@"inline") void = Mixin.alignForwardInPlace;
+    pub const alignBackward: fn (address: @This(), alignment: std.mem.Alignment) callconv(.@"inline") @This() = Mixin.alignBackward;
+    pub const alignBackwardInPlace: fn (address: *@This(), alignment: std.mem.Alignment) callconv(.@"inline") void = Mixin.alignBackwardInPlace;
+    pub const moveForward: fn (address: @This(), size: core.Size) callconv(.@"inline") @This() = Mixin.moveForward;
+    pub const moveForwardInPlace: fn (address: *@This(), size: core.Size) callconv(.@"inline") void = Mixin.moveForwardInPlace;
+    pub const moveBackward: fn (address: @This(), size: core.Size) callconv(.@"inline") @This() = Mixin.moveBackward;
+    pub const moveBackwardInPlace: fn (address: *@This(), size: core.Size) callconv(.@"inline") void = Mixin.moveBackwardInPlace;
+    pub const equal: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.equal;
+    pub const lessThan: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.lessThan;
+    pub const lessThanOrEqual: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.lessThanOrEqual;
+    pub const greaterThan: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.greaterThan;
+    pub const greaterThanOrEqual: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.greaterThanOrEqual;
+    pub const difference: fn (address: @This(), other: @This()) callconv(.@"inline") core.Size = Mixin.difference;
+    pub const format: fn (address: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void = Mixin.format;
+
+    const Mixin = AddressMixin(@This());
 
     comptime {
         core.testing.expectSize(KernelVirtualAddress, .of(usize));
@@ -119,23 +123,25 @@ pub const UserVirtualAddress = extern struct {
         return .{ .user = address };
     }
 
-    pub const from: fn (address: usize) callconv(.@"inline") @This() = AddressImpl(@This()).from;
-    pub const aligned: fn (@This(), std.mem.Alignment) callconv(.@"inline") bool = AddressImpl(@This()).aligned;
-    pub const alignForward: fn (@This(), std.mem.Alignment) callconv(.@"inline") @This() = AddressImpl(@This()).alignForward;
-    pub const alignForwardInPlace: fn (*@This(), std.mem.Alignment) callconv(.@"inline") void = AddressImpl(@This()).alignForwardInPlace;
-    pub const alignBackward: fn (@This(), std.mem.Alignment) callconv(.@"inline") @This() = AddressImpl(@This()).alignBackward;
-    pub const alignBackwardInPlace: fn (*@This(), std.mem.Alignment) callconv(.@"inline") void = AddressImpl(@This()).alignBackwardInPlace;
-    pub const moveForward: fn (@This(), core.Size) callconv(.@"inline") @This() = AddressImpl(@This()).moveForward;
-    pub const moveForwardInPlace: fn (*@This(), core.Size) callconv(.@"inline") void = AddressImpl(@This()).moveForwardInPlace;
-    pub const moveBackward: fn (@This(), core.Size) callconv(.@"inline") @This() = AddressImpl(@This()).moveBackward;
-    pub const moveBackwardInPlace: fn (*@This(), core.Size) callconv(.@"inline") void = AddressImpl(@This()).moveBackwardInPlace;
-    pub const equal: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).equal;
-    pub const lessThan: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).lessThan;
-    pub const lessThanOrEqual: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).lessThanOrEqual;
-    pub const greaterThan: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).greaterThan;
-    pub const greaterThanOrEqual: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).greaterThanOrEqual;
-    pub const difference: fn (@This(), @This()) callconv(.@"inline") core.Size = AddressImpl(@This()).difference;
-    pub const format = AddressImpl(@This()).format;
+    pub const from: fn (value: usize) callconv(.@"inline") @This() = Mixin.from;
+    pub const aligned: fn (address: @This(), alignment: std.mem.Alignment) callconv(.@"inline") bool = Mixin.aligned;
+    pub const alignForward: fn (address: @This(), alignment: std.mem.Alignment) callconv(.@"inline") @This() = Mixin.alignForward;
+    pub const alignForwardInPlace: fn (address: *@This(), alignment: std.mem.Alignment) callconv(.@"inline") void = Mixin.alignForwardInPlace;
+    pub const alignBackward: fn (address: @This(), alignment: std.mem.Alignment) callconv(.@"inline") @This() = Mixin.alignBackward;
+    pub const alignBackwardInPlace: fn (address: *@This(), alignment: std.mem.Alignment) callconv(.@"inline") void = Mixin.alignBackwardInPlace;
+    pub const moveForward: fn (address: @This(), size: core.Size) callconv(.@"inline") @This() = Mixin.moveForward;
+    pub const moveForwardInPlace: fn (address: *@This(), size: core.Size) callconv(.@"inline") void = Mixin.moveForwardInPlace;
+    pub const moveBackward: fn (address: @This(), size: core.Size) callconv(.@"inline") @This() = Mixin.moveBackward;
+    pub const moveBackwardInPlace: fn (address: *@This(), size: core.Size) callconv(.@"inline") void = Mixin.moveBackwardInPlace;
+    pub const equal: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.equal;
+    pub const lessThan: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.lessThan;
+    pub const lessThanOrEqual: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.lessThanOrEqual;
+    pub const greaterThan: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.greaterThan;
+    pub const greaterThanOrEqual: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.greaterThanOrEqual;
+    pub const difference: fn (address: @This(), other: @This()) callconv(.@"inline") core.Size = Mixin.difference;
+    pub const format: fn (address: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void = Mixin.format;
+
+    const Mixin = AddressMixin(@This());
 
     comptime {
         core.testing.expectSize(UserVirtualAddress, .of(usize));
@@ -161,23 +167,25 @@ pub const PhysicalAddress = extern struct {
         return .{ .value = physical_address.value + cascade.mem.globals.direct_map.address.value };
     }
 
-    pub const from: fn (usize) callconv(.@"inline") @This() = AddressImpl(@This()).from;
-    pub const aligned: fn (@This(), std.mem.Alignment) callconv(.@"inline") bool = AddressImpl(@This()).aligned;
-    pub const alignForward: fn (@This(), std.mem.Alignment) callconv(.@"inline") @This() = AddressImpl(@This()).alignForward;
-    pub const alignForwardInPlace: fn (*@This(), std.mem.Alignment) callconv(.@"inline") void = AddressImpl(@This()).alignForwardInPlace;
-    pub const alignBackward: fn (@This(), std.mem.Alignment) callconv(.@"inline") @This() = AddressImpl(@This()).alignBackward;
-    pub const alignBackwardInPlace: fn (*@This(), std.mem.Alignment) callconv(.@"inline") void = AddressImpl(@This()).alignBackwardInPlace;
-    pub const moveForward: fn (@This(), core.Size) callconv(.@"inline") @This() = AddressImpl(@This()).moveForward;
-    pub const moveForwardInPlace: fn (*@This(), core.Size) callconv(.@"inline") void = AddressImpl(@This()).moveForwardInPlace;
-    pub const moveBackward: fn (@This(), core.Size) callconv(.@"inline") @This() = AddressImpl(@This()).moveBackward;
-    pub const moveBackwardInPlace: fn (*@This(), core.Size) callconv(.@"inline") void = AddressImpl(@This()).moveBackwardInPlace;
-    pub const equal: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).equal;
-    pub const lessThan: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).lessThan;
-    pub const lessThanOrEqual: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).lessThanOrEqual;
-    pub const greaterThan: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).greaterThan;
-    pub const greaterThanOrEqual: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).greaterThanOrEqual;
-    pub const difference: fn (@This(), @This()) callconv(.@"inline") core.Size = AddressImpl(@This()).difference;
-    pub const format = AddressImpl(@This()).format;
+    pub const from: fn (value: usize) callconv(.@"inline") @This() = Mixin.from;
+    pub const aligned: fn (address: @This(), alignment: std.mem.Alignment) callconv(.@"inline") bool = Mixin.aligned;
+    pub const alignForward: fn (address: @This(), alignment: std.mem.Alignment) callconv(.@"inline") @This() = Mixin.alignForward;
+    pub const alignForwardInPlace: fn (address: *@This(), alignment: std.mem.Alignment) callconv(.@"inline") void = Mixin.alignForwardInPlace;
+    pub const alignBackward: fn (address: @This(), alignment: std.mem.Alignment) callconv(.@"inline") @This() = Mixin.alignBackward;
+    pub const alignBackwardInPlace: fn (address: *@This(), alignment: std.mem.Alignment) callconv(.@"inline") void = Mixin.alignBackwardInPlace;
+    pub const moveForward: fn (address: @This(), size: core.Size) callconv(.@"inline") @This() = Mixin.moveForward;
+    pub const moveForwardInPlace: fn (address: *@This(), size: core.Size) callconv(.@"inline") void = Mixin.moveForwardInPlace;
+    pub const moveBackward: fn (address: @This(), size: core.Size) callconv(.@"inline") @This() = Mixin.moveBackward;
+    pub const moveBackwardInPlace: fn (address: *@This(), size: core.Size) callconv(.@"inline") void = Mixin.moveBackwardInPlace;
+    pub const equal: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.equal;
+    pub const lessThan: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.lessThan;
+    pub const lessThanOrEqual: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.lessThanOrEqual;
+    pub const greaterThan: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.greaterThan;
+    pub const greaterThanOrEqual: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.greaterThanOrEqual;
+    pub const difference: fn (address: @This(), other: @This()) callconv(.@"inline") core.Size = Mixin.difference;
+    pub const format: fn (address: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void = Mixin.format;
+
+    const Mixin = AddressMixin(@This());
 
     comptime {
         core.testing.expectSize(PhysicalAddress, .of(usize));
@@ -185,7 +193,7 @@ pub const PhysicalAddress = extern struct {
 };
 
 pub const VirtualRange = struct {
-    address: VirtualAddress,
+    address: Address,
     size: core.Size,
 
     pub fn getType(range: VirtualRange) VirtualAddress.Type {
@@ -207,18 +215,21 @@ pub const VirtualRange = struct {
         return .from(range.address.toUser(), range.size);
     }
 
-    pub const from: fn (VirtualAddress, core.Size) callconv(.@"inline") @This() = RangeImpl(@This(), VirtualAddress).from;
-    pub const last: fn (@This()) VirtualAddress = RangeImpl(@This(), VirtualAddress).last;
-    pub const after: fn (@This()) callconv(.@"inline") VirtualAddress = RangeImpl(@This(), VirtualAddress).after;
-    pub const anyOverlap: fn (@This(), @This()) bool = RangeImpl(@This(), VirtualAddress).anyOverlap;
-    pub const fullyContains: fn (@This(), @This()) bool = RangeImpl(@This(), VirtualAddress).fullyContains;
-    pub const containsAddress: fn (@This(), VirtualAddress) bool = RangeImpl(@This(), VirtualAddress).containsAddress;
-    pub const containsAddressOrder: fn (@This(), VirtualAddress) std.math.Order = RangeImpl(@This(), VirtualAddress).containsAddressOrder;
-    pub const format = RangeImpl(@This(), VirtualAddress).format;
+    pub const from: fn (address: Address, size: core.Size) callconv(.@"inline") @This() = Mixin.from;
+    pub const last: fn (range: @This()) Address = Mixin.last;
+    pub const after: fn (range: @This()) callconv(.@"inline") Address = Mixin.after;
+    pub const anyOverlap: fn (range: @This(), other: @This()) bool = Mixin.anyOverlap;
+    pub const fullyContains: fn (range: @This(), other: @This()) bool = Mixin.fullyContains;
+    pub const containsAddress: fn (range: @This(), address: Address) bool = Mixin.containsAddress;
+    pub const containsAddressOrder: fn (range: @This(), address: Address) std.math.Order = Mixin.containsAddressOrder;
+    pub const format: fn (range: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void = Mixin.format;
+
+    const Address = VirtualAddress;
+    const Mixin = RangeMixin(@This());
 };
 
 pub const KernelVirtualRange = struct {
-    address: KernelVirtualAddress,
+    address: Address,
     size: core.Size,
 
     pub inline fn fromSlice(comptime T: type, slice: []const T) KernelVirtualRange {
@@ -236,18 +247,21 @@ pub const KernelVirtualRange = struct {
         return range.address.ptr([*]u8)[0..range.size.value];
     }
 
-    pub const from: fn (KernelVirtualAddress, core.Size) callconv(.@"inline") @This() = RangeImpl(@This(), KernelVirtualAddress).from;
-    pub const last: fn (@This()) KernelVirtualAddress = RangeImpl(@This(), KernelVirtualAddress).last;
-    pub const after: fn (@This()) callconv(.@"inline") KernelVirtualAddress = RangeImpl(@This(), KernelVirtualAddress).after;
-    pub const anyOverlap: fn (@This(), @This()) bool = RangeImpl(@This(), KernelVirtualAddress).anyOverlap;
-    pub const fullyContains: fn (@This(), @This()) bool = RangeImpl(@This(), KernelVirtualAddress).fullyContains;
-    pub const containsAddress: fn (@This(), KernelVirtualAddress) bool = RangeImpl(@This(), KernelVirtualAddress).containsAddress;
-    pub const containsAddressOrder: fn (@This(), KernelVirtualAddress) std.math.Order = RangeImpl(@This(), KernelVirtualAddress).containsAddressOrder;
-    pub const format = RangeImpl(@This(), KernelVirtualAddress).format;
+    pub const from: fn (address: Address, size: core.Size) callconv(.@"inline") @This() = Mixin.from;
+    pub const last: fn (range: @This()) Address = Mixin.last;
+    pub const after: fn (range: @This()) callconv(.@"inline") Address = Mixin.after;
+    pub const anyOverlap: fn (range: @This(), other: @This()) bool = Mixin.anyOverlap;
+    pub const fullyContains: fn (range: @This(), other: @This()) bool = Mixin.fullyContains;
+    pub const containsAddress: fn (range: @This(), address: Address) bool = Mixin.containsAddress;
+    pub const containsAddressOrder: fn (range: @This(), address: Address) std.math.Order = Mixin.containsAddressOrder;
+    pub const format: fn (range: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void = Mixin.format;
+
+    const Address = KernelVirtualAddress;
+    const Mixin = RangeMixin(@This());
 };
 
 pub const UserVirtualRange = struct {
-    address: UserVirtualAddress,
+    address: Address,
     size: core.Size,
 
     pub inline fn toVirtualRange(range: UserVirtualRange) VirtualRange {
@@ -259,18 +273,21 @@ pub const UserVirtualRange = struct {
         return range.address.ptr([*]u8)[0..range.size.value];
     }
 
-    pub const from: fn (UserVirtualAddress, core.Size) callconv(.@"inline") @This() = RangeImpl(@This(), UserVirtualAddress).from;
-    pub const last: fn (@This()) UserVirtualAddress = RangeImpl(@This(), UserVirtualAddress).last;
-    pub const after: fn (@This()) callconv(.@"inline") UserVirtualAddress = RangeImpl(@This(), UserVirtualAddress).after;
-    pub const anyOverlap: fn (@This(), @This()) bool = RangeImpl(@This(), UserVirtualAddress).anyOverlap;
-    pub const fullyContains: fn (@This(), @This()) bool = RangeImpl(@This(), UserVirtualAddress).fullyContains;
-    pub const containsAddress: fn (@This(), UserVirtualAddress) bool = RangeImpl(@This(), UserVirtualAddress).containsAddress;
-    pub const containsAddressOrder: fn (@This(), UserVirtualAddress) std.math.Order = RangeImpl(@This(), UserVirtualAddress).containsAddressOrder;
-    pub const format = RangeImpl(@This(), UserVirtualAddress).format;
+    pub const from: fn (address: Address, size: core.Size) callconv(.@"inline") @This() = Mixin.from;
+    pub const last: fn (range: @This()) Address = Mixin.last;
+    pub const after: fn (range: @This()) callconv(.@"inline") Address = Mixin.after;
+    pub const anyOverlap: fn (range: @This(), other: @This()) bool = Mixin.anyOverlap;
+    pub const fullyContains: fn (range: @This(), other: @This()) bool = Mixin.fullyContains;
+    pub const containsAddress: fn (range: @This(), address: Address) bool = Mixin.containsAddress;
+    pub const containsAddressOrder: fn (range: @This(), address: Address) std.math.Order = Mixin.containsAddressOrder;
+    pub const format: fn (range: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void = Mixin.format;
+
+    const Address = UserVirtualAddress;
+    const Mixin = RangeMixin(@This());
 };
 
 pub const PhysicalRange = struct {
-    address: PhysicalAddress,
+    address: Address,
     size: core.Size,
 
     /// Returns a virtual range corresponding to this physical range in the direct map.
@@ -281,17 +298,20 @@ pub const PhysicalRange = struct {
         };
     }
 
-    pub const from: fn (PhysicalAddress, core.Size) callconv(.@"inline") @This() = RangeImpl(@This(), PhysicalAddress).from;
-    pub const last: fn (@This()) PhysicalAddress = RangeImpl(@This(), PhysicalAddress).last;
-    pub const after: fn (@This()) callconv(.@"inline") PhysicalAddress = RangeImpl(@This(), PhysicalAddress).after;
-    pub const anyOverlap: fn (@This(), @This()) bool = RangeImpl(@This(), PhysicalAddress).anyOverlap;
-    pub const fullyContains: fn (@This(), @This()) bool = RangeImpl(@This(), PhysicalAddress).fullyContains;
-    pub const containsAddress: fn (@This(), PhysicalAddress) bool = RangeImpl(@This(), PhysicalAddress).containsAddress;
-    pub const containsAddressOrder: fn (@This(), PhysicalAddress) std.math.Order = RangeImpl(@This(), PhysicalAddress).containsAddressOrder;
-    pub const format = RangeImpl(@This(), PhysicalAddress).format;
+    pub const from: fn (address: Address, size: core.Size) callconv(.@"inline") @This() = Mixin.from;
+    pub const last: fn (range: @This()) Address = Mixin.last;
+    pub const after: fn (range: @This()) callconv(.@"inline") Address = Mixin.after;
+    pub const anyOverlap: fn (range: @This(), other: @This()) bool = Mixin.anyOverlap;
+    pub const fullyContains: fn (range: @This(), other: @This()) bool = Mixin.fullyContains;
+    pub const containsAddress: fn (range: @This(), address: Address) bool = Mixin.containsAddress;
+    pub const containsAddressOrder: fn (range: @This(), address: Address) std.math.Order = Mixin.containsAddressOrder;
+    pub const format: fn (range: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void = Mixin.format;
+
+    const Address = PhysicalAddress;
+    const Mixin = RangeMixin(@This());
 };
 
-fn AddressImpl(comptime Address: type) type {
+fn AddressMixin(comptime Address: type) type {
     return struct {
         inline fn from(value: usize) Address {
             return .{ .value = value };
@@ -388,7 +408,7 @@ fn AddressImpl(comptime Address: type) type {
     };
 }
 
-fn RangeImpl(comptime Range: type, comptime Address: type) type {
+fn RangeMixin(comptime Range: type) type {
     return struct {
         inline fn from(address: Address, size: core.Size) Range {
             return .{ .address = address, .size = size };
@@ -463,5 +483,13 @@ fn RangeImpl(comptime Range: type, comptime Address: type) type {
             try range.size.format(writer);
             try writer.writeAll(" }");
         }
+
+        const Address = switch (Range) {
+            VirtualRange => VirtualAddress,
+            KernelVirtualRange => KernelVirtualAddress,
+            UserVirtualRange => UserVirtualAddress,
+            PhysicalRange => PhysicalAddress,
+            else => unreachable,
+        };
     };
 }
