@@ -5,16 +5,16 @@ const std = @import("std");
 
 const arch = @import("arch");
 const core = @import("core");
-const kernel = @import("kernel");
-const Task = kernel.Task;
-const Process = kernel.user.Process;
-const Thread = kernel.user.Thread;
-const addr = kernel.addr;
+const cascade = @import("cascade");
+const Task = cascade.Task;
+const Process = cascade.user.Process;
+const Thread = cascade.user.Thread;
+const addr = cascade.addr;
 const user_cascade = @import("user_cascade");
 
 const x64 = @import("x64.zig");
 
-const log = kernel.debug.log.scoped(.user_x64);
+const log = cascade.debug.log.scoped(.user_x64);
 
 pub const PerThread = struct {
     extended_state: ExtendedState,
@@ -24,7 +24,7 @@ pub const PerThread = struct {
     /// Non-architecture specific creation has already been performed but no initialization.
     ///
     /// This function is called in the `Thread` cache constructor.
-    pub fn createThread(thread: *Thread) kernel.mem.cache.ConstructorError!void {
+    pub fn createThread(thread: *Thread) cascade.mem.cache.ConstructorError!void {
         const per_thread: *x64.user.PerThread = .from(thread);
 
         per_thread.* = .{
@@ -347,7 +347,7 @@ export fn syscallDispatch(syscall_frame: *SyscallFrame) callconv(.c) void {
         per_thread.extended_state.load();
     }
 
-    kernel.user.onSyscall(.{ .arch_specific = syscall_frame });
+    cascade.user.onSyscall(.{ .arch_specific = syscall_frame });
 
     x64.instructions.disableInterrupts();
 }
@@ -443,18 +443,18 @@ pub fn syscallEntry() callconv(.naked) noreturn {
             \\swapgs
             \\sysretq
         , .{
-            .user_rsp_scratch_offset = @offsetOf(kernel.Task, "arch_specific") + @offsetOf(x64.PerTask, "user_rsp_scratch"),
+            .user_rsp_scratch_offset = @offsetOf(cascade.Task, "arch_specific") + @offsetOf(x64.PerTask, "user_rsp_scratch"),
             .kernel_stack_pointer_offset = @offsetOf(Task, "stack") + @offsetOf(Task.Stack, "top_stack_pointer"),
         }));
 }
 
 const globals = struct {
     /// Initialized during `init.initialize`.
-    var xsave_area_cache: kernel.mem.cache.RawCache = undefined;
+    var xsave_area_cache: cascade.mem.cache.RawCache = undefined;
 };
 
 pub const init = struct {
-    const init_log = kernel.debug.log.scoped(.user_init);
+    const init_log = cascade.debug.log.scoped(.user_init);
 
     /// Perform any per-achitecture initialization needed for userspace processes/threads.
     pub fn initialize() !void {

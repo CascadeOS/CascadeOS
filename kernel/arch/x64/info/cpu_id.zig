@@ -14,8 +14,8 @@ const std = @import("std");
 
 const arch = @import("arch");
 const bitjuggle = @import("bitjuggle");
-const kernel = @import("kernel");
-const Task = kernel.Task;
+const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 
 const x64 = @import("../x64.zig");
@@ -2055,7 +2055,7 @@ pub const Hypervisor = enum {
 ///
 /// CPUID.40000010H
 ///
-/// https://lore.kernel.org/lkml/1222881242.9381.17.camel@alok-dev1/
+/// https://lore.cascade.org/lkml/1222881242.9381.17.camel@alok-dev1/
 pub var hypervisor_timing_information: ?HypervisorTimingInformation = null;
 
 pub const HypervisorTimingInformation = struct {

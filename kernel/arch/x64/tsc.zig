@@ -4,9 +4,9 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const kernel = @import("kernel");
-const Task = kernel.Task;
-const Tick = kernel.time.wallclock.Tick;
+const cascade = @import("cascade");
+const Task = cascade.Task;
+const Tick = cascade.time.wallclock.Tick;
 const core = @import("core");
 
 const x64 = @import("x64.zig");
@@ -20,16 +20,16 @@ const globals = struct {
 };
 
 pub const init = struct {
-    const init_log = kernel.debug.log.scoped(.tsc_init);
+    const init_log = cascade.debug.log.scoped(.tsc_init);
 
     // Read current wallclock time from the standard wallclock source of the current architecture.
     ///
     /// For example on x86_64 this is the TSC.
-    pub fn getStandardWallclockStartTime() kernel.time.wallclock.Tick {
+    pub fn getStandardWallclockStartTime() cascade.time.wallclock.Tick {
         return @enumFromInt(readTsc());
     }
 
-    pub fn registerTimeSource(candidate_time_sources: *kernel.time.init.CandidateTimeSources) void {
+    pub fn registerTimeSource(candidate_time_sources: *cascade.time.init.CandidateTimeSources) void {
         if (!shouldUseTsc()) return;
 
         candidate_time_sources.addTimeSource(.{
@@ -66,7 +66,7 @@ pub const init = struct {
                             const current_value = readTsc();
 
                             const target_value = current_value +
-                                ((duration.value * kernel.time.fs_per_ns) / globals.tick_duration_fs);
+                                ((duration.value * cascade.time.fs_per_ns) / globals.tick_duration_fs);
 
                             while (readTsc() < target_value) {}
                         }
@@ -84,7 +84,7 @@ pub const init = struct {
                 .elapsedFn = struct {
                     fn elapsedFn(value1: Tick, value2: Tick) core.Duration {
                         const number_of_ticks = @intFromEnum(value2) - @intFromEnum(value1);
-                        return core.Duration.from((number_of_ticks * globals.tick_duration_fs) / kernel.time.fs_per_ns, .nanosecond);
+                        return core.Duration.from((number_of_ticks * globals.tick_duration_fs) / cascade.time.fs_per_ns, .nanosecond);
                     }
                 }.elapsedFn,
                 .standard_wallclock_source = true,
@@ -92,7 +92,7 @@ pub const init = struct {
         });
     }
 
-    fn initializeTscCalibrate(reference_counter: kernel.time.init.ReferenceCounter) void {
+    fn initializeTscCalibrate(reference_counter: cascade.time.init.ReferenceCounter) void {
         std.debug.assert(shouldUseTsc());
 
         const sample_duration = core.Duration.from(5, .millisecond);
@@ -111,7 +111,7 @@ pub const init = struct {
 
         const average_ticks = total_ticks / number_of_samples;
 
-        globals.tick_duration_fs = (sample_duration.value * kernel.time.fs_per_ns) / average_ticks;
+        globals.tick_duration_fs = (sample_duration.value * cascade.time.fs_per_ns) / average_ticks;
         init_log.debug("tick duration (fs) using reference counter: {}", .{globals.tick_duration_fs});
     }
 

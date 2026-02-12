@@ -5,9 +5,9 @@ const std = @import("std");
 
 const arch = @import("arch");
 const core = @import("core");
-const kernel = @import("kernel");
-const Task = kernel.Task;
-const addr = kernel.addr;
+const cascade = @import("cascade");
+const Task = cascade.Task;
+const addr = cascade.addr;
 
 const riscv = @import("riscv.zig");
 
@@ -35,16 +35,16 @@ pub const functions: arch.Functions = .{
 
     .scheduling = .{
         .initializeTaskArchSpecific = struct {
-            fn initializeTaskArchSpecific(_: *kernel.Task) void {}
+            fn initializeTaskArchSpecific(_: *cascade.Task) void {}
         }.initializeTaskArchSpecific,
 
         .getCurrentTask = struct {
-            inline fn getCurrentTask() *kernel.Task {
+            inline fn getCurrentTask() *cascade.Task {
                 return @ptrFromInt(riscv.registers.SupervisorScratch.read());
             }
         }.getCurrentTask,
         .setCurrentTask = struct {
-            inline fn setCurrentTask(task: *kernel.Task) void {
+            inline fn setCurrentTask(task: *cascade.Task) void {
                 riscv.registers.SupervisorScratch.write(@intFromPtr(task));
             }
         }.setCurrentTask,
@@ -54,7 +54,7 @@ pub const functions: arch.Functions = .{
 
     .init = .{
         .getStandardWallclockStartTime = struct {
-            fn getStandardWallclockStartTime() kernel.time.wallclock.Tick {
+            fn getStandardWallclockStartTime() cascade.time.wallclock.Tick {
                 return @enumFromInt(riscv.instructions.readTime());
             }
         }.getStandardWallclockStartTime,
@@ -73,12 +73,12 @@ pub const functions: arch.Functions = .{
                 return null;
             }
 
-            const log = kernel.debug.log.scoped(.riscv_init);
+            const log = cascade.debug.log.scoped(.riscv_init);
         }.tryGetSerialOutput,
 
         .prepareBootstrapExecutor = struct {
             fn prepareBootstrapExecutor(
-                executor: *kernel.Executor,
+                executor: *cascade.Executor,
                 architecture_processor_id: u64,
             ) void {
                 executor.arch_specific = .{
@@ -89,7 +89,7 @@ pub const functions: arch.Functions = .{
 
         .initExecutor = struct {
             fn initExecutor(
-                executor: *kernel.Executor,
+                executor: *cascade.Executor,
             ) void {
                 _ = executor;
             }

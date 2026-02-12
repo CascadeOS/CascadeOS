@@ -10,8 +10,8 @@ const std = @import("std");
 
 const boot = @import("boot");
 const core = @import("core");
-const kernel = @import("kernel");
-const addr = kernel.addr;
+const cascade = @import("cascade");
+const addr = cascade.addr;
 const UUID = @import("uuid").UUID;
 
 /// Base protocol revisions change certain behaviours of the Limine boot protocol outside any specific feature.

@@ -5,9 +5,9 @@ const std = @import("std");
 
 const arch = @import("arch");
 const core = @import("core");
-const kernel = @import("kernel");
-const Task = kernel.Task;
-const addr = kernel.addr;
+const cascade = @import("cascade");
+const Task = cascade.Task;
+const addr = cascade.addr;
 
 const x64 = @import("x64.zig");
 
@@ -53,7 +53,7 @@ pub const functions: arch.Functions = .{
         .createPageTable = x64.paging.PageTable.create,
 
         .loadPageTable = struct {
-            fn loadPageTable(physical_page: kernel.mem.PhysicalPage.Index) void {
+            fn loadPageTable(physical_page: cascade.mem.PhysicalPage.Index) void {
                 x64.registers.Cr3.writeAddress(physical_page.baseAddress());
             }
         }.loadPageTable,

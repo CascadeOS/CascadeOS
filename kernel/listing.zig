@@ -6,7 +6,7 @@ const KernelComponent = @import("../build/KernelComponent.zig");
 pub const components: []const KernelComponent = &.{
     .{
         .name = "arch",
-        .component_dependencies = &.{"kernel"},
+        .component_dependencies = &.{"cascade"},
         .library_dependencies = &.{
             .{ .name = "cascade", .import_name = "user_cascade" },
             .{ .name = "core" },
@@ -16,21 +16,21 @@ pub const components: []const KernelComponent = &.{
     },
     .{
         .name = "boot",
-        .component_dependencies = &.{ "arch", "kernel" },
+        .component_dependencies = &.{ "arch", "cascade" },
         .library_dependencies = &.{
             .{ .name = "core" },
             .{ .name = "uuid" },
         },
     },
     .{
-        .name = "kernel",
+        .name = "cascade",
         .component_dependencies = &.{ "arch", "boot" },
         .library_dependencies = &.{
             .{ .name = "cascade", .import_name = "user_cascade" },
             .{ .name = "core" },
             .{ .name = "sdf" },
         },
-        .configuration = @import("kernel/custom_configuration.zig").customConfiguration,
+        .configuration = @import("cascade/custom_configuration.zig").customConfiguration,
         .provide_source_file_modules = true,
     },
 };

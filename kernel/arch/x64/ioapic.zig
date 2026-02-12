@@ -5,9 +5,9 @@ const std = @import("std");
 
 const arch = @import("arch");
 const core = @import("core");
-const kernel = @import("kernel");
-const Task = kernel.Task;
-const addr = kernel.addr;
+const cascade = @import("cascade");
+const Task = cascade.Task;
+const addr = cascade.addr;
 
 const x64 = @import("x64.zig");
 
@@ -54,7 +54,7 @@ const SourceOverride = struct {
     polarity: IOAPIC.Polarity,
     trigger_mode: IOAPIC.TriggerMode,
 
-    fn fromMADT(source_override: kernel.acpi.tables.MADT.InterruptControllerEntry.InterruptSourceOverride) SourceOverride {
+    fn fromMADT(source_override: cascade.acpi.tables.MADT.InterruptControllerEntry.InterruptSourceOverride) SourceOverride {
         const polarity: IOAPIC.Polarity = switch (source_override.flags.polarity) {
             .conforms => .active_high,
             .active_high => .active_high,
@@ -100,9 +100,9 @@ const globals = struct {
 };
 
 pub const init = struct {
-    const init_log = kernel.debug.log.scoped(.ioapic_init);
+    const init_log = cascade.debug.log.scoped(.ioapic_init);
 
-    pub fn captureMADTInformation(madt: *const kernel.acpi.tables.MADT) !void {
+    pub fn captureMADTInformation(madt: *const cascade.acpi.tables.MADT) !void {
         var iter = madt.iterate();
 
         while (iter.next()) |entry| {
@@ -112,7 +112,7 @@ pub const init = struct {
 
                     const size_to_map = IOAPIC.register_region_size.alignForward(arch.paging.standard_page_size_alignment);
 
-                    const register_region_range = try kernel.mem.heap.allocateSpecial(
+                    const register_region_range = try cascade.mem.heap.allocateSpecial(
                         size_to_map,
                         .from(.from(io_apic_data.ioapic_address), size_to_map),
                         .{

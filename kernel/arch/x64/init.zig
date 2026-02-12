@@ -5,14 +5,14 @@ const std = @import("std");
 
 const arch = @import("arch");
 const SerialPort = arch.init.InitOutput.Output.uart.IoPort16550;
-const kernel = @import("kernel");
-const Task = kernel.Task;
-const AcpiTable = kernel.acpi.init.AcpiTable;
+const cascade = @import("cascade");
+const Task = cascade.Task;
+const AcpiTable = cascade.acpi.init.AcpiTable;
 const core = @import("core");
 
 const x64 = @import("x64.zig");
 
-const log = kernel.debug.log.scoped(.init_x64);
+const log = cascade.debug.log.scoped(.init_x64);
 
 /// Attempt to get some form of architecture specific init output if it is available.
 ///
@@ -61,12 +61,12 @@ pub fn tryGetSerialOutput(memory_system_available: bool) ?arch.init.InitOutput {
 
 /// Prepares the executor as the bootstrap executor.
 pub fn prepareBootstrapExecutor(
-    executor: *kernel.Executor,
+    executor: *cascade.Executor,
     architecture_processor_id: u64,
 ) void {
     const static = struct {
-        var bootstrap_double_fault_stack: [kernel.config.task.kernel_stack_size.value]u8 align(16) = undefined;
-        var bootstrap_non_maskable_interrupt_stack: [kernel.config.task.kernel_stack_size.value]u8 align(16) = undefined;
+        var bootstrap_double_fault_stack: [cascade.config.task.kernel_stack_size.value]u8 align(16) = undefined;
+        var bootstrap_non_maskable_interrupt_stack: [cascade.config.task.kernel_stack_size.value]u8 align(16) = undefined;
     };
 
     prepareExecutorShared(
@@ -86,7 +86,7 @@ pub fn prepareBootstrapExecutor(
 /// Prepares the provided `Executor` for use.
 ///
 /// **WARNING**: This function will panic if the cpu cannot be prepared.
-pub fn prepareExecutor(executor: *kernel.Executor, architecture_processor_id: u64) void {
+pub fn prepareExecutor(executor: *cascade.Executor, architecture_processor_id: u64) void {
     prepareExecutorShared(
         executor,
         @intCast(architecture_processor_id),
@@ -96,7 +96,7 @@ pub fn prepareExecutor(executor: *kernel.Executor, architecture_processor_id: u6
 }
 
 fn prepareExecutorShared(
-    executor: *kernel.Executor,
+    executor: *cascade.Executor,
     apic_id: u32,
     double_fault_stack: Task.Stack,
     non_maskable_interrupt_stack: Task.Stack,
@@ -123,7 +123,7 @@ fn prepareExecutorShared(
 ///
 /// ** REQUIREMENTS **:
 /// - Must be called by the executor represented by `executor`
-pub fn initExecutor(executor: *kernel.Executor) void {
+pub fn initExecutor(executor: *cascade.Executor) void {
     const per_executor: *x64.PerExecutor = .from(executor);
 
     per_executor.gdt.load();
@@ -154,13 +154,13 @@ pub fn captureEarlySystemInformation() void {
     }
 
     if (x64.info.cpu_id.determineCrystalFrequency()) |crystal_frequency| {
-        const lapic_base_tick_duration_fs = kernel.time.fs_per_s / crystal_frequency;
+        const lapic_base_tick_duration_fs = cascade.time.fs_per_s / crystal_frequency;
         x64.info.lapic_base_tick_duration_fs = lapic_base_tick_duration_fs;
         log.debug("lapic base tick duration: {} fs", .{lapic_base_tick_duration_fs});
     }
 
     if (x64.info.cpu_id.determineTscFrequency()) |tsc_frequency| {
-        const tsc_tick_duration_fs = kernel.time.fs_per_s / tsc_frequency;
+        const tsc_tick_duration_fs = cascade.time.fs_per_s / tsc_frequency;
         x64.info.tsc_tick_duration_fs = tsc_tick_duration_fs;
         log.debug("tsc tick duration: {} fs", .{tsc_tick_duration_fs});
     }
@@ -208,11 +208,11 @@ pub const CaptureSystemInformationOptions = struct {
 ///
 /// For example, on x64 this should capture APIC and ACPI information.
 pub fn captureSystemInformation(options: CaptureSystemInformationOptions) !void {
-    const madt_acpi_table = AcpiTable(kernel.acpi.tables.MADT).get(0) orelse return error.NoMADT;
+    const madt_acpi_table = AcpiTable(cascade.acpi.tables.MADT).get(0) orelse return error.NoMADT;
     defer madt_acpi_table.deinit();
     const madt = madt_acpi_table.table;
 
-    const fadt_acpi_table = AcpiTable(kernel.acpi.tables.FADT).get(0) orelse return error.NoFADT;
+    const fadt_acpi_table = AcpiTable(cascade.acpi.tables.FADT).get(0) orelse return error.NoFADT;
     defer fadt_acpi_table.deinit();
     const fadt = fadt_acpi_table.table;
 
@@ -418,7 +418,7 @@ pub fn configurePerExecutorSystemFeatures() void {
 /// Register any architectural time sources.
 ///
 /// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
-pub fn registerArchitecturalTimeSources(candidate_time_sources: *kernel.time.init.CandidateTimeSources) void {
+pub fn registerArchitecturalTimeSources(candidate_time_sources: *cascade.time.init.CandidateTimeSources) void {
     x64.tsc.init.registerTimeSource(candidate_time_sources);
     x64.hpet.init.registerTimeSource(candidate_time_sources);
     x64.apic.init.registerTimeSource(candidate_time_sources);

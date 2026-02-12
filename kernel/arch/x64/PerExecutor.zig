@@ -4,8 +4,8 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const kernel = @import("kernel");
-const Task = kernel.Task;
+const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 
 const x64 = @import("x64.zig");
@@ -20,6 +20,6 @@ tss: x64.Tss = .{},
 double_fault_stack: Task.Stack,
 non_maskable_interrupt_stack: Task.Stack,
 
-pub inline fn from(executor: *kernel.Executor) *PerExecutor {
+pub inline fn from(executor: *cascade.Executor) *PerExecutor {
     return &executor.arch_specific;
 }

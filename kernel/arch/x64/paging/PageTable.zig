@@ -6,10 +6,10 @@ const std = @import("std");
 const arch = @import("arch");
 const bitjuggle = @import("bitjuggle");
 const core = @import("core");
-const kernel = @import("kernel");
-const Task = kernel.Task;
-const MapType = kernel.mem.MapType;
-const addr = kernel.addr;
+const cascade = @import("cascade");
+const Task = cascade.Task;
+const MapType = cascade.mem.MapType;
+const addr = cascade.addr;
 
 const x64 = @import("../x64.zig");
 
@@ -57,7 +57,7 @@ pub const PageTable = extern struct {
     ///
     /// **REQUIREMENTS**:
     /// - The provided physical page must be accessible in the direct map.
-    pub fn create(physical_page: kernel.mem.PhysicalPage.Index) *PageTable {
+    pub fn create(physical_page: cascade.mem.PhysicalPage.Index) *PageTable {
         const page_table = physical_page.baseAddress().toDirectMap().ptr(*PageTable);
         page_table.zero();
         return page_table;
@@ -67,13 +67,13 @@ pub const PageTable = extern struct {
     pub fn map4KiB(
         level4_table: *PageTable,
         virtual_address: addr.Virtual,
-        phys_page: kernel.mem.PhysicalPage.Index,
+        phys_page: cascade.mem.PhysicalPage.Index,
         map_type: MapType,
-        physical_page_allocator: kernel.mem.PhysicalPage.Allocator,
-    ) kernel.mem.MapError!void {
+        physical_page_allocator: cascade.mem.PhysicalPage.Allocator,
+    ) cascade.mem.MapError!void {
         if (core.is_debug) std.debug.assert(virtual_address.aligned(small_page_size_alignment));
 
-        var deallocate_page_list: kernel.mem.PhysicalPage.List = .{};
+        var deallocate_page_list: cascade.mem.PhysicalPage.List = .{};
         errdefer physical_page_allocator.deallocate(deallocate_page_list);
 
         const level4_index = p4Index(virtual_address);
@@ -142,8 +142,8 @@ pub const PageTable = extern struct {
         virtual_range: addr.Virtual.Range,
         backing_page_decision: core.CleanupDecision,
         top_level_decision: core.CleanupDecision,
-        flush_batch: *kernel.mem.VirtualRangeBatch,
-        deallocate_page_list: *kernel.mem.PhysicalPage.List,
+        flush_batch: *cascade.mem.VirtualRangeBatch,
+        deallocate_page_list: *cascade.mem.PhysicalPage.List,
     ) void {
         if (core.is_debug) {
             std.debug.assert(virtual_range.address.aligned(small_page_size_alignment));
@@ -289,7 +289,7 @@ pub const PageTable = extern struct {
         virtual_range: addr.Virtual.Range,
         previous_map_type: MapType,
         new_map_type: MapType,
-        flush_batch: *kernel.mem.VirtualRangeBatch,
+        flush_batch: *cascade.mem.VirtualRangeBatch,
     ) void {
         if (core.is_debug) {
             std.debug.assert(virtual_range.address.aligned(small_page_size_alignment));
@@ -987,7 +987,7 @@ pub const PageTable = extern struct {
         pub fn fillTopLevel(
             page_table: *PageTable,
             range: addr.Virtual.Range,
-            physical_page_allocator: kernel.mem.PhysicalPage.Allocator,
+            physical_page_allocator: cascade.mem.PhysicalPage.Allocator,
         ) !void {
             const size_of_top_level_entry = arch.paging.init.sizeOfTopLevelEntry();
             if (core.is_debug) {
@@ -1020,7 +1020,7 @@ pub const PageTable = extern struct {
             virtual_range: addr.Virtual.Range,
             physical_range: addr.Physical.Range,
             map_type: MapType,
-            physical_page_allocator: kernel.mem.PhysicalPage.Allocator,
+            physical_page_allocator: cascade.mem.PhysicalPage.Allocator,
         ) !void {
             if (core.is_debug) {
                 std.debug.assert(virtual_range.address.aligned(small_page_size_alignment));
@@ -1153,7 +1153,7 @@ pub const PageTable = extern struct {
             );
         }
 
-        const init_log = kernel.debug.log.scoped(.paging_init);
+        const init_log = cascade.debug.log.scoped(.paging_init);
     };
 
     comptime {
@@ -1166,7 +1166,7 @@ pub const PageTable = extern struct {
 /// Returns the next table and whether it had to be created by this function or not.
 fn ensureNextTable(
     raw_entry: *PageTable.Entry.Raw,
-    physical_page_allocator: kernel.mem.PhysicalPage.Allocator,
+    physical_page_allocator: cascade.mem.PhysicalPage.Allocator,
 ) !struct { *PageTable, bool } {
     var created_table = false;
 

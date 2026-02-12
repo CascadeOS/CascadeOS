@@ -4,9 +4,9 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const kernel = @import("kernel");
-const Task = kernel.Task;
-const Tick = kernel.time.wallclock.Tick;
+const cascade = @import("cascade");
+const Task = cascade.Task;
+const Tick = cascade.time.wallclock.Tick;
 const core = @import("core");
 
 const x64 = @import("x64.zig");
@@ -21,10 +21,10 @@ const globals = struct {
 };
 
 pub const init = struct {
-    const HPETAcpiTable = kernel.acpi.init.AcpiTable(kernel.acpi.tables.HPET);
-    const init_log = kernel.debug.log.scoped(.hpet_init);
+    const HPETAcpiTable = cascade.acpi.init.AcpiTable(cascade.acpi.tables.HPET);
+    const init_log = cascade.debug.log.scoped(.hpet_init);
 
-    pub fn registerTimeSource(candidate_time_sources: *kernel.time.init.CandidateTimeSources) void {
+    pub fn registerTimeSource(candidate_time_sources: *cascade.time.init.CandidateTimeSources) void {
         const hpet_acpi_table = HPETAcpiTable.get(0) orelse return;
         hpet_acpi_table.deinit(); // immediately deinitialize the table as we only need to check if it exists
 
@@ -76,7 +76,7 @@ pub const init = struct {
     }
 
     fn referenceCounterWaitFor(duration: core.Duration) void {
-        const duration_ticks = ((duration.value * kernel.time.fs_per_ns) / globals.tick_duration_fs);
+        const duration_ticks = ((duration.value * cascade.time.fs_per_ns) / globals.tick_duration_fs);
 
         const current_value = globals.hpet.readCounterRegister();
 
@@ -99,7 +99,7 @@ pub const init = struct {
 
         const size_to_map = Hpet.register_region_size.alignForward(arch.paging.standard_page_size_alignment);
 
-        const register_region_range = try kernel.mem.heap.allocateSpecial(
+        const register_region_range = try cascade.mem.heap.allocateSpecial(
             size_to_map,
             .from(.from(hpet.base_address.address), size_to_map),
             .{

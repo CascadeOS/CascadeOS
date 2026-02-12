@@ -241,7 +241,7 @@ fn constructKernelRootModule(
             .context = .cascade,
         }).?;
 
-        required_components.get("kernel").?.module.addImport(
+        required_components.get("cascade").?.module.addImport(
             "hello_world",
             b.createModule(.{ .root_source_file = hello_world_exe.getEmittedBin() }),
         );
@@ -249,7 +249,7 @@ fn constructKernelRootModule(
 
     kernel_root_module.addImport("arch", required_components.get("arch").?.module);
     kernel_root_module.addImport("boot", required_components.get("boot").?.module);
-    kernel_root_module.addImport("kernel", required_components.get("kernel").?.module);
+    kernel_root_module.addImport("cascade", required_components.get("cascade").?.module);
 
     // apply architecture-specific configuration to the kernel
     switch (architecture) {
@@ -271,7 +271,7 @@ fn getAllRequiredComponents(
     b: *std.Build,
 ) !WipComponent.Collection {
     var todo_components: std.StringArrayHashMapUnmanaged(void) = .empty;
-    try todo_components.putNoClobber(b.allocator, "kernel", {});
+    try todo_components.putNoClobber(b.allocator, "cascade", {});
 
     var required_components: WipComponent.Collection = .{};
 

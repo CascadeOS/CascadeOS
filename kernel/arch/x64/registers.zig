@@ -5,9 +5,9 @@ const std = @import("std");
 
 const arch = @import("arch");
 const core = @import("core");
-const kernel = @import("kernel");
-const Task = kernel.Task;
-const addr = kernel.addr;
+const cascade = @import("cascade");
+const Task = cascade.Task;
+const addr = cascade.addr;
 
 const x64 = @import("x64.zig");
 
@@ -235,7 +235,7 @@ pub const Cr0 = packed struct(u64) {
 /// Stores the linear address that was accessed to result in the last page fault.
 pub const Cr2 = struct {
     /// Read the page fault linear address from the CR2 register.
-    pub inline fn readAddress() kernel.addr.Virtual {
+    pub inline fn readAddress() cascade.addr.Virtual {
         return .from(asm ("mov %%cr2, %[value]"
             : [value] "=r" (-> u64),
         ));

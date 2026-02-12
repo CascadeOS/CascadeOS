@@ -4,8 +4,8 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const kernel = @import("kernel");
-const Task = kernel.Task;
+const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 
 const x64 = @import("x64.zig");
@@ -31,7 +31,7 @@ pub fn sendPanicIPI() void {
 }
 
 /// Send a flush IPI to the given executor.
-pub fn sendFlushIPI(executor: *kernel.Executor) void {
+pub fn sendFlushIPI(executor: *cascade.Executor) void {
     var icr = globals.lapic.readInterruptCommandRegister();
 
     icr.vector = .flush_request;
@@ -62,17 +62,17 @@ const globals = struct {
 };
 
 pub const init = struct {
-    const init_log = kernel.debug.log.scoped(.apic_init);
+    const init_log = cascade.debug.log.scoped(.apic_init);
 
     pub fn captureApicInformation(
-        fadt: *const kernel.acpi.tables.FADT,
-        madt: *const kernel.acpi.tables.MADT,
+        fadt: *const cascade.acpi.tables.FADT,
+        madt: *const cascade.acpi.tables.MADT,
         x2apic_enabled: bool,
     ) !void {
         if (x2apic_enabled) {
             globals.lapic = .x2apic;
         } else {
-            const register_space_range = try kernel.mem.heap.allocateSpecial(
+            const register_space_range = try cascade.mem.heap.allocateSpecial(
                 LAPIC.Register.register_space_size,
                 .from(.from(madt.local_interrupt_controller_address), LAPIC.Register.register_space_size),
                 .{
@@ -107,7 +107,7 @@ pub const init = struct {
     }
 
     pub fn registerTimeSource(
-        candidate_time_sources: *kernel.time.init.CandidateTimeSources,
+        candidate_time_sources: *cascade.time.init.CandidateTimeSources,
     ) void {
         candidate_time_sources.addTimeSource(.{
             .name = "lapic",
@@ -132,7 +132,7 @@ pub const init = struct {
     }
 
     fn initializeLapicTimerCalibrate(
-        reference_counter: kernel.time.init.ReferenceCounter,
+        reference_counter: cascade.time.init.ReferenceCounter,
     ) void {
         globals.lapic.writeDivideConfigurationRegister(divide_configuration);
 
@@ -184,7 +184,7 @@ pub const init = struct {
 
         const average_ticks = total_ticks / number_of_samples;
 
-        globals.tick_duration_fs = (sample_duration.value * kernel.time.fs_per_ns) / average_ticks;
+        globals.tick_duration_fs = (sample_duration.value * cascade.time.fs_per_ns) / average_ticks;
         init_log.debug("tick duration (fs) using reference counter: {}", .{globals.tick_duration_fs});
     }
 
@@ -204,7 +204,7 @@ pub const init = struct {
 
         const ticks = std.math.cast(
             u32,
-            (period.value * kernel.time.fs_per_ns) / globals.tick_duration_fs,
+            (period.value * cascade.time.fs_per_ns) / globals.tick_duration_fs,
         ) orelse @panic("period is too long");
 
         globals.lapic.writeInitialCountRegister(ticks);

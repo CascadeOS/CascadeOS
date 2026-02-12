@@ -4,8 +4,8 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const kernel = @import("kernel");
-const Task = kernel.Task;
+const cascade = @import("cascade");
+const Task = cascade.Task;
 const core = @import("core");
 
 const x64 = @import("../x64.zig");
@@ -14,7 +14,7 @@ pub fn nonMaskableInterruptHandler(
     interrupt_frame: arch.interrupts.InterruptFrame,
     _: Task.Current.StateBeforeInterrupt,
 ) void {
-    if (!kernel.debug.hasAnExecutorPanicked()) {
+    if (!cascade.debug.hasAnExecutorPanicked()) {
         std.debug.panic("non-maskable interrupt\n{f}", .{interrupt_frame});
     }
 
@@ -31,7 +31,7 @@ pub fn pageFaultHandler(
     const arch_interrupt_frame: *const x64.interrupts.InterruptFrame = .from(interrupt_frame);
     const error_code: x64.paging.PageFaultErrorCode = .fromErrorCode(arch_interrupt_frame.error_code);
 
-    kernel.mem.onPageFault(.{
+    cascade.mem.onPageFault(.{
         .faulting_address = faulting_address,
 
         .access_type = if (error_code.write)
@@ -68,7 +68,7 @@ pub fn earlyPageFaultHandler(
     const error_code: x64.paging.PageFaultErrorCode = .fromErrorCode(arch_interrupt_frame.error_code);
 
     switch (arch_interrupt_frame.context()) {
-        .kernel => kernel.debug.interruptSourcePanic(
+        .kernel => cascade.debug.interruptSourcePanic(
             interrupt_frame,
             "kernel page fault @ {f} - {f}",
             .{ faulting_address, error_code },
@@ -81,7 +81,7 @@ pub fn flushRequestHandler(
     _: arch.interrupts.InterruptFrame,
     _: Task.Current.StateBeforeInterrupt,
 ) void {
-    kernel.mem.FlushRequest.processFlushRequests();
+    cascade.mem.FlushRequest.processFlushRequests();
     // eoi after all current flush requests have been handled
     x64.apic.eoi();
 }
@@ -101,7 +101,7 @@ pub fn unhandledException(
 ) void {
     const arch_interrupt_frame: *const x64.interrupts.InterruptFrame = .from(interrupt_frame);
     switch (arch_interrupt_frame.context()) {
-        .kernel => kernel.debug.interruptSourcePanic(
+        .kernel => cascade.debug.interruptSourcePanic(
             interrupt_frame,
             "unhandled kernel exception: {t}",
             .{arch_interrupt_frame.vector_number.interrupt},
