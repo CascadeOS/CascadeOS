@@ -19,10 +19,6 @@ pub const Virtual = extern union {
     pub const zero: Virtual = .from(0);
     pub const undefined_address: Virtual = .from(0xAAAAAAAAAAAAAAAA);
 
-    pub inline fn from(value: usize) Virtual {
-        return .{ .value = value };
-    }
-
     pub const Type = enum {
         kernel,
         user,
@@ -50,6 +46,8 @@ pub const Virtual = extern union {
         return address.user;
     }
 
+    pub const from: fn (address: usize) callconv(.@"inline") @This() = AddressImpl(@This()).from;
+
     pub const aligned: fn (@This(), std.mem.Alignment) callconv(.@"inline") bool = AddressImpl(@This()).aligned;
     pub const alignForward: fn (@This(), std.mem.Alignment) callconv(.@"inline") @This() = AddressImpl(@This()).alignForward;
     pub const alignForwardInPlace: fn (*@This(), std.mem.Alignment) callconv(.@"inline") void = AddressImpl(@This()).alignForwardInPlace;
@@ -67,8 +65,6 @@ pub const Virtual = extern union {
     pub const greaterThan: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).greaterThan;
     pub const greaterThanOrEqual: fn (@This(), @This()) callconv(.@"inline") bool = AddressImpl(@This()).greaterThanOrEqual;
 
-    pub const format = addressFormat(@This(), "Virtual");
-
     /// Returns the size from  `address` to `other`.
     ///
     /// `address + address.difference(other) == other`
@@ -77,12 +73,10 @@ pub const Virtual = extern union {
     /// - `other` must be greater than or equal to `address`
     pub const difference: fn (@This(), @This()) callconv(.@"inline") core.Size = AddressImpl(@This()).difference;
 
+    pub const format = addressFormat(@This(), "Virtual");
+
     pub const Kernel = extern struct {
         value: usize,
-
-        pub inline fn from(value: usize) Kernel {
-            return .{ .value = value };
-        }
 
         pub inline fn ptr(address: Kernel, comptime PtrT: type) PtrT {
             return @ptrFromInt(address.value);
@@ -98,6 +92,8 @@ pub const Virtual = extern union {
         pub inline fn applyKernelOffset(address: Kernel) Virtual {
             return address.moveBackward(kernel.mem.globals.kernel_virtual_offset).toVirtual();
         }
+
+        pub const from: fn (address: usize) callconv(.@"inline") @This() = AddressImpl(@This()).from;
 
         pub const aligned: fn (@This(), std.mem.Alignment) callconv(.@"inline") bool = AddressImpl(@This()).aligned;
         pub const alignForward: fn (@This(), std.mem.Alignment) callconv(.@"inline") @This() = AddressImpl(@This()).alignForward;
@@ -136,10 +132,6 @@ pub const Virtual = extern union {
 
         pub const zero: User = .{ .value = 0 };
 
-        pub inline fn from(value: usize) User {
-            return .{ .value = value };
-        }
-
         pub inline fn ptr(address: User, comptime PtrT: type) PtrT {
             return @ptrFromInt(address.value);
         }
@@ -147,6 +139,8 @@ pub const Virtual = extern union {
         pub inline fn toVirtual(address: User) Virtual {
             return .{ .user = address };
         }
+
+        pub const from: fn (address: usize) callconv(.@"inline") @This() = AddressImpl(@This()).from;
 
         pub const aligned: fn (@This(), std.mem.Alignment) callconv(.@"inline") bool = AddressImpl(@This()).aligned;
         pub const alignForward: fn (@This(), std.mem.Alignment) callconv(.@"inline") @This() = AddressImpl(@This()).alignForward;
@@ -228,10 +222,6 @@ pub const Virtual = extern union {
             address: Virtual.Kernel,
             size: core.Size,
 
-            pub inline fn from(address: Virtual.Kernel, size: core.Size) Range.Kernel {
-                return .{ .address = address, .size = size };
-            }
-
             pub inline fn fromSlice(comptime T: type, slice: []const T) Range.Kernel {
                 return .from(
                     .from(@intFromPtr(slice.ptr)),
@@ -246,6 +236,8 @@ pub const Virtual = extern union {
             pub inline fn byteSlice(range: Range.Kernel) []u8 {
                 return range.address.ptr([*]u8)[0..range.size.value];
             }
+
+            pub const from: fn (Virtual.Kernel, core.Size) callconv(.@"inline") @This() = RangeImpl(@This(), Virtual.Kernel).from;
 
             /// Returns the last address in this range.
             ///
@@ -269,10 +261,6 @@ pub const Virtual = extern union {
             address: Virtual.User,
             size: core.Size,
 
-            pub fn from(address: Virtual.User, size: core.Size) Range.User {
-                return .{ .address = address, .size = size };
-            }
-
             pub inline fn toVirtualRange(range: Range.User) Virtual.Range {
                 return .from(.from(range.address.value), range.size);
             }
@@ -281,6 +269,8 @@ pub const Virtual = extern union {
                 if (core.is_debug) std.debug.assert(Task.Current.get().task.enable_access_to_user_memory_count != 0);
                 return range.address.ptr([*]u8)[0..range.size.value];
             }
+
+            pub const from: fn (Virtual.User, core.Size) callconv(.@"inline") @This() = RangeImpl(@This(), Virtual.User).from;
 
             /// Returns the last address in this range.
             ///
@@ -307,10 +297,6 @@ pub const Physical = extern struct {
 
     pub const zero: Physical = .from(0);
 
-    pub inline fn from(value: usize) Physical {
-        return .{ .value = value };
-    }
-
     /// Returns the physical address of this virtual address if it is in the direct map.
     pub fn fromDirectMap(address: Virtual.Kernel) error{AddressNotInDirectMap}!Physical {
         if (!kernel.mem.globals.direct_map.containsAddress(address)) {
@@ -324,6 +310,8 @@ pub const Physical = extern struct {
     pub fn toDirectMap(physical_address: Physical) Virtual.Kernel {
         return .{ .value = physical_address.value + kernel.mem.globals.direct_map.address.value };
     }
+
+    pub const from: fn (usize) callconv(.@"inline") @This() = AddressImpl(@This()).from;
 
     pub const aligned: fn (@This(), std.mem.Alignment) callconv(.@"inline") bool = AddressImpl(@This()).aligned;
     pub const alignForward: fn (@This(), std.mem.Alignment) callconv(.@"inline") @This() = AddressImpl(@This()).alignForward;
@@ -360,10 +348,6 @@ pub const Physical = extern struct {
         address: Physical,
         size: core.Size,
 
-        pub inline fn from(address: Physical, size: core.Size) Range {
-            return .{ .address = address, .size = size };
-        }
-
         /// Returns a virtual range corresponding to this physical range in the direct map.
         pub fn toDirectMap(range: Range) Virtual.Range.Kernel {
             return .{
@@ -371,6 +355,8 @@ pub const Physical = extern struct {
                 .size = range.size,
             };
         }
+
+        pub const from: fn (Physical, core.Size) callconv(.@"inline") @This() = RangeImpl(@This(), Physical).from;
 
         // Returns the last address in this range.
         ///
@@ -393,6 +379,10 @@ pub const Physical = extern struct {
 
 fn AddressImpl(comptime Address: type) type {
     return struct {
+        inline fn from(value: usize) Address {
+            return .{ .value = value };
+        }
+
         inline fn aligned(address: Address, alignment: std.mem.Alignment) bool {
             return alignment.check(address.value);
         }
@@ -482,6 +472,10 @@ fn addressFormat(comptime Address: type, comptime name: []const u8) fn (Address,
 
 fn RangeImpl(comptime Range: type, comptime Address: type) type {
     return struct {
+        inline fn from(address: Address, size: core.Size) Range {
+            return .{ .address = address, .size = size };
+        }
+
         /// Returns the last address in this range.
         ///
         /// If the range's size is zero, returns the start address of the range.
