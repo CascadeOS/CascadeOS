@@ -113,7 +113,7 @@ pub const decls: arch.Decls = .{
         .largest_page_size = .from(1, .gib),
         .kernel_memory_range = .from(
             .from(0xffff800000000000),
-            half_address_space_size,
+            half_address_space_size.subtract(.one),
         ),
         .PageTable = extern struct {},
     },

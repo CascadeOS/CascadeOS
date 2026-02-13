@@ -18,6 +18,7 @@ pub const VirtualAddress = extern union {
 
     pub const zero: VirtualAddress = .from(0);
     pub const undefined_address: VirtualAddress = .from(0xAAAAAAAAAAAAAAAA);
+    pub const max: VirtualAddress = .from(std.math.maxInt(usize));
 
     pub inline fn from(value: usize) VirtualAddress {
         return .{ .value = value };
@@ -529,6 +530,9 @@ fn AddressMixin(comptime Address: type) type {
 
 fn RangeMixin(comptime Range: type) type {
     return struct {
+        // We disallow the address `VirtualAddress.max` from being a valid kernel or user address, this allows these range functions to be
+        // implemented more efficiently. See `arch/arch.zig`.
+
         /// Returns the last address in this range.
         ///
         /// If the range's size is zero, returns the start address of the range.
@@ -548,20 +552,20 @@ fn RangeMixin(comptime Range: type) type {
         }
 
         fn anyOverlap(range: Range, other: Range) bool {
-            return range.address.lessThanOrEqual(last(other)) and last(range).greaterThanOrEqual(other.address);
+            return range.address.lessThan(after(other)) and after(range).greaterThan(other.address);
         }
 
         fn fullyContains(range: Range, other: Range) bool {
-            return range.address.lessThanOrEqual(other.address) and last(range).greaterThanOrEqual(last(other));
+            return range.address.lessThanOrEqual(other.address) and after(range).greaterThanOrEqual(after(other));
         }
 
         fn containsAddress(range: Range, address: Address) bool {
-            return address.greaterThanOrEqual(range.address) and address.lessThanOrEqual(last(range));
+            return range.address.lessThanOrEqual(address) and after(range).greaterThan(address);
         }
 
         fn containsAddressOrder(range: Range, address: Address) std.math.Order {
             if (range.address.greaterThan(address)) return .lt;
-            if (last(range).lessThan(address)) return .gt;
+            if (after(range).lessThanOrEqual(address)) return .gt;
             return .eq;
         }
 

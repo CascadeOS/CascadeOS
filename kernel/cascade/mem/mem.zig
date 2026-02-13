@@ -697,10 +697,10 @@ pub const init = struct {
                 break :last_memory_map_entry memory_map_iterator.next() orelse @panic("no memory map entries");
             };
 
-            var direct_map_size = core.Size.from(last_memory_map_entry.range.last().value, .byte);
+            var direct_map_size: core.Size = .from(last_memory_map_entry.range.last().value, .byte);
 
             // We ensure that the lowest 4GiB are always mapped.
-            const four_gib = core.Size.from(4, .gib);
+            const four_gib: core.Size = .from(4, .gib);
             if (direct_map_size.lessThan(four_gib)) direct_map_size = four_gib;
 
             // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.

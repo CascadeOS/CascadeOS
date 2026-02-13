@@ -211,12 +211,13 @@ pub const paging = struct {
     ///
     /// Usually the higher half of the address space.
     ///
-    /// This must not include either the zero nor undefined address.
+    /// This must not include either the zero, undefined nor max addresses.
     pub const kernel_memory_range: cascade.VirtualRange = current_decls.paging.kernel_memory_range;
 
     comptime {
         std.debug.assert(!kernel_memory_range.containsAddress(.zero));
         std.debug.assert(!kernel_memory_range.containsAddress(.undefined_address));
+        std.debug.assert(!kernel_memory_range.containsAddress(.max));
     }
 
     pub const PageTable = struct {
@@ -550,12 +551,13 @@ pub const user = struct {
     ///
     /// Usually the lower half of the address space.
     ///
-    /// This must not include either the zero nor undefined address.
+    /// This must not include either the zero, undefined nor max addresses.
     pub const user_memory_range: cascade.VirtualRange = current_decls.user.user_memory_range;
 
     comptime {
         std.debug.assert(!user_memory_range.containsAddress(.zero));
         std.debug.assert(!user_memory_range.containsAddress(.undefined_address));
+        std.debug.assert(!user_memory_range.containsAddress(.max));
     }
 
     /// Create the `PerThread` data of a thread.
@@ -1247,7 +1249,7 @@ pub const Decls = struct {
         ///
         /// Usually the higher half of the address space.
         ///
-        /// This must not include either the zero nor undefined address.
+        /// This must not include either the zero, undefined nor max addresses.
         kernel_memory_range: cascade.VirtualRange,
 
         PageTable: type,
@@ -1273,7 +1275,7 @@ pub const Decls = struct {
         ///
         /// Usually the lower half of the address space.
         ///
-        /// This must not include either the zero nor undefined address.
+        /// This must not include either the zero, undefined nor max addresses.
         user_memory_range: cascade.VirtualRange,
     },
 

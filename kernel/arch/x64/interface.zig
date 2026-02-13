@@ -167,7 +167,7 @@ pub const decls: arch.Decls = .{
         .largest_page_size = x64.paging.PageTable.large_page_size,
         .kernel_memory_range = .from(
             .from(0xffff800000000000),
-            x64.paging.PageTable.half_address_space_size,
+            x64.paging.PageTable.half_address_space_size.subtract(.one),
         ),
         .PageTable = x64.paging.PageTable,
     },

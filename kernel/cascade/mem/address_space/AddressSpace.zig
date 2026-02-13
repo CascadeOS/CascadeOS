@@ -379,7 +379,7 @@ fn findExactFreeRange(address_space: *AddressSpace, range: cascade.VirtualRange)
     if (index == entries.len) {
         @branchHint(.unlikely);
 
-        if (range.last().lessThanOrEqual(address_space.range.last())) {
+        if (range.after().lessThanOrEqual(address_space.range.after())) {
             // the range does not extend past the end of the address space
             @branchHint(.likely);
             return .{
@@ -1402,12 +1402,12 @@ fn entryRange(address_space: *const AddressSpace, range: cascade.VirtualRange) ?
 
     const first_entry = address_space.entries.items[entry_range.start];
     if (first_entry.range.address.lessThan(range.address)) {
-        if (core.is_debug) std.debug.assert(first_entry.range.last().greaterThan(range.address));
+        if (core.is_debug) std.debug.assert(first_entry.range.after().greaterThanOrEqual(range.address));
         entry_range.start_overlap = true;
     }
 
     const last_entry = address_space.entries.items[entry_range.start + entry_range.length - 1];
-    if (last_entry.range.last().greaterThan(range.last())) {
+    if (last_entry.range.after().greaterThan(range.after())) {
         if (core.is_debug) std.debug.assert(last_entry.range.address.lessThan(range.last()));
         entry_range.end_overlap = true;
     }
