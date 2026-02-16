@@ -68,9 +68,8 @@ pub fn allocateSpecial(
     map_type: cascade.mem.MapType,
 ) AllocateError!cascade.KernelVirtualRange {
     if (core.is_debug) {
+        std.debug.assert(physical_range.pageAligned());
         std.debug.assert(size.equal(physical_range.size));
-        std.debug.assert(size.aligned(arch.paging.standard_page_size_alignment));
-        std.debug.assert(physical_range.address.aligned(arch.paging.standard_page_size_alignment));
     }
 
     const allocation = globals.special_heap_address_space_arena.allocate(

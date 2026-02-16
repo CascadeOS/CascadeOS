@@ -47,7 +47,7 @@ pub fn mapSinglePage(
 ) MapError!void {
     if (core.is_debug) {
         std.debug.assert(map_type.protection != .none);
-        std.debug.assert(virtual_address.aligned(arch.paging.standard_page_size_alignment));
+        std.debug.assert(virtual_address.pageAligned());
     }
 
     try page_table.mapSinglePage(
@@ -77,8 +77,7 @@ pub fn mapRangeAndBackWithPhysicalPages(
 ) MapError!void {
     if (core.is_debug) {
         std.debug.assert(map_type.protection != .none);
-        std.debug.assert(virtual_range.address.aligned(arch.paging.standard_page_size_alignment));
-        std.debug.assert(virtual_range.size.aligned(arch.paging.standard_page_size_alignment));
+        std.debug.assert(virtual_range.pageAligned());
     }
 
     const last_virtual_address = virtual_range.last();
@@ -122,7 +121,7 @@ pub fn mapRangeAndBackWithPhysicalPages(
             physical_page_allocator,
         );
 
-        current_virtual_address.moveForwardInPlace(arch.paging.standard_page_size);
+        current_virtual_address.moveForwardPageInPlace();
     }
 }
 
@@ -147,10 +146,8 @@ pub fn mapRangeToPhysicalRange(
 ) MapError!void {
     if (core.is_debug) {
         std.debug.assert(map_type.protection != .none);
-        std.debug.assert(virtual_range.address.aligned(arch.paging.standard_page_size_alignment));
-        std.debug.assert(virtual_range.size.aligned(arch.paging.standard_page_size_alignment));
-        std.debug.assert(physical_range.address.aligned(arch.paging.standard_page_size_alignment));
-        std.debug.assert(physical_range.size.aligned(arch.paging.standard_page_size_alignment));
+        std.debug.assert(virtual_range.pageAligned());
+        std.debug.assert(physical_range.pageAligned());
         std.debug.assert(virtual_range.size.equal(physical_range.size));
     }
 
@@ -186,8 +183,8 @@ pub fn mapRangeToPhysicalRange(
             physical_page_allocator,
         );
 
-        current_virtual_address.moveForwardInPlace(arch.paging.standard_page_size);
-        current_physical_address.moveForwardInPlace(arch.paging.standard_page_size);
+        current_virtual_address.moveForwardPageInPlace();
+        current_physical_address.moveForwardPageInPlace();
     }
 }
 
@@ -482,10 +479,7 @@ pub const VirtualRangeBatch = struct {
     /// - `range.address` must be aligned to `arch.paging.standard_page_size`
     /// - `range.size` must be aligned to `arch.paging.standard_page_size`
     pub fn appendMergeIfFull(batch: *VirtualRangeBatch, range: cascade.VirtualRange) void {
-        if (core.is_debug) {
-            std.debug.assert(range.address.aligned(arch.paging.standard_page_size_alignment));
-            std.debug.assert(range.size.aligned(arch.paging.standard_page_size_alignment));
-        }
+        if (core.is_debug) std.debug.assert(range.pageAligned());
 
         switch (batch.ranges.len) {
             0 => {
@@ -529,10 +523,7 @@ pub const VirtualRangeBatch = struct {
     /// - `range.address` must be aligned to `arch.paging.standard_page_size`
     /// - `range.size` must be aligned to `arch.paging.standard_page_size`
     pub fn append(batch: *VirtualRangeBatch, range: cascade.VirtualRange) bool {
-        if (core.is_debug) {
-            std.debug.assert(range.address.aligned(arch.paging.standard_page_size_alignment));
-            std.debug.assert(range.size.aligned(arch.paging.standard_page_size_alignment));
-        }
+        if (core.is_debug) std.debug.assert(range.pageAligned());
 
         const len = batch.ranges.len;
 
@@ -594,10 +585,7 @@ pub const ChangeProtectionBatch = struct {
     /// - `range.virtual_range.address` must be aligned to `arch.paging.standard_page_size`
     /// - `range.virtual_range.size` must be aligned to `arch.paging.standard_page_size`
     pub fn append(batch: *ChangeProtectionBatch, range: VirtualRangeWithMapType) bool {
-        if (core.is_debug) {
-            std.debug.assert(range.virtual_range.address.aligned(arch.paging.standard_page_size_alignment));
-            std.debug.assert(range.virtual_range.size.aligned(arch.paging.standard_page_size_alignment));
-        }
+        if (core.is_debug) std.debug.assert(range.virtual_range.pageAligned());
 
         const len = batch.ranges.len;
 

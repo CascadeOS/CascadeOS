@@ -32,7 +32,7 @@ fn tryGetFramebufferOutputInner(memory_system_available: bool) !?Output {
 
     const physical_address: cascade.PhysicalAddress = .fromDirectMap(.fromPtr(framebuffer.ptr));
 
-    if (!physical_address.aligned(arch.paging.standard_page_size_alignment)) @panic("framebuffer is not aligned");
+    if (!physical_address.pageAligned()) @panic("framebuffer is not aligned");
 
     const framebuffer_size: core.Size = .from(framebuffer.height * framebuffer.pitch, .byte);
 

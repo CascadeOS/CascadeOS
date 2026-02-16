@@ -302,14 +302,14 @@ pub const init = struct {
                     core.Size.of(PhysicalPage)
                         .multiplyScalar(@intFromEnum(Index.fromAddress(entry.range.address))),
                 )
-                .alignBackward(arch.paging.standard_page_size_alignment);
+                .pageAlignBackward();
 
             const entry_range_end: cascade.KernelVirtualAddress = pages_array_base
                 .moveForward(
                     core.Size.of(PhysicalPage)
                         .multiplyScalar(@intFromEnum(Index.fromAddress(entry.range.last()))),
                 )
-                .alignForward(arch.paging.standard_page_size_alignment);
+                .pageAlignForward();
 
             if (opt_current_range_start) |*ptr_current_range_start| {
                 const current_range_start = ptr_current_range_start.*;

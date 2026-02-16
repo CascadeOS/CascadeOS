@@ -518,7 +518,7 @@ pub const LoadableRegion = struct {
                 if (program_header.memory_size == 0) continue; // can this even happen with a loadable segment?
 
                 const raw_segment_base: cascade.VirtualAddress = .from(program_header.virtual_address);
-                const raw_range_base = raw_segment_base.alignBackward(arch.paging.standard_page_size_alignment);
+                const raw_range_base = raw_segment_base.pageAlignBackward();
 
                 const segment_offset_size = raw_range_base.difference(raw_segment_base);
 

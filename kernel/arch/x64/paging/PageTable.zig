@@ -70,7 +70,7 @@ pub const PageTable = extern struct {
         map_type: MapType,
         physical_page_allocator: cascade.mem.PhysicalPage.Allocator,
     ) cascade.mem.MapError!void {
-        if (core.is_debug) std.debug.assert(virtual_address.aligned(small_page_size_alignment));
+        if (core.is_debug) std.debug.assert(virtual_address.pageAligned());
 
         var deallocate_page_list: cascade.mem.PhysicalPage.List = .{};
         errdefer physical_page_allocator.deallocate(deallocate_page_list);
@@ -144,10 +144,7 @@ pub const PageTable = extern struct {
         flush_batch: *cascade.mem.VirtualRangeBatch,
         deallocate_page_list: *cascade.mem.PhysicalPage.List,
     ) void {
-        if (core.is_debug) {
-            std.debug.assert(virtual_range.address.aligned(small_page_size_alignment));
-            std.debug.assert(virtual_range.size.aligned(small_page_size_alignment));
-        }
+        if (core.is_debug) std.debug.assert(virtual_range.pageAligned());
 
         var current_virtual_address = virtual_range.address;
         const last_virtual_address = virtual_range.last();
@@ -246,7 +243,7 @@ pub const PageTable = extern struct {
                         number_of_entries - 1;
 
                     while (level1_index <= last_level1_index) : (level1_index += 1) {
-                        defer current_virtual_address.moveForwardInPlace(small_page_size);
+                        defer current_virtual_address.moveForwardPageInPlace();
 
                         const level1_entry = level1_table.entries[level1_index].load();
 
@@ -290,10 +287,7 @@ pub const PageTable = extern struct {
         new_map_type: MapType,
         flush_batch: *cascade.mem.VirtualRangeBatch,
     ) void {
-        if (core.is_debug) {
-            std.debug.assert(virtual_range.address.aligned(small_page_size_alignment));
-            std.debug.assert(virtual_range.size.aligned(small_page_size_alignment));
-        }
+        if (core.is_debug) std.debug.assert(virtual_range.pageAligned());
 
         const need_to_flush = needToFlush(previous_map_type, new_map_type);
 
@@ -380,7 +374,7 @@ pub const PageTable = extern struct {
                         number_of_entries - 1;
 
                     while (level1_index <= last_level1_index) : (level1_index += 1) {
-                        defer current_virtual_address.moveForwardInPlace(small_page_size);
+                        defer current_virtual_address.moveForwardPageInPlace();
 
                         var level1_entry = level1_table.entries[level1_index].load();
 
@@ -647,7 +641,7 @@ pub const PageTable = extern struct {
         }
 
         fn setAddress4kib(entry: *Entry, address: cascade.PhysicalAddress) void {
-            if (core.is_debug) std.debug.assert(address.aligned(small_page_size_alignment));
+            if (core.is_debug) std.debug.assert(address.pageAligned());
             entry._address_4kib_aligned.writeNoShiftFullSize(address.value);
         }
 
@@ -1022,10 +1016,8 @@ pub const PageTable = extern struct {
             physical_page_allocator: cascade.mem.PhysicalPage.Allocator,
         ) !void {
             if (core.is_debug) {
-                std.debug.assert(virtual_range.address.aligned(small_page_size_alignment));
-                std.debug.assert(virtual_range.size.aligned(small_page_size_alignment));
-                std.debug.assert(physical_range.address.aligned(small_page_size_alignment));
-                std.debug.assert(physical_range.size.aligned(small_page_size_alignment));
+                std.debug.assert(virtual_range.pageAligned());
+                std.debug.assert(physical_range.pageAligned());
                 std.debug.assert(virtual_range.size.equal(physical_range.size));
             }
 
@@ -1138,8 +1130,8 @@ pub const PageTable = extern struct {
 
                             small_pages_mapped += 1;
 
-                            current_virtual_address.moveForwardInPlace(small_page_size);
-                            current_physical_address.moveForwardInPlace(small_page_size);
+                            current_virtual_address.moveForwardPageInPlace();
+                            current_physical_address.moveForwardPageInPlace();
                             size_remaining.subtractInPlace(small_page_size);
                         }
                     }

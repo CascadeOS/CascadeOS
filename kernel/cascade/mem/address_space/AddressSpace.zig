@@ -226,7 +226,7 @@ pub fn map(
 
     if (core.is_debug) {
         std.debug.assert(options.size.aligned(arch.paging.standard_page_size_alignment));
-        if (options.base) |base| std.debug.assert(base.aligned(arch.paging.standard_page_size_alignment));
+        if (options.base) |base| std.debug.assert(base.pageAligned());
     }
 
     if (options.size.equal(.zero)) {
@@ -537,10 +537,7 @@ pub fn changeProtection(
 
     log.verbose("{s}: change protection of {f} to {f}", .{ address_space.name(), range, request });
 
-    if (core.is_debug) {
-        std.debug.assert(range.address.aligned(arch.paging.standard_page_size_alignment));
-        std.debug.assert(range.size.aligned(arch.paging.standard_page_size_alignment));
-    }
+    if (core.is_debug) std.debug.assert(range.pageAligned());
 
     if (request.max_protection) |max_protection| if (max_protection == .none) {
         @branchHint(.cold);
@@ -883,10 +880,7 @@ pub fn unmap(address_space: *AddressSpace, range: cascade.VirtualRange) UnmapErr
 
     log.verbose("{s}: unmap {f}", .{ address_space.name(), range });
 
-    if (core.is_debug) {
-        std.debug.assert(range.address.aligned(arch.paging.standard_page_size_alignment));
-        std.debug.assert(range.size.aligned(arch.paging.standard_page_size_alignment));
-    }
+    if (core.is_debug) std.debug.assert(range.pageAligned());
 
     const result: UnmapResult = blk: {
         if (range.size.equal(.zero)) {
@@ -1098,9 +1092,7 @@ pub fn handlePageFault(
 
     var fault_info: FaultInfo = .{
         .address_space = address_space,
-        .faulting_address = page_fault_details.faulting_address.alignBackward(
-            arch.paging.standard_page_size.toAlignment(),
-        ),
+        .faulting_address = page_fault_details.faulting_address.pageAlignBackward(),
         .access_type = page_fault_details.access_type,
     };
 

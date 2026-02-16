@@ -170,7 +170,7 @@ pub const Reference = struct {
             std.debug.assert(reference.start_offset.aligned(arch.paging.standard_page_size_alignment));
             std.debug.assert(entry.anonymous_map_reference.anonymous_map == reference.anonymous_map);
             std.debug.assert(entry.anonymous_map_reference.start_offset.equal(reference.start_offset));
-            std.debug.assert(faulting_address.aligned(arch.paging.standard_page_size_alignment));
+            std.debug.assert(faulting_address.pageAligned());
             std.debug.assert(entry.range.containsAddress(faulting_address));
         }
 
@@ -203,7 +203,7 @@ pub const Reference = struct {
             std.debug.assert(reference.anonymous_map != null);
             std.debug.assert(entry.anonymous_map_reference.anonymous_map == reference.anonymous_map);
             std.debug.assert(entry.anonymous_map_reference.start_offset.equal(reference.start_offset));
-            std.debug.assert(faulting_address.aligned(arch.paging.standard_page_size_alignment));
+            std.debug.assert(faulting_address.pageAligned());
             std.debug.assert(entry.range.containsAddress(faulting_address));
         }
 

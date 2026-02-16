@@ -69,11 +69,23 @@ pub const VirtualAddress = extern union {
     pub const moveForwardInPlace: fn (address: *@This(), size: core.Size) callconv(.@"inline") void = Mixin.moveForwardInPlace;
     pub const moveBackward: fn (address: @This(), size: core.Size) callconv(.@"inline") @This() = Mixin.moveBackward;
     pub const moveBackwardInPlace: fn (address: *@This(), size: core.Size) callconv(.@"inline") void = Mixin.moveBackwardInPlace;
+
+    pub const pageAligned: fn (address: @This()) callconv(.@"inline") bool = Mixin.pageAligned;
+    pub const pageAlignForward: fn (address: @This()) callconv(.@"inline") @This() = Mixin.pageAlignForward;
+    pub const pageAlignForwardInPlace: fn (address: *@This()) callconv(.@"inline") void = Mixin.pageAlignForwardInPlace;
+    pub const pageAlignBackward: fn (address: @This()) callconv(.@"inline") @This() = Mixin.pageAlignBackward;
+    pub const pageAlignBackwardInPlace: fn (address: *@This()) callconv(.@"inline") void = Mixin.pageAlignBackwardInPlace;
+    pub const moveForwardPage: fn (address: @This()) callconv(.@"inline") @This() = Mixin.moveForwardPage;
+    pub const moveForwardPageInPlace: fn (address: *@This()) callconv(.@"inline") void = Mixin.moveForwardPageInPlace;
+    pub const moveBackwardPage: fn (address: @This()) callconv(.@"inline") @This() = Mixin.moveBackwardPage;
+    pub const moveBackwardPageInPlace: fn (address: *@This()) callconv(.@"inline") void = Mixin.moveBackwardPageInPlace;
+
     pub const equal: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.equal;
     pub const lessThan: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.lessThan;
     pub const lessThanOrEqual: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.lessThanOrEqual;
     pub const greaterThan: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.greaterThan;
     pub const greaterThanOrEqual: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.greaterThanOrEqual;
+
     pub const difference: fn (address: @This(), other: @This()) callconv(.@"inline") core.Size = Mixin.difference;
     pub const format: fn (address: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void = Mixin.format;
 
@@ -97,11 +109,19 @@ pub const KernelVirtualAddress = extern struct {
         return address;
     }
 
+    /// Creates a new kernel virtual address from a pointer.
+    ///
+    /// **REQUIREMENTS**:
+    /// - The pointer must be a valid kernel pointer.
     pub inline fn fromPtr(ptr: anytype) KernelVirtualAddress {
         comptime std.debug.assert(@typeInfo(@TypeOf(ptr)) == .pointer);
         return .{ .value = @intFromPtr(ptr) };
     }
 
+    /// Converts the kernel virtual address to a pointer.
+    ///
+    /// **REQUIREMENTS**:
+    /// - The pointer must be a valid kernel pointer.
     pub inline fn toPtr(address: KernelVirtualAddress, comptime PtrT: type) PtrT {
         return @ptrFromInt(address.value);
     }
@@ -126,11 +146,23 @@ pub const KernelVirtualAddress = extern struct {
     pub const moveForwardInPlace: fn (address: *@This(), size: core.Size) callconv(.@"inline") void = Mixin.moveForwardInPlace;
     pub const moveBackward: fn (address: @This(), size: core.Size) callconv(.@"inline") @This() = Mixin.moveBackward;
     pub const moveBackwardInPlace: fn (address: *@This(), size: core.Size) callconv(.@"inline") void = Mixin.moveBackwardInPlace;
+
+    pub const pageAligned: fn (address: @This()) callconv(.@"inline") bool = Mixin.pageAligned;
+    pub const pageAlignForward: fn (address: @This()) callconv(.@"inline") @This() = Mixin.pageAlignForward;
+    pub const pageAlignForwardInPlace: fn (address: *@This()) callconv(.@"inline") void = Mixin.pageAlignForwardInPlace;
+    pub const pageAlignBackward: fn (address: @This()) callconv(.@"inline") @This() = Mixin.pageAlignBackward;
+    pub const pageAlignBackwardInPlace: fn (address: *@This()) callconv(.@"inline") void = Mixin.pageAlignBackwardInPlace;
+    pub const moveForwardPage: fn (address: @This()) callconv(.@"inline") @This() = Mixin.moveForwardPage;
+    pub const moveForwardPageInPlace: fn (address: *@This()) callconv(.@"inline") void = Mixin.moveForwardPageInPlace;
+    pub const moveBackwardPage: fn (address: @This()) callconv(.@"inline") @This() = Mixin.moveBackwardPage;
+    pub const moveBackwardPageInPlace: fn (address: *@This()) callconv(.@"inline") void = Mixin.moveBackwardPageInPlace;
+
     pub const equal: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.equal;
     pub const lessThan: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.lessThan;
     pub const lessThanOrEqual: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.lessThanOrEqual;
     pub const greaterThan: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.greaterThan;
     pub const greaterThanOrEqual: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.greaterThanOrEqual;
+
     pub const difference: fn (address: @This(), other: @This()) callconv(.@"inline") core.Size = Mixin.difference;
     pub const format: fn (address: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void = Mixin.format;
 
@@ -154,7 +186,12 @@ pub const UserVirtualAddress = extern struct {
         return address;
     }
 
+    /// Creates a pointer from a user virtual address.
+    ///
+    /// **REQUIREMENTS**:
+    /// - The current task must have enabled access to user memory.
     pub inline fn ptr(address: UserVirtualAddress, comptime PtrT: type) PtrT {
+        if (core.is_debug) std.debug.assert(Task.Current.get().task.enable_access_to_user_memory_count != 0);
         return @ptrFromInt(address.value);
     }
 
@@ -171,11 +208,23 @@ pub const UserVirtualAddress = extern struct {
     pub const moveForwardInPlace: fn (address: *@This(), size: core.Size) callconv(.@"inline") void = Mixin.moveForwardInPlace;
     pub const moveBackward: fn (address: @This(), size: core.Size) callconv(.@"inline") @This() = Mixin.moveBackward;
     pub const moveBackwardInPlace: fn (address: *@This(), size: core.Size) callconv(.@"inline") void = Mixin.moveBackwardInPlace;
+
+    pub const pageAligned: fn (address: @This()) callconv(.@"inline") bool = Mixin.pageAligned;
+    pub const pageAlignForward: fn (address: @This()) callconv(.@"inline") @This() = Mixin.pageAlignForward;
+    pub const pageAlignForwardInPlace: fn (address: *@This()) callconv(.@"inline") void = Mixin.pageAlignForwardInPlace;
+    pub const pageAlignBackward: fn (address: @This()) callconv(.@"inline") @This() = Mixin.pageAlignBackward;
+    pub const pageAlignBackwardInPlace: fn (address: *@This()) callconv(.@"inline") void = Mixin.pageAlignBackwardInPlace;
+    pub const moveForwardPage: fn (address: @This()) callconv(.@"inline") @This() = Mixin.moveForwardPage;
+    pub const moveForwardPageInPlace: fn (address: *@This()) callconv(.@"inline") void = Mixin.moveForwardPageInPlace;
+    pub const moveBackwardPage: fn (address: @This()) callconv(.@"inline") @This() = Mixin.moveBackwardPage;
+    pub const moveBackwardPageInPlace: fn (address: *@This()) callconv(.@"inline") void = Mixin.moveBackwardPageInPlace;
+
     pub const equal: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.equal;
     pub const lessThan: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.lessThan;
     pub const lessThanOrEqual: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.lessThanOrEqual;
     pub const greaterThan: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.greaterThan;
     pub const greaterThanOrEqual: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.greaterThanOrEqual;
+
     pub const difference: fn (address: @This(), other: @This()) callconv(.@"inline") core.Size = Mixin.difference;
     pub const format: fn (address: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void = Mixin.format;
 
@@ -209,8 +258,9 @@ pub const PhysicalAddress = extern struct {
     /// **REQUIREMENTS**:
     /// - The provided `address` is covered by the direct map.
     pub inline fn toDirectMap(physical_address: PhysicalAddress) KernelVirtualAddress {
-        if (core.is_debug) std.debug.assert(physical_address.value < cascade.mem.globals.direct_map.size.value);
-        return .{ .value = physical_address.value + cascade.mem.globals.direct_map.address.value };
+        const direct_map_address: KernelVirtualAddress = .{ .value = physical_address.value + cascade.mem.globals.direct_map.address.value };
+        if (core.is_debug) std.debug.assert(cascade.mem.globals.direct_map.containsAddress(direct_map_address));
+        return direct_map_address;
     }
 
     pub const aligned: fn (address: @This(), alignment: std.mem.Alignment) callconv(.@"inline") bool = Mixin.aligned;
@@ -222,11 +272,23 @@ pub const PhysicalAddress = extern struct {
     pub const moveForwardInPlace: fn (address: *@This(), size: core.Size) callconv(.@"inline") void = Mixin.moveForwardInPlace;
     pub const moveBackward: fn (address: @This(), size: core.Size) callconv(.@"inline") @This() = Mixin.moveBackward;
     pub const moveBackwardInPlace: fn (address: *@This(), size: core.Size) callconv(.@"inline") void = Mixin.moveBackwardInPlace;
+
+    pub const pageAligned: fn (address: @This()) callconv(.@"inline") bool = Mixin.pageAligned;
+    pub const pageAlignForward: fn (address: @This()) callconv(.@"inline") @This() = Mixin.pageAlignForward;
+    pub const pageAlignForwardInPlace: fn (address: *@This()) callconv(.@"inline") void = Mixin.pageAlignForwardInPlace;
+    pub const pageAlignBackward: fn (address: @This()) callconv(.@"inline") @This() = Mixin.pageAlignBackward;
+    pub const pageAlignBackwardInPlace: fn (address: *@This()) callconv(.@"inline") void = Mixin.pageAlignBackwardInPlace;
+    pub const moveForwardPage: fn (address: @This()) callconv(.@"inline") @This() = Mixin.moveForwardPage;
+    pub const moveForwardPageInPlace: fn (address: *@This()) callconv(.@"inline") void = Mixin.moveForwardPageInPlace;
+    pub const moveBackwardPage: fn (address: @This()) callconv(.@"inline") @This() = Mixin.moveBackwardPage;
+    pub const moveBackwardPageInPlace: fn (address: *@This()) callconv(.@"inline") void = Mixin.moveBackwardPageInPlace;
+
     pub const equal: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.equal;
     pub const lessThan: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.lessThan;
     pub const lessThanOrEqual: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.lessThanOrEqual;
     pub const greaterThan: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.greaterThan;
     pub const greaterThanOrEqual: fn (address: @This(), other: @This()) callconv(.@"inline") bool = Mixin.greaterThanOrEqual;
+
     pub const difference: fn (address: @This(), other: @This()) callconv(.@"inline") core.Size = Mixin.difference;
     pub const format: fn (address: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void = Mixin.format;
 
@@ -283,6 +345,7 @@ pub const VirtualRange = struct {
         };
     }
 
+    pub const pageAligned: fn (range: @This()) callconv(.@"inline") bool = Mixin.pageAligned;
     pub const last: fn (range: @This()) Address = Mixin.last;
     pub const after: fn (range: @This()) callconv(.@"inline") Address = Mixin.after;
     pub const anyOverlap: fn (range: @This(), other: @This()) bool = Mixin.anyOverlap;
@@ -314,10 +377,10 @@ pub const KernelVirtualRange = struct {
     /// **REQUIREMENTS**:
     /// - The slice must be fully contained in kernel memory.
     pub inline fn fromSlice(comptime T: type, slice: []const T) KernelVirtualRange {
-        return VirtualRange.from(
-            .from(@intFromPtr(slice.ptr)),
-            core.Size.of(T).multiplyScalar(slice.len),
-        ).toKernel();
+        return .{
+            .address = .fromPtr(slice.ptr),
+            .size = core.Size.of(T).multiplyScalar(slice.len),
+        };
     }
 
     pub inline fn toVirtualRange(range: KernelVirtualRange) VirtualRange {
@@ -328,10 +391,14 @@ pub const KernelVirtualRange = struct {
     }
 
     /// Returns a mutable slice of bytes in this range.
+    ///
+    /// **REQUIREMENTS**:
+    /// - The range must be fully contained in kernel memory.
     pub inline fn byteSlice(range: KernelVirtualRange) []u8 {
         return range.address.toPtr([*]u8)[0..range.size.value];
     }
 
+    pub const pageAligned: fn (range: @This()) callconv(.@"inline") bool = Mixin.pageAligned;
     pub const last: fn (range: @This()) Address = Mixin.last;
     pub const after: fn (range: @This()) callconv(.@"inline") Address = Mixin.after;
     pub const anyOverlap: fn (range: @This(), other: @This()) bool = Mixin.anyOverlap;
@@ -374,6 +441,7 @@ pub const UserVirtualRange = struct {
         return range.address.ptr([*]u8)[0..range.size.value];
     }
 
+    pub const pageAligned: fn (range: @This()) callconv(.@"inline") bool = Mixin.pageAligned;
     pub const last: fn (range: @This()) Address = Mixin.last;
     pub const after: fn (range: @This()) callconv(.@"inline") Address = Mixin.after;
     pub const anyOverlap: fn (range: @This(), other: @This()) bool = Mixin.anyOverlap;
@@ -415,7 +483,7 @@ pub const PhysicalRange = struct {
     pub inline fn toDirectMap(range: PhysicalRange) VirtualRange {
         const direct_map_range: VirtualRange = .{
             .address = .{
-                .value = range.address.value - cascade.mem.globals.direct_map.address.value,
+                .value = range.address.value + cascade.mem.globals.direct_map.address.value,
             },
             .size = range.size,
         };
@@ -423,6 +491,7 @@ pub const PhysicalRange = struct {
         return direct_map_range;
     }
 
+    pub const pageAligned: fn (range: @This()) callconv(.@"inline") bool = Mixin.pageAligned;
     pub const last: fn (range: @This()) Address = Mixin.last;
     pub const after: fn (range: @This()) callconv(.@"inline") Address = Mixin.after;
     pub const anyOverlap: fn (range: @This(), other: @This()) bool = Mixin.anyOverlap;
@@ -441,36 +510,72 @@ fn AddressMixin(comptime Address: type) type {
             return alignment.check(address.value);
         }
 
+        inline fn pageAligned(address: Address) bool {
+            return arch.paging.standard_page_size_alignment.check(address.value);
+        }
+
         inline fn alignForward(address: Address, alignment: std.mem.Alignment) Address {
             return .{ .value = alignment.forward(address.value) };
+        }
+
+        inline fn pageAlignForward(address: Address) Address {
+            return .{ .value = arch.paging.standard_page_size_alignment.forward(address.value) };
         }
 
         inline fn alignForwardInPlace(address: *Address, alignment: std.mem.Alignment) void {
             address.value = alignment.forward(address.value);
         }
 
+        inline fn pageAlignForwardInPlace(address: *Address) void {
+            address.value = arch.paging.standard_page_size_alignment.forward(address.value);
+        }
+
         inline fn alignBackward(address: Address, alignment: std.mem.Alignment) Address {
             return .{ .value = alignment.backward(address.value) };
+        }
+
+        inline fn pageAlignBackward(address: Address) Address {
+            return .{ .value = arch.paging.standard_page_size_alignment.backward(address.value) };
         }
 
         inline fn alignBackwardInPlace(address: *Address, alignment: std.mem.Alignment) void {
             address.value = alignment.backward(address.value);
         }
 
+        inline fn pageAlignBackwardInPlace(address: *Address) void {
+            address.value = arch.paging.standard_page_size_alignment.backward(address.value);
+        }
+
         inline fn moveForward(address: Address, size: core.Size) Address {
             return .{ .value = address.value + size.value };
+        }
+
+        inline fn moveForwardPage(address: Address) Address {
+            return .{ .value = address.value + arch.paging.standard_page_size.value };
         }
 
         inline fn moveForwardInPlace(address: *Address, size: core.Size) void {
             address.value += size.value;
         }
 
+        inline fn moveForwardPageInPlace(address: *Address) void {
+            address.value += arch.paging.standard_page_size.value;
+        }
+
         inline fn moveBackward(address: Address, size: core.Size) Address {
             return .{ .value = address.value - size.value };
         }
 
+        inline fn moveBackwardPage(address: Address) Address {
+            return .{ .value = address.value - arch.paging.standard_page_size.value };
+        }
+
         inline fn moveBackwardInPlace(address: *Address, size: core.Size) void {
             address.value -= size.value;
+        }
+
+        inline fn moveBackwardPageInPlace(address: *Address) void {
+            address.value -= arch.paging.standard_page_size.value;
         }
 
         inline fn equal(address: Address, other: Address) bool {
@@ -532,6 +637,13 @@ fn RangeMixin(comptime Range: type) type {
     return struct {
         // We disallow the address `VirtualAddress.max` from being a valid kernel or user address, this allows these range functions to be
         // implemented more efficiently. See `arch/arch.zig`.
+
+        /// Returns whether the range is page aligned.
+        ///
+        /// Both the address and size must be page aligned for this to return true.
+        pub inline fn pageAligned(range: Range) bool {
+            return range.address.pageAligned() and range.size.aligned(arch.paging.standard_page_size_alignment);
+        }
 
         /// Returns the last address in this range.
         ///

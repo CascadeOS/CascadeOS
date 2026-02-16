@@ -18,10 +18,7 @@ const log = cascade.debug.log.scoped(.paging);
 ///
 /// The `virtual_range` address and size must be aligned to the standard page size.
 pub fn flushCache(virtual_range: cascade.VirtualRange) void {
-    if (core.is_debug) {
-        std.debug.assert(virtual_range.address.aligned(PageTable.small_page_size_alignment));
-        std.debug.assert(virtual_range.size.aligned(PageTable.small_page_size_alignment));
-    }
+    if (core.is_debug) std.debug.assert(virtual_range.pageAligned());
 
     var current_virtual_address = virtual_range.address;
     const last_virtual_address = virtual_range.last();
@@ -29,6 +26,6 @@ pub fn flushCache(virtual_range: cascade.VirtualRange) void {
     while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
         x64.instructions.invlpg(current_virtual_address);
 
-        current_virtual_address.moveForwardInPlace(PageTable.small_page_size);
+        current_virtual_address.moveForwardPageInPlace();
     }
 }
