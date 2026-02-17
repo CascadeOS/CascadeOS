@@ -118,6 +118,7 @@ pub fn reinitializeAndUnmapAll(address_space: *AddressSpace) void {
 
     address_space.unmap(address_space.range) catch |err| switch (err) {
         error.OutOfMemory => unreachable, // as we are freeing the entire address space we do not need to split any entries
+        error.RangeNotPageAligned => unreachable, // the entire address space range is page aligned
     };
 
     address_space.entries_version = 0;
@@ -200,6 +201,12 @@ pub const MapError = error{
 
     /// The request would result in the maximum protection of an entry in the range being set to `.none`.
     MaxProtectionNone,
+
+    /// The requested size is not a multiple of the standard page size.
+    SizeNotMultipleOfAPage,
+
+    /// The requested base is not page aligned.
+    BaseNotPageAligned,
 };
 
 /// Map a range into the address space.
@@ -224,14 +231,21 @@ pub fn map(
         });
     }
 
-    if (core.is_debug) {
-        std.debug.assert(options.size.aligned(arch.paging.standard_page_size_alignment));
-        if (options.base) |base| std.debug.assert(base.pageAligned());
-    }
-
     if (options.size.equal(.zero)) {
         @branchHint(.cold);
         return error.ZeroSize;
+    }
+
+    if (!options.size.aligned(arch.paging.standard_page_size_alignment)) {
+        @branchHint(.cold);
+        return error.SizeNotMultipleOfAPage;
+    }
+
+    if (options.base) |base| {
+        if (!base.pageAligned()) {
+            @branchHint(.cold);
+            return error.BaseNotPageAligned;
+        }
     }
 
     if (options.max_protection) |max_protection| {
@@ -520,12 +534,12 @@ pub const ChangeProtectionError = error{
 
     /// No memory available.
     OutOfMemory,
+
+    /// The provided range is not aligned to the standard page size.
+    RangeNotPageAligned,
 };
 
 /// Change the protection and/or maximum protection of a range in the address space.
-///
-/// Caller must ensure:
-///  - the size and address of the range are aligned to the standard page size
 pub fn changeProtection(
     address_space: *AddressSpace,
     range: cascade.VirtualRange,
@@ -537,7 +551,10 @@ pub fn changeProtection(
 
     log.verbose("{s}: change protection of {f} to {f}", .{ address_space.name(), range, request });
 
-    if (core.is_debug) std.debug.assert(range.pageAligned());
+    if (!range.pageAligned()) {
+        @branchHint(.cold);
+        return error.RangeNotPageAligned;
+    }
 
     if (request.max_protection) |max_protection| if (max_protection == .none) {
         @branchHint(.cold);
@@ -869,18 +886,21 @@ pub const UnmapError = error{
     ///
     /// This is only possible if the given range results in splitting an entry
     OutOfMemory,
+
+    /// The provided range is not aligned to the standard page size.
+    RangeNotPageAligned,
 };
 
 /// Unmap a range from the address space.
-///
-/// Caller must ensure:
-///  - the size and address of the range are aligned to the standard page size
 pub fn unmap(address_space: *AddressSpace, range: cascade.VirtualRange) UnmapError!void {
     errdefer |err| log.debug("{s}: unmap failed {t}", .{ address_space.name(), err });
 
     log.verbose("{s}: unmap {f}", .{ address_space.name(), range });
 
-    if (core.is_debug) std.debug.assert(range.pageAligned());
+    if (!range.pageAligned()) {
+        @branchHint(.cold);
+        return error.RangeNotPageAligned;
+    }
 
     const result: UnmapResult = blk: {
         if (range.size.equal(.zero)) {
