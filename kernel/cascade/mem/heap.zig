@@ -56,24 +56,20 @@ pub fn deallocate(range: cascade.KernelVirtualRange) void {
     );
 }
 
+pub const AllocatorSpecialMapType = struct {
+    protection: cascade.mem.MapType.Protection,
+    cache: cascade.mem.MapType.Cache,
+};
+
 /// Allocate a range of memory that is mapped to a specific physical range with the given map type.
-///
-/// **REQUIREMENTS**:
-/// - `size` must be equal to `physical_range.size`.
-/// - `size` must be aligned to `arch.paging.standard_page_size`.
-/// - `physical_range.address` must be aligned to `arch.paging.standard_page_size`.
 pub fn allocateSpecial(
-    size: core.Size,
     physical_range: cascade.PhysicalRange,
-    map_type: cascade.mem.MapType,
+    map_type: AllocatorSpecialMapType,
 ) AllocateError!cascade.KernelVirtualRange {
-    if (core.is_debug) {
-        std.debug.assert(physical_range.pageAligned());
-        std.debug.assert(size.equal(physical_range.size));
-    }
+    const page_aligned_physical_range = physical_range.pageAlign();
 
     const allocation = globals.special_heap_address_space_arena.allocate(
-        size.value,
+        page_aligned_physical_range.size.value,
         .instant_fit,
     ) catch |err| {
         @branchHint(.unlikely);
@@ -84,28 +80,37 @@ pub fn allocateSpecial(
     };
     errdefer globals.special_heap_address_space_arena.deallocate(allocation);
 
-    const virtual_range = allocation.toVirtualRange();
+    const page_aligned_virtual_range = allocation.toVirtualRange();
 
-    globals.special_heap_page_table_mutex.lock();
-    defer globals.special_heap_page_table_mutex.unlock();
+    {
+        globals.special_heap_page_table_mutex.lock();
+        defer globals.special_heap_page_table_mutex.unlock();
 
-    cascade.mem.mapRangeToPhysicalRange(
-        cascade.mem.kernelPageTable(),
-        virtual_range.toVirtualRange(),
-        physical_range,
-        map_type,
-        .kernel,
-        .keep,
-        cascade.mem.PhysicalPage.allocator,
-    ) catch |err| {
-        @branchHint(.unlikely);
-        switch (err) {
-            error.AlreadyMapped, error.MappingNotValid => std.debug.panic("allocate special failed: {s}", .{@errorName(err)}),
-            error.PagesExhausted => return error.OutOfMemory,
-        }
-    };
+        cascade.mem.mapRangeToPhysicalRange(
+            cascade.mem.kernelPageTable(),
+            page_aligned_virtual_range.toVirtualRange(),
+            page_aligned_physical_range,
+            .{
+                .type = .kernel,
+                .protection = map_type.protection,
+                .cache = map_type.cache,
+            },
+            .kernel,
+            .keep,
+            cascade.mem.PhysicalPage.allocator,
+        ) catch |err| {
+            @branchHint(.unlikely);
+            switch (err) {
+                error.AlreadyMapped, error.MappingNotValid => std.debug.panic("allocate special failed: {s}", .{@errorName(err)}),
+                error.PagesExhausted => return error.OutOfMemory,
+            }
+        };
+    }
 
-    return virtual_range;
+    return .from(
+        page_aligned_virtual_range.address.moveForward(page_aligned_physical_range.address.difference(physical_range.address)),
+        physical_range.size,
+    );
 }
 
 /// Deallocate a range of memory that was allocated by `allocateSpecial`.
@@ -113,12 +118,14 @@ pub fn allocateSpecial(
 /// **REQUIREMENTS**:
 /// - `virtual_range` must be a range that was previously allocated by `allocateSpecial`.
 pub fn deallocateSpecial(virtual_range: cascade.KernelVirtualRange) void {
+    const page_aligned_virtual_range = virtual_range.pageAlign();
+
     {
         globals.special_heap_page_table_mutex.lock();
         defer globals.special_heap_page_table_mutex.unlock();
 
         var unmap_batch: cascade.mem.VirtualRangeBatch = .{};
-        std.debug.assert(unmap_batch.append(virtual_range.toVirtualRange()));
+        std.debug.assert(unmap_batch.append(page_aligned_virtual_range.toVirtualRange()));
 
         cascade.mem.unmap(
             cascade.mem.kernelPageTable(),
@@ -130,7 +137,7 @@ pub fn deallocateSpecial(virtual_range: cascade.KernelVirtualRange) void {
         );
     }
 
-    globals.special_heap_address_space_arena.deallocate(.fromVirtualRange(virtual_range));
+    globals.special_heap_address_space_arena.deallocate(.fromVirtualRange(page_aligned_virtual_range));
 }
 
 // pub to allow access by `cascade.mem.cache`

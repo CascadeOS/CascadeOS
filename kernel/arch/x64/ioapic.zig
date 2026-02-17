@@ -109,19 +109,18 @@ pub const init = struct {
                 .io_apic => {
                     const io_apic_data = entry.specific.io_apic;
 
-                    const size_to_map = IOAPIC.register_region_size.alignForward(arch.paging.standard_page_size_alignment);
-
                     const register_region_range = try cascade.mem.heap.allocateSpecial(
-                        size_to_map,
-                        .from(.from(io_apic_data.ioapic_address), size_to_map),
+                        .from(.from(io_apic_data.ioapic_address), IOAPIC.register_region_size),
                         .{
-                            .type = .kernel,
                             .protection = .read_write,
                             .cache = .uncached,
                         },
                     );
 
-                    const ioapic = IOAPIC.init(register_region_range.address, io_apic_data.global_system_interrupt_base);
+                    const ioapic = IOAPIC.init(
+                        register_region_range.address,
+                        io_apic_data.global_system_interrupt_base,
+                    );
 
                     init_log.debug("found ioapic for gsi {}-{}", .{
                         ioapic.gsi_base,

@@ -144,13 +144,11 @@ fn getSerialOutputFromNS16550a(dt: DeviceTree, node: DeviceTree.Node, memory_sys
     };
 
     const register_range = try cascade.mem.heap.allocateSpecial(
-        uart.Memory16550.register_region_size,
         .from(
             .from(address),
             uart.Memory16550.register_region_size,
         ),
         .{
-            .type = .kernel,
             .protection = .read_write,
             .cache = .uncached,
         },
@@ -228,13 +226,11 @@ fn getSerialOutputFromPL011(dt: DeviceTree, node: DeviceTree.Node, memory_system
     };
 
     const register_range = try cascade.mem.heap.allocateSpecial(
-        uart.PL011.register_region_size,
         .from(
             .from(address),
             uart.PL011.register_region_size,
         ),
         .{
-            .type = .kernel,
             .protection = .read_write,
             .cache = .uncached,
         },

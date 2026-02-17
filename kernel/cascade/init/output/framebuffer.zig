@@ -30,20 +30,12 @@ fn tryGetFramebufferOutputInner(memory_system_available: bool) !?Output {
 
     const framebuffer = boot.framebuffer() orelse return null;
 
-    const physical_address: cascade.PhysicalAddress = .fromDirectMap(.fromPtr(framebuffer.ptr));
-
-    if (!physical_address.pageAligned()) @panic("framebuffer is not aligned");
-
-    const framebuffer_size: core.Size = .from(framebuffer.height * framebuffer.pitch, .byte);
-
     const virtual_range = try cascade.mem.heap.allocateSpecial(
-        framebuffer_size,
         .from(
-            physical_address,
-            framebuffer_size,
+            .fromDirectMap(.fromPtr(framebuffer.ptr)),
+            .from(framebuffer.height * framebuffer.pitch, .byte),
         ),
         .{
-            .type = .kernel,
             .protection = .read_write,
             .cache = .write_combining,
         },

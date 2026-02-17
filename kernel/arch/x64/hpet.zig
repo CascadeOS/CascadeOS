@@ -97,13 +97,9 @@ pub const init = struct {
 
         if (hpet.base_address.address_space != .memory) @panic("HPET base address is not memory mapped");
 
-        const size_to_map = Hpet.register_region_size.alignForward(arch.paging.standard_page_size_alignment);
-
         const register_region_range = try cascade.mem.heap.allocateSpecial(
-            size_to_map,
-            .from(.from(hpet.base_address.address), size_to_map),
+            .from(.from(hpet.base_address.address), Hpet.register_region_size),
             .{
-                .type = .kernel,
                 .protection = .read_write,
                 .cache = .uncached,
             },

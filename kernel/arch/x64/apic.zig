@@ -73,10 +73,8 @@ pub const init = struct {
             globals.lapic = .x2apic;
         } else {
             const register_space_range = try cascade.mem.heap.allocateSpecial(
-                LAPIC.Register.register_space_size,
                 .from(.from(madt.local_interrupt_controller_address), LAPIC.Register.register_space_size),
                 .{
-                    .type = .kernel,
                     .protection = .read_write,
                     .cache = .uncached,
                 },
