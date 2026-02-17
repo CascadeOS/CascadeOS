@@ -25,7 +25,7 @@ SPDX-License-Identifier = "CC0-1.0"
 SPDX-FileCopyrightText = "https://shields.io/"
 
 [[annotations]]
-path = "kernel/kernel/init/output/simple.font"
+path = "kernel/cascade/init/output/simple.font"
 precedence = "aggregate"
-SPDX-License-Identifier = "OFL-1.1-RFN"
+SPDX-License-Identifier = "OFL-1.1"
 SPDX-FileCopyrightText = ""
