@@ -346,6 +346,7 @@ pub const VirtualRange = struct {
     }
 
     pub const pageAligned: fn (range: @This()) callconv(.@"inline") bool = Mixin.pageAligned;
+    pub const pageAlign: fn (range: @This()) callconv(.@"inline") @This() = Mixin.pageAlign;
     pub const last: fn (range: @This()) Address = Mixin.last;
     pub const after: fn (range: @This()) callconv(.@"inline") Address = Mixin.after;
     pub const anyOverlap: fn (range: @This(), other: @This()) bool = Mixin.anyOverlap;
@@ -399,6 +400,7 @@ pub const KernelVirtualRange = struct {
     }
 
     pub const pageAligned: fn (range: @This()) callconv(.@"inline") bool = Mixin.pageAligned;
+    pub const pageAlign: fn (range: @This()) callconv(.@"inline") @This() = Mixin.pageAlign;
     pub const last: fn (range: @This()) Address = Mixin.last;
     pub const after: fn (range: @This()) callconv(.@"inline") Address = Mixin.after;
     pub const anyOverlap: fn (range: @This(), other: @This()) bool = Mixin.anyOverlap;
@@ -442,6 +444,7 @@ pub const UserVirtualRange = struct {
     }
 
     pub const pageAligned: fn (range: @This()) callconv(.@"inline") bool = Mixin.pageAligned;
+    pub const pageAlign: fn (range: @This()) callconv(.@"inline") @This() = Mixin.pageAlign;
     pub const last: fn (range: @This()) Address = Mixin.last;
     pub const after: fn (range: @This()) callconv(.@"inline") Address = Mixin.after;
     pub const anyOverlap: fn (range: @This(), other: @This()) bool = Mixin.anyOverlap;
@@ -492,6 +495,7 @@ pub const PhysicalRange = struct {
     }
 
     pub const pageAligned: fn (range: @This()) callconv(.@"inline") bool = Mixin.pageAligned;
+    pub const pageAlign: fn (range: @This()) callconv(.@"inline") @This() = Mixin.pageAlign;
     pub const last: fn (range: @This()) Address = Mixin.last;
     pub const after: fn (range: @This()) callconv(.@"inline") Address = Mixin.after;
     pub const anyOverlap: fn (range: @This(), other: @This()) bool = Mixin.anyOverlap;
@@ -643,6 +647,16 @@ fn RangeMixin(comptime Range: type) type {
         /// Both the address and size must be page aligned for this to return true.
         pub inline fn pageAligned(range: Range) bool {
             return range.address.pageAligned() and range.size.aligned(arch.paging.standard_page_size_alignment);
+        }
+
+        /// Returns the range with the address and size page aligned.
+        ///
+        /// The address is aligned backward and the size is aligned forward.
+        pub inline fn pageAlign(range: Range) Range {
+            return .{
+                .address = range.address.pageAlignBackward(),
+                .size = range.size.alignForward(arch.paging.standard_page_size_alignment),
+            };
         }
 
         /// Returns the last address in this range.
