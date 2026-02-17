@@ -352,8 +352,8 @@ fn loadHelloWorld() !void {
     // TODO: this only makes sense for an embedded program, not if it is loaded from disk
     while (try iter.next()) |loadable_region| {
         _ = try process.address_space.map(.{
-            .base = loadable_region.map_range.address.toVirtualAddress(),
-            .size = loadable_region.map_range.size,
+            .base = loadable_region.virtual_range.address.toVirtualAddress(),
+            .size = loadable_region.virtual_range.size,
             .protection = .read_write,
             .type = .zero_fill,
         });
@@ -367,11 +367,13 @@ fn loadHelloWorld() !void {
         iter.reset();
 
         while (try iter.next()) |loadable_region| {
-            const mapped_slice = loadable_region.map_range.byteSlice();
+            if (loadable_region.source_length == 0) continue;
+
+            const mapped_slice = loadable_region.virtual_range.byteSlice();
 
             @memcpy(
-                mapped_slice[loadable_region.destination_offset..][0..loadable_region.length],
-                hello_world_elf[loadable_region.source_base..][0..loadable_region.length],
+                mapped_slice[loadable_region.destination_offset..][0..loadable_region.source_length],
+                hello_world_elf[loadable_region.source_base..][0..loadable_region.source_length],
             );
         }
     }
@@ -383,7 +385,7 @@ fn loadHelloWorld() !void {
         if (loadable_region.protection == .read_write) continue;
 
         try process.address_space.changeProtection(
-            loadable_region.map_range.toVirtualRange(),
+            loadable_region.virtual_range.toVirtualRange(),
             .{
                 .both = .{
                     .protection = loadable_region.protection,

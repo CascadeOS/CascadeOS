@@ -497,13 +497,24 @@ pub const ProgramHeader = struct {
 };
 
 pub const LoadableRegion = struct {
-    map_range: cascade.UserVirtualRange,
+    /// The virtual range to allocate in the address space.
+    ///
+    /// Page aligned.
+    virtual_range: cascade.UserVirtualRange,
 
-    destination_offset: usize,
-    source_base: usize,
-    length: usize,
-
+    /// The protection to use for the mapping.
     protection: cascade.mem.MapType.Protection,
+
+    /// The offset into the source data to copy from.
+    source_base: usize,
+
+    /// The number of bytes to copy from the source data.
+    ///
+    /// May be zero.
+    source_length: usize,
+
+    /// The offset into the virtual range to copy the data to.
+    destination_offset: usize,
 
     pub const Iterator = struct {
         program_header_iterator: ProgramHeader.Iterator,
@@ -517,22 +528,23 @@ pub const LoadableRegion = struct {
                 if (program_header.type != .load) continue;
                 if (program_header.memory_size == 0) continue; // can this even happen with a loadable segment?
 
-                const raw_segment_base: cascade.VirtualAddress = .from(program_header.virtual_address);
-                const raw_range_base = raw_segment_base.pageAlignBackward();
+                const address, const offset_due_to_alignment = blk: {
+                    const unaligned_address: cascade.VirtualAddress = .from(program_header.virtual_address);
+                    const aligned_address = unaligned_address.pageAlignBackward();
+                    break :blk .{ aligned_address, aligned_address.difference(unaligned_address) };
+                };
 
-                const segment_offset_size = raw_range_base.difference(raw_segment_base);
-
-                const segment_size: core.Size = .from(program_header.memory_size, .byte);
-                const range_size = segment_size
-                    .add(segment_offset_size)
+                const range_size: core.Size = offset_due_to_alignment
+                    .add(.from(program_header.memory_size, .byte))
                     .alignForward(arch.paging.standard_page_size_alignment);
 
-                const raw_map_range: cascade.VirtualRange = .from(raw_segment_base, range_size);
-                if (raw_map_range.getType() != .user) {
+                const virtual_range: cascade.VirtualRange = .from(address, range_size);
+                if (core.is_debug) std.debug.assert(virtual_range.pageAligned());
+
+                if (virtual_range.getType() != .user) {
                     log.warn("program header has invalid user virtual address range: {f}", .{program_header});
                     return error.ProgramHeaderInvalidVirtualAddress;
                 }
-                const map_range = raw_map_range.toUser();
 
                 const new_protection = blk: {
                     var prot: cascade.mem.MapType.Protection = .none;
@@ -558,10 +570,10 @@ pub const LoadableRegion = struct {
                 };
 
                 return .{
-                    .map_range = map_range,
-                    .destination_offset = segment_offset_size.value,
+                    .virtual_range = virtual_range.toUser(),
+                    .destination_offset = offset_due_to_alignment.value,
                     .source_base = program_header.offset,
-                    .length = program_header.file_size,
+                    .source_length = program_header.file_size,
                     .protection = new_protection,
                 };
             }
@@ -569,6 +581,34 @@ pub const LoadableRegion = struct {
             return null;
         }
     };
+
+    pub fn print(loadable_region: LoadableRegion, writer: *std.Io.Writer, indent: usize) !void {
+        const new_indent = indent + 2;
+
+        try writer.writeAll("LoadableRegion{\n");
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("virtual_range: {f},\n", .{loadable_region.virtual_range});
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("protection: {t},\n", .{loadable_region.protection});
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("source_base: 0x{x},\n", .{loadable_region.source_base});
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("source_length: 0x{x},\n", .{loadable_region.source_length});
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("destination_offset: 0x{x},\n", .{loadable_region.destination_offset});
+
+        try writer.splatByteAll(' ', indent);
+        try writer.writeByte('}');
+    }
+
+    pub fn format(loadable_region: LoadableRegion, writer: *std.Io.Writer) !void {
+        return loadable_region.print(writer, 0);
+    }
 };
 
 pub const ObjectType = enum(u16) {
