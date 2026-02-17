@@ -270,12 +270,24 @@ export fn uacpi_kernel_io_write32(
 ///              Let's assume the returned virtual address for the mapping is 0xF000.
 ///           5. Add the original offset within page 0xABC (from step 1) to the resulting virtual address
 ///              0xF000 + 0xABC => 0xFABC. Return it to uACPI.
-export fn uacpi_kernel_map(physical_address: cascade.PhysicalAddress, len: usize) [*]u8 {
+export fn uacpi_kernel_map(physical_address: cascade.PhysicalAddress, len: usize) ?[*]u8 {
     log.verbose("uacpi_kernel_map called", .{});
 
-    _ = len;
+    if (!acpi.init.init_globals.acpi_present) {
+        // early calls to `uacpi_kernel_map` occur only to map ACPI tables, so using the direct map is fine
+        @branchHint(.cold);
+        return physical_address.toDirectMap().toPtr([*]u8);
+    }
 
-    return physical_address.toDirectMap().toPtr([*]u8);
+    const virtual_range = cascade.mem.heap.allocateSpecial(
+        .from(physical_address, .from(len, .byte)),
+        .{ .cache = .write_back, .protection = .read_write },
+    ) catch |err| {
+        log.warn("uacpi_kernel_map failed: {s}", .{@errorName(err)});
+        return null;
+    };
+
+    return virtual_range.address.toPtr([*]u8);
 }
 
 /// Unmap a virtual memory range at 'addr' with a length of 'len' bytes.
@@ -286,8 +298,13 @@ export fn uacpi_kernel_map(physical_address: cascade.PhysicalAddress, len: usize
 export fn uacpi_kernel_unmap(ptr: [*]u8, len: usize) void {
     log.verbose("uacpi_kernel_unmap called", .{});
 
-    _ = ptr;
-    _ = len;
+    if (!acpi.init.init_globals.acpi_present) {
+        // early calls to `uacpi_kernel_unmap` occur only to unmap ACPI tables, so using the direct map is fine
+        @branchHint(.cold);
+        return;
+    }
+
+    cascade.mem.heap.deallocateSpecial(.fromSlice(u8, ptr[0..len]));
 }
 
 /// Allocate a block of memory of 'size' bytes.

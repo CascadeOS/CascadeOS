@@ -209,9 +209,9 @@ pub const init = struct {
         }
     };
 
-    const init_globals = struct {
+    pub const init_globals = struct {
         /// If this is true, the ACPI tables have been initialized and the RSDP pointer is valid.
-        var acpi_present: bool = false;
+        pub var acpi_present: bool = false;
     };
 };
 
