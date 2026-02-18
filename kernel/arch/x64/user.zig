@@ -16,133 +16,6 @@ const x64 = @import("x64.zig");
 
 const log = cascade.debug.log.scoped(.user_x64);
 
-pub const PerThread = struct {
-    extended_state: ExtendedState,
-
-    /// Create the `PerThread` data of a thread.
-    ///
-    /// Non-architecture specific creation has already been performed but no initialization.
-    ///
-    /// This function is called in the `Thread` cache constructor.
-    pub fn createThread(thread: *Thread) cascade.mem.cache.ConstructorError!void {
-        const per_thread: *x64.user.PerThread = .from(thread);
-
-        per_thread.* = .{
-            .extended_state = .{
-                .xsave_area = @alignCast(
-                    globals.xsave_area_cache.allocate() catch return error.ItemConstructionFailed,
-                ),
-            },
-        };
-    }
-
-    /// Destroy the `PerThread` data of a thread.
-    ///
-    /// Non-architecture specific destruction has not already been performed.
-    ///
-    /// This function is called in the `Thread` cache destructor.
-    pub fn destroyThread(thread: *Thread) void {
-        const per_thread: *x64.user.PerThread = .from(thread);
-
-        globals.xsave_area_cache.deallocate(per_thread.extended_state.xsave_area);
-    }
-
-    /// Initialize the `PerThread` data of a thread.
-    ///
-    /// All non-architecture specific initialization has already been performed.
-    ///
-    /// This function is called in `Thread.internal.create`.
-    pub fn initializeThread(thread: *Thread) void {
-        const per_thread: *x64.user.PerThread = .from(thread);
-        per_thread.extended_state.zero();
-    }
-
-    pub fn from(thread: *Thread) *PerThread {
-        return &thread.arch_specific;
-    }
-
-    pub const ExtendedState = struct {
-        fs_base: usize = undefined,
-        gs_base: usize = undefined,
-        xsave_area: []align(64) u8,
-
-        /// Where is the extended state currently stored
-        state: State = .memory,
-
-        pub const State = enum {
-            registers,
-            memory,
-        };
-
-        fn zero(extended_state: *ExtendedState) void {
-            extended_state.fs_base = 0;
-            extended_state.gs_base = 0;
-            @memset(extended_state.xsave_area, 0);
-            extended_state.state = .memory;
-        }
-
-        /// Save the extended state into memory if it is currently stored in the registers.
-        ///
-        /// Caller must ensure SSE is enabled before calling; see `x64.instructions.enableSSEUsage`
-        pub fn save(extended_state: *ExtendedState) void {
-            switch (extended_state.state) {
-                .memory => {},
-                .registers => {
-                    if (x64.info.cpu_id.fsgsbase) {
-                        @branchHint(.likely); // modern machines support fsgsbase
-                        extended_state.fs_base = x64.instructions.rdfsbase();
-                    } else {
-                        extended_state.fs_base = x64.registers.FS_BASE.read();
-                    }
-                    extended_state.gs_base = x64.registers.KERNEL_GS_BASE.read();
-
-                    switch (x64.info.xsave.method) {
-                        .xsaveopt => {
-                            @branchHint(.likely); // modern machines support xsaveopt
-                            x64.instructions.xsaveopt(
-                                extended_state.xsave_area,
-                                x64.info.xsave.xcr0_value,
-                            );
-                        },
-                        .xsave => x64.instructions.xsave(
-                            extended_state.xsave_area,
-                            x64.info.xsave.xcr0_value,
-                        ),
-                    }
-
-                    extended_state.state = .memory;
-                },
-            }
-        }
-
-        /// Load the extended state into registers if it is currently stored in memory.
-        ///
-        /// Caller must ensure SSE is enabled before calling; see `x64.instructions.enableSSEUsage`
-        pub fn load(extended_state: *ExtendedState) void {
-            switch (extended_state.state) {
-                .memory => {
-                    if (x64.info.cpu_id.fsgsbase) {
-                        @branchHint(.likely); // modern machines support fsgsbase
-                        x64.instructions.wrfsbase(extended_state.fs_base);
-                    } else {
-                        x64.registers.FS_BASE.write(extended_state.fs_base);
-                    }
-
-                    x64.registers.KERNEL_GS_BASE.write(extended_state.gs_base);
-
-                    x64.instructions.xrstor(
-                        extended_state.xsave_area,
-                        x64.info.xsave.xcr0_value,
-                    );
-
-                    extended_state.state = .registers;
-                },
-                .registers => {},
-            }
-        }
-    };
-};
-
 /// Enter userspace for the first time in the current task.
 pub fn enterUserspace(options: arch.user.EnterUserspaceOptions) noreturn {
     const per_thread: *x64.user.PerThread = .from(.from(Task.Current.get().task));
@@ -227,122 +100,10 @@ const EnterUserspaceFrame = extern struct {
     };
 };
 
-pub const SyscallFrame = extern struct {
-    /// arg11
-    r15: u64,
-    /// arg10
-    r14: u64,
-    /// arg9
-    r13: u64,
-    /// arg8
-    r12: u64,
-    /// arg7
-    r10: u64,
-    /// arg5
-    r9: u64,
-    /// arg4
-    r8: u64,
-    /// syscall number
-    rdi: u64,
-    /// arg1
-    rsi: u64,
-    /// arg12
-    rbp: u64,
-    /// arg2
-    rdx: u64,
-    /// arg6
-    rbx: u64,
-    /// arg3
-    rax: u64,
-
-    /// r11
-    rflags: x64.registers.RFlags,
-    /// rcx
-    rip: cascade.VirtualAddress,
-    rsp: cascade.VirtualAddress,
-
-    pub inline fn from(syscall_frame: arch.user.SyscallFrame) *SyscallFrame {
-        return &syscall_frame.arch_specific;
-    }
-
-    pub inline fn syscall(syscall_frame: *const SyscallFrame) ?user_cascade.Syscall {
-        return std.enums.fromInt(user_cascade.Syscall, syscall_frame.rdi);
-    }
-
-    pub inline fn arg(syscall_frame: *const SyscallFrame, comptime argument: arch.user.SyscallFrame.Arg) usize {
-        return switch (argument) {
-            .one => syscall_frame.rsi,
-            .two => syscall_frame.rdx,
-            .three => syscall_frame.rax,
-            .four => syscall_frame.r8,
-            .five => syscall_frame.r9,
-            .six => syscall_frame.rbx,
-            .seven => syscall_frame.r10,
-            .eight => syscall_frame.r12,
-            .nine => syscall_frame.r13,
-            .ten => syscall_frame.r14,
-            .eleven => syscall_frame.r15,
-            .twelve => syscall_frame.rbp,
-        };
-    }
-
-    pub fn print(
-        value: *const SyscallFrame,
-        writer: *std.Io.Writer,
-        indent: usize,
-    ) !void {
-        const new_indent = indent + 2;
-
-        try writer.writeAll("SyscallFrame{\n");
-
-        try writer.splatByteAll(' ', new_indent);
-        if (value.syscall()) |s|
-            try writer.print("syscall: {t},\n", .{s})
-        else
-            try writer.print("invalid syscall: {d},\n", .{value.rdi});
-
-        try writer.splatByteAll(' ', new_indent);
-        try writer.print("arg1:  0x{x:0>16}, arg2:  0x{x:0>16},\n", .{ value.arg(.one), value.arg(.two) });
-
-        try writer.splatByteAll(' ', new_indent);
-        try writer.print("arg3:  0x{x:0>16}, arg4:  0x{x:0>16},\n", .{ value.arg(.three), value.arg(.four) });
-
-        try writer.splatByteAll(' ', new_indent);
-        try writer.print("arg5:  0x{x:0>16}, arg6:  0x{x:0>16},\n", .{ value.arg(.five), value.arg(.six) });
-
-        try writer.splatByteAll(' ', new_indent);
-        try writer.print("arg7:  0x{x:0>16}, arg8:  0x{x:0>16},\n", .{ value.arg(.seven), value.arg(.eight) });
-
-        try writer.splatByteAll(' ', new_indent);
-        try writer.print("arg9:  0x{x:0>16}, arg10: 0x{x:0>16},\n", .{ value.arg(.nine), value.arg(.ten) });
-
-        try writer.splatByteAll(' ', new_indent);
-        try writer.print("arg11: 0x{x:0>16}, arg12: 0x{x:0>16},\n", .{ value.arg(.eleven), value.arg(.twelve) });
-
-        try writer.splatByteAll(' ', new_indent);
-        try writer.print("rsp:   0x{x:0>16}, rip:   0x{x:0>16},\n", .{ value.rsp.value, value.rip.value });
-
-        try writer.splatByteAll(' ', new_indent);
-        try writer.writeAll("rflags: ");
-        try value.rflags.print(writer, new_indent);
-        try writer.writeAll(",\n");
-
-        try writer.splatByteAll(' ', indent);
-        try writer.writeByte('}');
-    }
-
-    pub inline fn format(
-        value: *const SyscallFrame,
-        writer: *std.Io.Writer,
-    ) std.Io.Writer.Error!void {
-        return print(value, writer, 0);
-    }
-};
-
 export fn syscallDispatch(syscall_frame: *SyscallFrame) callconv(.c) void {
     x64.instructions.disableSSEUsage();
     defer {
-        const per_thread: *x64.user.PerThread = .from(.from(Task.Current.get().task));
+        const per_thread: *PerThread = .from(.from(Task.Current.get().task));
         x64.instructions.enableSSEUsage();
         per_thread.extended_state.load();
     }
@@ -447,6 +208,245 @@ pub fn syscallEntry() callconv(.naked) noreturn {
             .kernel_stack_pointer_offset = @offsetOf(Task, "stack") + @offsetOf(Task.Stack, "top_stack_pointer"),
         }));
 }
+
+pub const SyscallFrame = extern struct {
+    /// arg11
+    r15: u64,
+    /// arg10
+    r14: u64,
+    /// arg9
+    r13: u64,
+    /// arg8
+    r12: u64,
+    /// arg7
+    r10: u64,
+    /// arg5
+    r9: u64,
+    /// arg4
+    r8: u64,
+    /// syscall number
+    rdi: u64,
+    /// arg1
+    rsi: u64,
+    /// arg12
+    rbp: u64,
+    /// arg2
+    rdx: u64,
+    /// arg6
+    rbx: u64,
+    /// arg3
+    rax: u64,
+
+    /// r11
+    rflags: x64.registers.RFlags,
+    /// rcx
+    rip: cascade.VirtualAddress,
+    rsp: cascade.VirtualAddress,
+
+    pub inline fn from(syscall_frame: arch.user.SyscallFrame) *SyscallFrame {
+        return &syscall_frame.arch_specific;
+    }
+
+    pub inline fn syscall(syscall_frame: *const SyscallFrame) ?user_cascade.Syscall {
+        return std.enums.fromInt(user_cascade.Syscall, syscall_frame.rdi);
+    }
+
+    pub inline fn arg(syscall_frame: *const SyscallFrame, comptime argument: arch.user.SyscallFrame.Arg) usize {
+        return switch (argument) {
+            .one => syscall_frame.rsi,
+            .two => syscall_frame.rdx,
+            .three => syscall_frame.rax,
+            .four => syscall_frame.r8,
+            .five => syscall_frame.r9,
+            .six => syscall_frame.rbx,
+            .seven => syscall_frame.r10,
+            .eight => syscall_frame.r12,
+            .nine => syscall_frame.r13,
+            .ten => syscall_frame.r14,
+            .eleven => syscall_frame.r15,
+            .twelve => syscall_frame.rbp,
+        };
+    }
+
+    pub fn print(
+        value: *const SyscallFrame,
+        writer: *std.Io.Writer,
+        indent: usize,
+    ) !void {
+        const new_indent = indent + 2;
+
+        try writer.writeAll("SyscallFrame{\n");
+
+        try writer.splatByteAll(' ', new_indent);
+        if (value.syscall()) |s|
+            try writer.print("syscall: {t},\n", .{s})
+        else
+            try writer.print("invalid syscall: {d},\n", .{value.rdi});
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("arg1/rsi:  0x{x:0>16}, arg2/rdx:  0x{x:0>16},\n", .{ value.arg(.one), value.arg(.two) });
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("arg3/rax:  0x{x:0>16}, arg4/r8:   0x{x:0>16},\n", .{ value.arg(.three), value.arg(.four) });
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("arg5/r9:   0x{x:0>16}, arg6/rbx:  0x{x:0>16},\n", .{ value.arg(.five), value.arg(.six) });
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("arg7/r10:  0x{x:0>16}, arg8/r12:  0x{x:0>16},\n", .{ value.arg(.seven), value.arg(.eight) });
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("arg9/r13:  0x{x:0>16}, arg10/r14: 0x{x:0>16},\n", .{ value.arg(.nine), value.arg(.ten) });
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("arg11/r15: 0x{x:0>16}, arg12/rbp: 0x{x:0>16},\n", .{ value.arg(.eleven), value.arg(.twelve) });
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.print("rsp:       0x{x:0>16}, rip:       0x{x:0>16},\n", .{ value.rsp.value, value.rip.value });
+
+        try writer.splatByteAll(' ', new_indent);
+        try writer.writeAll("rflags: ");
+        try value.rflags.print(writer, new_indent);
+        try writer.writeAll(",\n");
+
+        try writer.splatByteAll(' ', indent);
+        try writer.writeByte('}');
+    }
+
+    pub inline fn format(
+        value: *const SyscallFrame,
+        writer: *std.Io.Writer,
+    ) std.Io.Writer.Error!void {
+        return print(value, writer, 0);
+    }
+};
+
+pub const PerThread = struct {
+    extended_state: ExtendedState,
+
+    /// Create the `PerThread` data of a thread.
+    ///
+    /// Non-architecture specific creation has already been performed but no initialization.
+    ///
+    /// This function is called in the `Thread` cache constructor.
+    pub fn createThread(thread: *Thread) cascade.mem.cache.ConstructorError!void {
+        const per_thread: *x64.user.PerThread = .from(thread);
+
+        per_thread.* = .{
+            .extended_state = .{
+                .xsave_area = @alignCast(
+                    globals.xsave_area_cache.allocate() catch return error.ItemConstructionFailed,
+                ),
+            },
+        };
+    }
+
+    /// Destroy the `PerThread` data of a thread.
+    ///
+    /// Non-architecture specific destruction has not already been performed.
+    ///
+    /// This function is called in the `Thread` cache destructor.
+    pub fn destroyThread(thread: *Thread) void {
+        const per_thread: *x64.user.PerThread = .from(thread);
+
+        globals.xsave_area_cache.deallocate(per_thread.extended_state.xsave_area);
+    }
+
+    /// Initialize the `PerThread` data of a thread.
+    ///
+    /// All non-architecture specific initialization has already been performed.
+    ///
+    /// This function is called in `Thread.internal.create`.
+    pub fn initializeThread(thread: *Thread) void {
+        const per_thread: *x64.user.PerThread = .from(thread);
+        per_thread.extended_state.zero();
+    }
+
+    pub inline fn from(thread: *Thread) *PerThread {
+        return &thread.arch_specific;
+    }
+
+    pub const ExtendedState = struct {
+        fs_base: usize = undefined,
+        gs_base: usize = undefined,
+        xsave_area: []align(64) u8,
+
+        /// Where is the extended state currently stored
+        state: State = .memory,
+
+        pub const State = enum {
+            registers,
+            memory,
+        };
+
+        fn zero(extended_state: *ExtendedState) void {
+            extended_state.fs_base = 0;
+            extended_state.gs_base = 0;
+            @memset(extended_state.xsave_area, 0);
+            extended_state.state = .memory;
+        }
+
+        /// Save the extended state into memory if it is currently stored in the registers.
+        ///
+        /// Caller must ensure SSE is enabled before calling; see `x64.instructions.enableSSEUsage`
+        pub fn save(extended_state: *ExtendedState) void {
+            switch (extended_state.state) {
+                .memory => {},
+                .registers => {
+                    if (x64.info.cpu_id.fsgsbase) {
+                        @branchHint(.likely); // modern machines support fsgsbase
+                        extended_state.fs_base = x64.instructions.rdfsbase();
+                    } else {
+                        extended_state.fs_base = x64.registers.FS_BASE.read();
+                    }
+                    extended_state.gs_base = x64.registers.KERNEL_GS_BASE.read();
+
+                    switch (x64.info.xsave.method) {
+                        .xsaveopt => {
+                            @branchHint(.likely); // modern machines support xsaveopt
+                            x64.instructions.xsaveopt(
+                                extended_state.xsave_area,
+                                x64.info.xsave.xcr0_value,
+                            );
+                        },
+                        .xsave => x64.instructions.xsave(
+                            extended_state.xsave_area,
+                            x64.info.xsave.xcr0_value,
+                        ),
+                    }
+
+                    extended_state.state = .memory;
+                },
+            }
+        }
+
+        /// Load the extended state into registers if it is currently stored in memory.
+        ///
+        /// Caller must ensure SSE is enabled before calling; see `x64.instructions.enableSSEUsage`
+        pub fn load(extended_state: *ExtendedState) void {
+            switch (extended_state.state) {
+                .memory => {
+                    if (x64.info.cpu_id.fsgsbase) {
+                        @branchHint(.likely); // modern machines support fsgsbase
+                        x64.instructions.wrfsbase(extended_state.fs_base);
+                    } else {
+                        x64.registers.FS_BASE.write(extended_state.fs_base);
+                    }
+
+                    x64.registers.KERNEL_GS_BASE.write(extended_state.gs_base);
+
+                    x64.instructions.xrstor(
+                        extended_state.xsave_area,
+                        x64.info.xsave.xcr0_value,
+                    );
+
+                    extended_state.state = .registers;
+                },
+                .registers => {},
+            }
+        }
+    };
+};
 
 const globals = struct {
     /// Initialized during `init.initialize`.
