@@ -97,7 +97,8 @@ pub const functions: arch.Functions = .{
 };
 
 const standard_page_size: core.Size = .from(4, .kib);
-const half_address_space_size: core.Size = .from(128, .tib);
+
+const size_of_address_space_half = core.Size.from(128, .tib).subtract(standard_page_size);
 
 pub const decls: arch.Decls = .{
     .PerExecutor = struct { hartid: u32 },
@@ -112,8 +113,8 @@ pub const decls: arch.Decls = .{
         .standard_page_size = standard_page_size,
         .largest_page_size = .from(1, .gib),
         .kernel_memory_range = .from(
-            .from(0xffff800000000000),
-            half_address_space_size.subtract(.one),
+            cascade.VirtualAddress.from(0xffff800000000000),
+            size_of_address_space_half,
         ),
         .PageTable = extern struct {},
     },
@@ -132,7 +133,7 @@ pub const decls: arch.Decls = .{
         .SyscallFrame = struct {},
         .user_memory_range = .from(
             cascade.VirtualAddress.zero.moveForward(standard_page_size),
-            half_address_space_size.subtract(standard_page_size),
+            size_of_address_space_half,
         ),
     },
 

@@ -154,6 +154,8 @@ pub const functions: arch.Functions = .{
     },
 };
 
+const size_of_address_space_half = core.Size.from(128, .tib).subtract(x64.paging.PageTable.small_page_size);
+
 pub const decls: arch.Decls = .{
     .PerExecutor = x64.PerExecutor,
 
@@ -166,8 +168,8 @@ pub const decls: arch.Decls = .{
         .standard_page_size = x64.paging.PageTable.small_page_size,
         .largest_page_size = x64.paging.PageTable.large_page_size,
         .kernel_memory_range = .from(
-            .from(0xffff800000000000),
-            x64.paging.PageTable.half_address_space_size.subtract(.one),
+            cascade.VirtualAddress.from(0xffff800000000000),
+            size_of_address_space_half,
         ),
         .PageTable = x64.paging.PageTable,
     },
@@ -186,7 +188,7 @@ pub const decls: arch.Decls = .{
         .SyscallFrame = x64.user.SyscallFrame,
         .user_memory_range = .from(
             cascade.VirtualAddress.zero.moveForward(x64.paging.PageTable.small_page_size),
-            x64.paging.PageTable.half_address_space_size.subtract(x64.paging.PageTable.small_page_size),
+            size_of_address_space_half,
         ),
     },
 
