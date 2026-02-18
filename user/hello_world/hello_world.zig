@@ -3,7 +3,7 @@
 
 const std = @import("std");
 
-const cascade = @import("cascade");
+const cascade = @import("user_cascade");
 
 pub const _start = cascade._cascade_start;
 comptime {

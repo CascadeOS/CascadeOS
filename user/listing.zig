@@ -4,7 +4,7 @@
 pub const applications: []const ApplicationDescription = &.{
     .{
         .name = "hello_world",
-        .dependencies = &.{"cascade"},
+        .dependencies = &.{"user_cascade"},
     },
 };
 

@@ -3,7 +3,7 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
-const cascade = @import("cascade");
+const cascade = @import("user_cascade");
 
 pub fn _cascade_start() callconv(.naked) noreturn {
     if (builtin.unwind_tables != .none or !builtin.strip_debug_info) {
