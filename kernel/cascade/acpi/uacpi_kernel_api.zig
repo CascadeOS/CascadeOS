@@ -273,7 +273,7 @@ export fn uacpi_kernel_io_write32(
 export fn uacpi_kernel_map(physical_address: cascade.PhysicalAddress, len: usize) ?[*]u8 {
     log.verbose("uacpi_kernel_map called", .{});
 
-    if (!acpi.init.init_globals.acpi_present) {
+    if (!cascade.mem.globals.memory_system_initialized) {
         // early calls to `uacpi_kernel_map` occur only to map ACPI tables, so using the direct map is fine
         @branchHint(.cold);
         return physical_address.toDirectMap().toPtr([*]u8);
@@ -298,7 +298,7 @@ export fn uacpi_kernel_map(physical_address: cascade.PhysicalAddress, len: usize
 export fn uacpi_kernel_unmap(ptr: [*]u8, len: usize) void {
     log.verbose("uacpi_kernel_unmap called", .{});
 
-    if (!acpi.init.init_globals.acpi_present) {
+    if (!cascade.mem.globals.memory_system_initialized) {
         // early calls to `uacpi_kernel_unmap` occur only to unmap ACPI tables, so using the direct map is fine
         @branchHint(.cold);
         return;

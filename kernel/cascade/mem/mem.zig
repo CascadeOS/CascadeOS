@@ -628,6 +628,15 @@ pub const ChangeProtectionBatch = struct {
 };
 
 pub const globals = struct {
+    /// Whether the memory system has been initialized.
+    ///
+    /// Before this is set to true other systems should not assume that heaps or address spaces are available.
+    ///
+    /// Mainly used to prevent early ACPI table mappings from using the special heap.
+    ///
+    /// Set to true during `init.initializeMemorySystem`.
+    pub var memory_system_initialized: bool = false;
+
     /// The kernel page table.
     ///
     /// All other page tables start as a copy of this one.
@@ -751,6 +760,8 @@ pub const init = struct {
                 .context = .kernel,
             },
         );
+
+        globals.memory_system_initialized = true;
     }
 
     fn buildMemoryLayout() void {
