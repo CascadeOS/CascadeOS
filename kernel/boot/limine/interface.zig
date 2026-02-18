@@ -268,8 +268,7 @@ fn limineEntryPoint() callconv(.c) noreturn {
     @panic("`initStage1` returned");
 }
 
-// TODO: ACPI tables and UART are not mapped to HHDM from revision 3 onwards, revision 4 maps ACPI tables but not UART :(
-const target_limine_revison: limine.BaseRevison.Revison = .@"2";
+const target_limine_revison: limine.BaseRevison.Revison = .@"4";
 var limine_revison: limine.BaseRevison.Revison = .@"0";
 
 pub fn exportRequests() void {
