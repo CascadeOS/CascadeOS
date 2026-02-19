@@ -114,7 +114,10 @@ pub const KernelVirtualAddress = extern struct {
     /// **REQUIREMENTS**:
     /// - The pointer must be a valid kernel pointer.
     pub inline fn fromPtr(ptr: anytype) KernelVirtualAddress {
-        comptime std.debug.assert(@typeInfo(@TypeOf(ptr)) == .pointer);
+        comptime {
+            const pointer_type_info = @typeInfo(@TypeOf(ptr)).pointer;
+            std.debug.assert(pointer_type_info.size == .one or pointer_type_info.size == .many);
+        }
         return .{ .value = @intFromPtr(ptr) };
     }
 
@@ -378,10 +381,20 @@ pub const KernelVirtualRange = struct {
     /// **REQUIREMENTS**:
     /// - The slice must be fully contained in kernel memory.
     pub inline fn fromSlice(comptime T: type, slice: []const T) KernelVirtualRange {
-        return .{
-            .address = .fromPtr(slice.ptr),
-            .size = core.Size.of(T).multiplyScalar(slice.len),
+        return .from(.{ .value = @intFromPtr(slice.ptr) }, core.Size.of(T).multiplyScalar(slice.len));
+    }
+
+    /// Creates a new kernel virtual range from a pointer.
+    ///
+    /// **REQUIREMENTS**:
+    /// - The pointer must be a valid kernel pointer.
+    pub inline fn fromPtr(ptr: anytype) KernelVirtualRange {
+        const T = comptime blk: {
+            const pointer_type_info = @typeInfo(@TypeOf(ptr)).pointer;
+            std.debug.assert(pointer_type_info.size == .one);
+            break :blk pointer_type_info.child;
         };
+        return .from(.{ .value = @intFromPtr(ptr) }, .of(T));
     }
 
     pub inline fn toVirtualRange(range: KernelVirtualRange) VirtualRange {
@@ -469,7 +482,7 @@ pub const PhysicalRange = struct {
     ///
     /// **REQUIREMENTS**:
     /// - `direct_map_range` must be fully contained within the direct map.
-    pub inline fn fromDirectMap(direct_map_range: VirtualRange) PhysicalRange {
+    pub inline fn fromDirectMap(direct_map_range: KernelVirtualRange) PhysicalRange {
         if (core.is_debug) std.debug.assert(cascade.mem.globals.direct_map.fullyContains(direct_map_range));
         return .{
             .address = .{
@@ -483,11 +496,9 @@ pub const PhysicalRange = struct {
     ///
     /// **REQUIREMENTS**:
     /// - `range` must be fully covered by the direct map.
-    pub inline fn toDirectMap(range: PhysicalRange) VirtualRange {
-        const direct_map_range: VirtualRange = .{
-            .address = .{
-                .value = range.address.value + cascade.mem.globals.direct_map.address.value,
-            },
+    pub inline fn toDirectMap(range: PhysicalRange) KernelVirtualRange {
+        const direct_map_range: KernelVirtualRange = .{
+            .address = .{ .value = range.address.value + cascade.mem.globals.direct_map.address.value },
             .size = range.size,
         };
         if (core.is_debug) std.debug.assert(cascade.mem.globals.direct_map.fullyContains(direct_map_range));
