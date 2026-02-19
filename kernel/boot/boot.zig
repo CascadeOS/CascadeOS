@@ -92,6 +92,8 @@ pub const MemoryMap = struct {
 /// Includes all memory map entries that return true for `MemoryMap.Entry.type.isUsable`.
 ///
 /// Contiguous ranges are merged together.
+///
+/// Ensures the ranges are aligned to the standard page size.
 pub fn usableRangeIterator() error{NoMemoryMap}!UsableRangeIterator {
     return .{ .memory_map = try memoryMap() };
 }
@@ -107,11 +109,11 @@ pub const UsableRangeIterator = struct {
                 if (entry.type.isUsable()) break entry.range;
             } else null;
 
-            const entry_range = opt_entry_range orelse {
+            const entry_range = (opt_entry_range orelse {
                 const current_range = iter.opt_current_range;
                 iter.opt_current_range = null;
                 return current_range;
-            };
+            }).pageAlign();
 
             const current_range = iter.opt_current_range orelse {
                 iter.opt_current_range = entry_range;
