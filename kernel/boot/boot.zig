@@ -23,10 +23,10 @@ pub const KernelBaseAddress = struct {
     physical: cascade.PhysicalAddress,
 };
 
-/// Returns an iterator over the memory map entries, iterating in the given direction.
-pub fn memoryMap(direction: core.Direction) error{NoMemoryMap}!MemoryMap {
+/// Returns an iterator over the memory map entries.
+pub fn memoryMap() error{NoMemoryMap}!MemoryMap {
     return switch (bootloader_api) {
-        .limine => limine_interface.memoryMap(direction),
+        .limine => limine_interface.memoryMap(),
         .unknown => error.NoMemoryMap,
     };
 }
@@ -35,21 +35,10 @@ pub const MemoryMap = struct {
     backing: [backing_size]u8 align(backing_align),
 
     pub fn next(memory_map: *MemoryMap) ?Entry {
-        while (true) {
-            const entry = switch (bootloader_api) {
-                .limine => limine_interface.MemoryMapIterator.next(memory_map),
-                .unknown => null,
-            } orelse
-                return null;
-
-            if (entry.range.address.equal(.from(0xfd00000000))) {
-                // this is a qemu specific hack to not have a 1TiB direct map
-                // this `0xfd00000000` memory region is not listed in qemu's `info mtree` but the bootloader reports it
-                continue;
-            }
-
-            return entry;
-        }
+        return switch (bootloader_api) {
+            .limine => limine_interface.MemoryMapIterator.next(memory_map),
+            .unknown => null,
+        };
     }
 
     /// An entry in the memory map provided by the bootloader.
@@ -96,6 +85,49 @@ pub const MemoryMap = struct {
         @alignOf(limine_interface.MemoryMapIterator),
         0,
     );
+};
+
+/// Iterate over the usable ranges of physical memory.
+///
+/// Includes all memory map entries that return true for `MemoryMap.Entry.type.isUsable`.
+///
+/// Contiguous ranges are merged together.
+pub fn usableRangeIterator() error{NoMemoryMap}!UsableRangeIterator {
+    return .{ .memory_map = try memoryMap() };
+}
+
+pub const UsableRangeIterator = struct {
+    memory_map: MemoryMap,
+
+    opt_current_range: ?cascade.PhysicalRange = null,
+
+    pub fn next(iter: *UsableRangeIterator) ?cascade.PhysicalRange {
+        while (true) {
+            const opt_entry_range: ?cascade.PhysicalRange = while (iter.memory_map.next()) |entry| {
+                if (entry.type.isUsable()) break entry.range;
+            } else null;
+
+            const entry_range = opt_entry_range orelse {
+                const current_range = iter.opt_current_range;
+                iter.opt_current_range = null;
+                return current_range;
+            };
+
+            const current_range = iter.opt_current_range orelse {
+                iter.opt_current_range = entry_range;
+                continue;
+            };
+
+            if (current_range.after().equal(entry_range.address)) {
+                iter.opt_current_range.?.size.addInPlace(entry_range.size);
+                continue;
+            }
+
+            iter.opt_current_range = entry_range;
+
+            return current_range;
+        }
+    }
 };
 
 /// Returns the direct map address provided by the bootloader, if any.

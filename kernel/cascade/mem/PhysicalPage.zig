@@ -266,7 +266,7 @@ pub const init = struct {
     /// Initialize the bootstrap physical page allocator that is used for allocating physical pages before the full memory
     /// system is initialized.
     pub fn initializeBootstrapAllocator() void {
-        var memory_map = boot.memoryMap(.forward) catch @panic("no memory map");
+        var memory_map = boot.memoryMap() catch @panic("no memory map");
         while (memory_map.next()) |entry| {
             if (entry.type != .free) continue;
 
@@ -289,68 +289,51 @@ pub const init = struct {
     ) !void {
         const pages_array_base = pages_array_range.address;
 
-        var opt_current_range_start: ?cascade.KernelVirtualAddress = null;
-        var current_range_end: cascade.KernelVirtualAddress = undefined;
+        var opt_current_pages_range: ?cascade.KernelVirtualRange = null;
 
-        var memory_iter = boot.memoryMap(.forward) catch @panic("no memory map");
+        var iter = boot.usableRangeIterator() catch @panic("no memory map");
 
-        while (memory_iter.next()) |entry| {
-            if (!entry.type.isUsable()) continue;
-
-            const entry_range_start: cascade.KernelVirtualAddress = pages_array_base
-                .moveForward(
-                    core.Size.of(PhysicalPage)
-                        .multiplyScalar(@intFromEnum(Index.fromAddress(entry.range.address))),
-                )
-                .pageAlignBackward();
-
-            const entry_range_end: cascade.KernelVirtualAddress = pages_array_base
-                .moveForward(
-                    core.Size.of(PhysicalPage)
-                        .multiplyScalar(@intFromEnum(Index.fromAddress(entry.range.last()))),
-                )
-                .pageAlignForward();
-
-            if (opt_current_range_start) |*ptr_current_range_start| {
-                const current_range_start = ptr_current_range_start.*;
-
-                if (entry_range_start.lessThanOrEqual(current_range_end) and
-                    entry_range_end.greaterThanOrEqual(current_range_start))
-                {
-                    ptr_current_range_start.value = @min(current_range_start.value, entry_range_start.value);
-                    current_range_end.value = @max(current_range_end.value, entry_range_end.value);
-                    continue;
-                }
-
-                try cascade.mem.mapRangeAndBackWithPhysicalPages(
-                    kernel_page_table,
-                    .from(
-                        current_range_start.toVirtualAddress(),
-                        current_range_start.difference(current_range_end),
+        while (iter.next()) |entry_range| {
+            const entry_pages_range = cascade.KernelVirtualRange.from(
+                pages_array_base.moveForward(
+                    core.Size.of(PhysicalPage).multiplyScalar(
+                        @intFromEnum(Index.fromAddress(entry_range.address)),
                     ),
-                    .{ .protection = .read_write, .type = .kernel },
-                    .kernel,
-                    .keep,
-                    bootstrap_allocator,
-                );
+                ),
+                core.Size.of(PhysicalPage).multiplyScalar(
+                    @intFromEnum(Index.fromAddress(entry_range.last())),
+                ),
+            ).pageAlign();
 
-                opt_current_range_start = entry_range_start;
-                current_range_end = entry_range_end;
+            const current_pages_range = opt_current_pages_range orelse {
+                opt_current_pages_range = entry_pages_range;
+                continue;
+            };
 
+            if (current_pages_range.anyOverlap(entry_pages_range) or
+                current_pages_range.after().equal(entry_pages_range.address))
+            {
+                std.debug.assert(current_pages_range.address.lessThanOrEqual(entry_pages_range.address));
+                opt_current_pages_range.?.size.addInPlace(current_pages_range.last().difference(entry_pages_range.last()));
                 continue;
             }
 
-            opt_current_range_start = entry_range_start;
-            current_range_end = entry_range_end;
-        }
+            opt_current_pages_range = entry_pages_range;
 
-        if (opt_current_range_start) |current_range_start| {
             try cascade.mem.mapRangeAndBackWithPhysicalPages(
                 kernel_page_table,
-                .from(
-                    current_range_start.toVirtualAddress(),
-                    current_range_start.difference(current_range_end),
-                ),
+                current_pages_range.toVirtualRange(),
+                .{ .protection = .read_write, .type = .kernel },
+                .kernel,
+                .keep,
+                bootstrap_allocator,
+            );
+        }
+
+        if (opt_current_pages_range) |range| {
+            try cascade.mem.mapRangeAndBackWithPhysicalPages(
+                kernel_page_table,
+                range.toVirtualRange(),
                 .{ .protection = .read_write, .type = .kernel },
                 .kernel,
                 .keep,
@@ -374,7 +357,7 @@ pub const init = struct {
         var reclaimable_memory: core.Size = .zero;
         var unavailable_memory: core.Size = .zero;
 
-        var memory_iter = boot.memoryMap(.forward) catch @panic("no memory map");
+        var memory_iter = boot.memoryMap() catch @panic("no memory map");
 
         while (memory_iter.next()) |entry| {
             total_memory.addInPlace(entry.range.size);

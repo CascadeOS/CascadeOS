@@ -21,7 +21,7 @@ pub fn kernelBaseAddress() ?boot.KernelBaseAddress {
     };
 }
 
-pub fn memoryMap(direction: core.Direction) error{NoMemoryMap}!boot.MemoryMap {
+pub fn memoryMap() error{NoMemoryMap}!boot.MemoryMap {
     const resp = requests.memmap.response orelse
         return error.NoMemoryMap;
 
@@ -33,38 +33,23 @@ pub fn memoryMap(direction: core.Direction) error{NoMemoryMap}!boot.MemoryMap {
 
     const entries = resp.entries();
 
-    limine_memory_map.* = .{
-        .index = switch (direction) {
-            .forward => 0,
-            .backward => entries.len,
-        },
-        .entries = entries,
-        .direction = direction,
-    };
+    limine_memory_map.* = .{ .entries = entries };
 
     return result;
 }
 
 pub const MemoryMapIterator = struct {
-    index: usize,
+    index: usize = 0,
     entries: []const *const limine.Memmap.Entry,
-    direction: core.Direction,
 
     pub fn next(memory_map: *boot.MemoryMap) ?boot.MemoryMap.Entry {
         const memory_map_iterator: *MemoryMapIterator = @ptrCast(@alignCast(&memory_map.backing));
 
-        const limine_entry = switch (memory_map_iterator.direction) {
-            .backward => blk: {
-                if (memory_map_iterator.index == 0) return null;
-                memory_map_iterator.index -= 1;
-                break :blk memory_map_iterator.entries[memory_map_iterator.index];
-            },
-            .forward => blk: {
-                if (memory_map_iterator.index >= memory_map_iterator.entries.len) return null;
-                const entry = memory_map_iterator.entries[memory_map_iterator.index];
-                memory_map_iterator.index += 1;
-                break :blk entry;
-            },
+        const limine_entry = blk: {
+            if (memory_map_iterator.index >= memory_map_iterator.entries.len) return null;
+            const entry = memory_map_iterator.entries[memory_map_iterator.index];
+            memory_map_iterator.index += 1;
+            break :blk entry;
         };
 
         return .{

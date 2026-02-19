@@ -689,21 +689,19 @@ pub const init = struct {
         );
 
         const direct_map_size = direct_map_size: {
-            const last_memory_map_entry = last_memory_map_entry: {
-                var memory_map_iterator = boot.memoryMap(.backward) catch @panic("no memory map");
-                break :last_memory_map_entry memory_map_iterator.next() orelse @panic("no memory map entries");
-            };
+            var last_usable_physical_address: cascade.PhysicalAddress = .zero;
 
-            var direct_map_size: core.Size = .from(last_memory_map_entry.range.last().value, .byte);
+            var iter = boot.usableRangeIterator() catch @panic("no memory map");
 
-            // We ensure that the lowest 4GiB are always mapped.
-            const four_gib: core.Size = .from(4, .gib);
-            if (direct_map_size.lessThan(four_gib)) direct_map_size = four_gib;
+            while (iter.next()) |range| {
+                const range_last_address = range.last();
+                std.debug.assert(range_last_address.greaterThan(last_usable_physical_address));
+                last_usable_physical_address = range_last_address;
+            }
 
-            // We align the length of the direct map to `largest_page_size` to allow large pages to be used for the mapping.
-            direct_map_size.alignForwardInPlace(arch.paging.largest_page_size_alignment);
-
-            break :direct_map_size direct_map_size;
+            break :direct_map_size core.Size
+                .from(last_usable_physical_address.value + 1, .byte)
+                .alignForward(arch.paging.standard_page_size_alignment);
         };
 
         globals.direct_map = .from(
@@ -725,7 +723,7 @@ pub const init = struct {
 
     pub fn initializeMemorySystem() !void {
         if (init_log.levelEnabled(.debug)) {
-            var memory_iter = boot.memoryMap(.forward) catch @panic("no memory map");
+            var memory_iter = boot.memoryMap() catch @panic("no memory map");
             init_log.debug("bootloader provided memory map:", .{});
             while (memory_iter.next()) |entry| {
                 init_log.debug("\t{f}", .{entry});
@@ -909,13 +907,13 @@ pub const init = struct {
     }
 
     fn registerPages(kernel_regions: *KernelMemoryRegion.List) void {
-        const total_number_of_pages = blk: {
-            var memory_iter = boot.memoryMap(.forward) catch @panic("no memory map");
+        const number_of_usable_pages = blk: {
+            var iter = boot.usableRangeIterator() catch @panic("no memory map");
 
             var last_page: cascade.PhysicalAddress = .zero;
 
-            while (memory_iter.next()) |entry| {
-                last_page = entry.range.last();
+            while (iter.next()) |range| {
+                last_page = range.last();
             }
 
             break :blk @intFromEnum(PhysicalPage.Index.fromAddress(last_page)) + 1;
@@ -923,7 +921,7 @@ pub const init = struct {
 
         const pages_range = kernel_regions.findFreeRange(
             core.Size.of(PhysicalPage)
-                .multiplyScalar(total_number_of_pages)
+                .multiplyScalar(number_of_usable_pages)
                 .alignForward(arch.paging.standard_page_size_alignment),
             arch.paging.standard_page_size_alignment,
         ) orelse @panic("no space in kernel memory layout for the pages array");
