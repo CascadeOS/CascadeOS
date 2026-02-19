@@ -23,13 +23,17 @@ pub const Index = enum(u32) {
     _,
 
     /// Returns the physical page that contains the given physical address.
-    pub fn fromAddress(physical_address: cascade.PhysicalAddress) Index {
+    pub inline fn fromAddress(physical_address: cascade.PhysicalAddress) Index {
         return @enumFromInt(physical_address.value / arch.paging.standard_page_size.value);
     }
 
     /// Returns the base address of the given physical page.
-    pub fn baseAddress(index: Index) cascade.PhysicalAddress {
+    pub inline fn baseAddress(index: Index) cascade.PhysicalAddress {
         return .from(@intFromEnum(index) * arch.paging.standard_page_size.value);
+    }
+
+    pub inline fn range(index: Index) cascade.PhysicalRange {
+        return .from(index.baseAddress(), arch.paging.standard_page_size);
     }
 };
 
