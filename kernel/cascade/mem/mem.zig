@@ -699,9 +699,7 @@ pub const init = struct {
                 last_usable_physical_address = range_last_address;
             }
 
-            break :direct_map_size core.Size
-                .from(last_usable_physical_address.value + 1, .byte)
-                .alignForward(arch.paging.standard_page_size_alignment);
+            break :direct_map_size cascade.PhysicalAddress.zero.difference(last_usable_physical_address).add(.one);
         };
 
         globals.direct_map = .from(
@@ -941,17 +939,25 @@ pub const init = struct {
             init_log.debug("mapping '{t}' into the kernel page table", .{region.type});
 
             switch (region.type) {
-                .direct_map,
-                => arch.paging.init.mapToPhysicalRangeAllPageSizes(
-                    kernel_page_table,
-                    region.range.toVirtualRange(),
-                    .from(.zero, region.range.size),
-                    .{
-                        .type = .kernel,
-                        .protection = .read_write,
-                    },
-                    PhysicalPage.init.bootstrap_allocator,
-                ) catch |err| std.debug.panic("failed to map {f}: {t}", .{ region, err }),
+                .direct_map => {
+                    var usable_range_iter = boot.usableRangeIterator() catch @panic("no memory map");
+
+                    while (usable_range_iter.next()) |range| {
+                        arch.paging.init.mapToPhysicalRangeAllPageSizes(
+                            kernel_page_table,
+                            cascade.KernelVirtualRange.from(
+                                region.range.address.moveForward(cascade.PhysicalAddress.zero.difference(range.address)),
+                                range.size,
+                            ).toVirtualRange(),
+                            range,
+                            .{
+                                .type = .kernel,
+                                .protection = .read_write,
+                            },
+                            PhysicalPage.init.bootstrap_allocator,
+                        ) catch |err| std.debug.panic("failed to map {f}: {t}", .{ region, err });
+                    }
+                },
 
                 .writeable_section,
                 .readonly_section,
@@ -983,8 +989,7 @@ pub const init = struct {
                     PhysicalPage.init.bootstrap_allocator,
                 ) catch |err| std.debug.panic("failed to map {f}: {t}", .{ region, err }),
 
-                .pages,
-                => PhysicalPage.init.mapPagesArray(
+                .pages => PhysicalPage.init.mapPagesArray(
                     kernel_page_table,
                     region.range,
                 ) catch |err| std.debug.panic("failed to map {f}: {t}", .{ region, err }),
