@@ -664,9 +664,10 @@ fn RangeMixin(comptime Range: type) type {
         ///
         /// The address is aligned backward and the size is aligned forward.
         pub inline fn pageAlign(range: Range) Range {
+            const new_address = range.address.pageAlignBackward();
             return .{
-                .address = range.address.pageAlignBackward(),
-                .size = range.size.alignForward(arch.paging.standard_page_size_alignment),
+                .address = new_address,
+                .size = new_address.difference(range.last().pageAlignForward()),
             };
         }
 
