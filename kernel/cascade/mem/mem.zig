@@ -689,17 +689,18 @@ pub const init = struct {
         );
 
         const direct_map_size = direct_map_size: {
-            var last_usable_physical_address: cascade.PhysicalAddress = .zero;
+            var last_physical_address: cascade.PhysicalAddress = .zero;
 
-            var iter = boot.usableRangeIterator() catch @panic("no memory map");
+            var iter = boot.memoryMap() catch @panic("no memory map");
 
-            while (iter.next()) |range| {
-                const range_last_address = range.last();
-                std.debug.assert(range_last_address.greaterThan(last_usable_physical_address));
-                last_usable_physical_address = range_last_address;
+            while (iter.next()) |entry| {
+                const range_last_address = entry.range.last();
+                if (range_last_address.greaterThan(last_physical_address)) {
+                    last_physical_address = range_last_address;
+                }
             }
 
-            break :direct_map_size cascade.PhysicalAddress.zero.difference(last_usable_physical_address).add(.one);
+            break :direct_map_size cascade.PhysicalAddress.zero.difference(last_physical_address).add(.one);
         };
 
         globals.direct_map = .from(
