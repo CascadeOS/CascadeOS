@@ -56,10 +56,11 @@ pub const MemoryMapIterator = struct {
             .range = .from(limine_entry.base, limine_entry.length),
             .type = switch (limine_entry.type) {
                 .usable => .free,
-                .executable_and_modules, .framebuffer => .in_use,
+                .executable_and_modules => .in_use,
                 .reserved, .acpi_nvs => .reserved,
                 .bootloader_reclaimable => .bootloader_reclaimable,
                 .acpi_reclaimable, .acpi_tables => .acpi_reclaimable,
+                .framebuffer => .framebuffer,
                 .bad_memory => .unusable,
                 _ => .unknown,
             },

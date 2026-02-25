@@ -52,18 +52,15 @@ pub const MemoryMap = struct {
             reserved,
             bootloader_reclaimable,
             acpi_reclaimable,
-            unusable,
+            framebuffer,
 
+            unusable,
             unknown,
 
-            pub fn isUsable(entry_type: Type) bool {
+            pub fn isUsableForAllocation(entry_type: Type) bool {
                 return switch (entry_type) {
-                    .free,
-                    .in_use,
-                    .bootloader_reclaimable,
-                    .acpi_reclaimable,
-                    => true,
-                    .reserved, .unusable, .unknown => false,
+                    .free, .in_use, .bootloader_reclaimable, .acpi_reclaimable => true,
+                    .framebuffer, .reserved, .unusable, .unknown => false,
                 };
             }
         };
@@ -87,9 +84,9 @@ pub const MemoryMap = struct {
     );
 };
 
-/// Iterate over the usable ranges of physical memory.
+/// Iterate over the ranges of physical memory that are usable for allocation.
 ///
-/// Includes all memory map entries that return true for `MemoryMap.Entry.type.isUsable`.
+/// Includes all memory map entries that return true for `MemoryMap.Entry.type.isUsableForAllocation`.
 ///
 /// Contiguous ranges are merged together.
 ///
@@ -106,7 +103,7 @@ pub const UsableRangeIterator = struct {
     pub fn next(iter: *UsableRangeIterator) ?cascade.PhysicalRange {
         while (true) {
             const opt_entry_range: ?cascade.PhysicalRange = while (iter.memory_map.next()) |entry| {
-                if (entry.type.isUsable()) break entry.range;
+                if (entry.type.isUsableForAllocation()) break entry.range;
             } else null;
 
             const entry_range = (opt_entry_range orelse {

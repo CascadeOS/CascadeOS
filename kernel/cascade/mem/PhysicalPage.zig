@@ -223,6 +223,13 @@ const globals = struct {
     /// Initialized during `init.initializePhysicalMemory`.
     var reclaimable_memory: core.Size = undefined;
 
+    /// Framebuffer physical memory.
+    ///
+    /// Does not change during the lifetime of the system.
+    ///
+    /// Initialized during `init.initializePhysicalMemory`.
+    var framebuffer_memory: core.Size = undefined;
+
     /// The unavailable physical memory.
     ///
     /// Does not change during the lifetime of the system.
@@ -359,6 +366,7 @@ pub const init = struct {
         var total_memory: core.Size = .zero;
         var reserved_memory: core.Size = .zero;
         var reclaimable_memory: core.Size = .zero;
+        var framebuffer_memory: core.Size = .zero;
         var unavailable_memory: core.Size = .zero;
 
         var memory_iter = boot.memoryMap() catch @panic("no memory map");
@@ -368,12 +376,13 @@ pub const init = struct {
 
             switch (entry.type) {
                 .free, .in_use => {},
+                .framebuffer => framebuffer_memory.addInPlace(entry.range.size),
                 .reserved => reserved_memory.addInPlace(entry.range.size),
                 .bootloader_reclaimable, .acpi_reclaimable => reclaimable_memory.addInPlace(entry.range.size),
                 .unusable, .unknown => unavailable_memory.addInPlace(entry.range.size),
             }
 
-            if (entry.type.isUsable()) {
+            if (entry.type.isUsableForAllocation()) {
                 const first_page_index: usize = @intFromEnum(PhysicalPage.Index.fromAddress(entry.range.address));
                 const last_page_index: usize = @intFromEnum(PhysicalPage.Index.fromAddress(entry.range.last()));
 
@@ -440,12 +449,14 @@ pub const init = struct {
         globals.total_memory = total_memory;
         globals.reserved_memory = reserved_memory;
         globals.reclaimable_memory = reclaimable_memory;
+        globals.framebuffer_memory = framebuffer_memory;
         globals.unavailable_memory = unavailable_memory;
 
         const used_memory = total_memory
             .subtract(free_memory)
             .subtract(reserved_memory)
             .subtract(reclaimable_memory)
+            .subtract(framebuffer_memory)
             .subtract(unavailable_memory);
 
         init_log.debug("total memory:         {f}", .{total_memory});
@@ -453,6 +464,7 @@ pub const init = struct {
         init_log.debug("  used memory:        {f}", .{used_memory});
         init_log.debug("  reserved memory:    {f}", .{reserved_memory});
         init_log.debug("  reclaimable memory: {f}", .{reclaimable_memory});
+        init_log.debug("  framebuffer memory: {f}", .{framebuffer_memory});
         init_log.debug("  unavailable memory: {f}", .{unavailable_memory});
     }
 
