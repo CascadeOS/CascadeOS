@@ -873,6 +873,7 @@ pub const PageTable = extern struct {
     pub fn print(
         page_table: *const PageTable,
         writer: *std.Io.Writer,
+        range: cascade.VirtualRange,
         comptime print_detailed_level1: bool,
     ) std.Io.Writer.Error!void {
         for (page_table.entries, 0..) |raw_level4_entry, level4_index| {
@@ -884,8 +885,14 @@ pub const PageTable = extern struct {
 
             // The level 4 part is sign extended to ensure the address is cannonical.
             const level4_part = signExtendAddress(level4_index << level_4_shift);
+            const level4_range: cascade.VirtualRange = .from(
+                .from(level4_part),
+                level_4_address_space_size,
+            );
 
-            try writer.print("level 4 [{}] 0x{x:0>16}    Flags: ", .{ level4_index, cascade.VirtualAddress.from(level4_part).value });
+            if (!level4_range.anyOverlap(range)) continue;
+
+            try writer.print("level 4 [{}] 0x{x:0>16}    Flags: ", .{ level4_index, level4_range.address.value });
             try level4_entry.printDirectoryEntryFlags(writer);
             try writer.writeByte('\n');
 
@@ -897,16 +904,25 @@ pub const PageTable = extern struct {
 
                 const level3_part = level3_index << level_3_shift;
 
+                const level3_range: cascade.VirtualRange = .from(
+                    .from(level4_part | level3_part),
+                    level_3_address_space_size,
+                );
+
+                if (!level3_range.anyOverlap(range)) continue;
+
                 if (level3_entry.huge.read()) {
-                    const virtual = cascade.VirtualAddress.from(level4_part | level3_part);
                     const physical = level3_entry.getAddress1gib();
-                    try writer.print("  [{}] 1GIB 0x{x:0>16} -> 0x{x:0>16}    Flags: ", .{ level3_index, virtual.value, physical.value });
+                    try writer.print(
+                        "  [{}] 1GIB 0x{x:0>16} -> 0x{x:0>16}    Flags: ",
+                        .{ level3_index, level3_range.address.value, physical.value },
+                    );
                     try level3_entry.printHugeEntryFlags(writer);
                     try writer.writeByte('\n');
                     continue;
                 }
 
-                try writer.print("  level 3 [{}] 0x{x:0>16}    Flags: ", .{ level3_index, cascade.VirtualAddress.from(level4_part | level3_part).value });
+                try writer.print("  level 3 [{}] 0x{x:0>16}    Flags: ", .{ level3_index, level3_range.address.value });
                 try level3_entry.printDirectoryEntryFlags(writer);
                 try writer.writeByte('\n');
 
@@ -918,16 +934,25 @@ pub const PageTable = extern struct {
 
                     const level2_part = level2_index << level_2_shift;
 
+                    const level2_range: cascade.VirtualRange = .from(
+                        .from(level4_part | level3_part | level2_part),
+                        level_2_address_space_size,
+                    );
+
+                    if (!level2_range.anyOverlap(range)) continue;
+
                     if (level2_entry.huge.read()) {
-                        const virtual = cascade.VirtualAddress.from(level4_part | level3_part | level2_part);
                         const physical = level2_entry.getAddress2mib();
-                        try writer.print("    [{}] 2MIB 0x{x:0>16} -> 0x{x:0>16}    Flags: ", .{ level2_index, virtual.value, physical.value });
+                        try writer.print(
+                            "    [{}] 2MIB 0x{x:0>16} -> 0x{x:0>16}    Flags: ",
+                            .{ level2_index, level2_range.address.value, physical.value },
+                        );
                         try level2_entry.printHugeEntryFlags(writer);
                         try writer.writeByte('\n');
                         continue;
                     }
 
-                    try writer.print("    level 2 [{}] 0x{x:0>16}    Flags: ", .{ level2_index, cascade.VirtualAddress.from(level4_part | level3_part | level2_part).value });
+                    try writer.print("    level 2 [{}] 0x{x:0>16}    Flags: ", .{ level2_index, level2_range.address.value });
                     try level2_entry.printDirectoryEntryFlags(writer);
                     try writer.writeByte('\n');
 
@@ -940,16 +965,25 @@ pub const PageTable = extern struct {
 
                         if (!level1_entry.present.read()) continue;
 
+                        const level1_part = level1_index << level_1_shift;
+
+                        const level1_range: cascade.VirtualRange = .from(
+                            .from(level4_part | level3_part | level2_part | level1_part),
+                            level_1_address_space_size,
+                        );
+
+                        if (!level1_range.anyOverlap(range)) continue;
+
                         if (!print_detailed_level1) {
                             level1_present_entries += 1;
                             continue;
                         }
 
-                        const level1_part = level1_index << level_1_shift;
-
-                        const virtual = cascade.VirtualAddress.from(level4_part | level3_part | level2_part | level1_part);
                         const physical = level1_entry.getAddress4kib();
-                        try writer.print("      [{}] 4KIB 0x{x:0>16} -> 0x{x:0>16}    Flags: ", .{ level1_index, virtual.value, physical.value });
+                        try writer.print(
+                            "      [{}] 4KIB 0x{x:0>16} -> 0x{x:0>16}    Flags: ",
+                            .{ level1_index, level1_range.address.value, physical.value },
+                        );
                         try level1_entry.printSmallEntryFlags(writer);
                         try writer.writeByte('\n');
                     }
