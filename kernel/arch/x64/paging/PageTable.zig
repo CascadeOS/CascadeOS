@@ -726,10 +726,7 @@ pub const PageTable = extern struct {
                     }
                 },
                 .write_combining => {
-                    entry.no_cache.write(true);
-
-                    // PAT entry 6 is the one set to write combining
-                    // to select entry 6 `pat[_huge]` and `no_cache` (pcd) must be set to `true`
+                    entry.write_through.write(true);
 
                     switch (page_type) {
                         .small => entry.pat.write(true),

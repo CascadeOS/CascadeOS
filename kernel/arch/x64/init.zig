@@ -383,19 +383,15 @@ pub fn configurePerExecutorSystemFeatures() void {
 
     // PAT
     {
-        // Match the default PAT configuration on power up as per the SDM, except for entry 6.
-        // Using entry 6 as write combining allows us to access it using `PAT = 1 PCD = 1` in the page table, which
-        // during the small window after starting an executor and before setting the PAT means accesses to it will be
-        // uncached.
         var pat = x64.registers.PAT.read();
 
         pat.entry0 = .write_back;
         pat.entry1 = .write_through;
         pat.entry2 = .uncached;
         pat.entry3 = .unchacheable;
-        pat.entry4 = .write_back;
-        pat.entry5 = .write_through;
-        pat.entry6 = .write_combining; // defaults to uncached
+        pat.entry4 = .write_protected;
+        pat.entry5 = .write_combining;
+        pat.entry6 = .uncached;
         pat.entry7 = .unchacheable;
         x64.registers.PAT.write(pat);
 
