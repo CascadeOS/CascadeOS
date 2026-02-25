@@ -941,19 +941,30 @@ pub const init = struct {
 
             switch (region.type) {
                 .direct_map => {
-                    var usable_range_iter = boot.usableRangeIterator() catch @panic("no memory map");
+                    var iter = boot.memoryMap() catch @panic("no memory map");
 
-                    while (usable_range_iter.next()) |range| {
+                    while (iter.next()) |entry| {
+                        const cache_type: cascade.mem.MapType.Cache = switch (entry.type) {
+                            .free, .in_use, .bootloader_reclaimable, .acpi_reclaimable => .write_back,
+                            .framebuffer => .write_combining,
+                            .reserved, .unusable, .unknown => continue,
+                        };
+
+                        const range = entry.range.pageAlign();
+
                         arch.paging.init.mapToPhysicalRangeAllPageSizes(
                             kernel_page_table,
                             cascade.KernelVirtualRange.from(
-                                region.range.address.moveForward(cascade.PhysicalAddress.zero.difference(range.address)),
+                                region.range.address.moveForward(
+                                    cascade.PhysicalAddress.zero.difference(range.address),
+                                ),
                                 range.size,
                             ).toVirtualRange(),
                             range,
                             .{
                                 .type = .kernel,
                                 .protection = .read_write,
+                                .cache = cache_type,
                             },
                             PhysicalPage.init.bootstrap_allocator,
                         ) catch |err| std.debug.panic("failed to map {f}: {t}", .{ region, err });
