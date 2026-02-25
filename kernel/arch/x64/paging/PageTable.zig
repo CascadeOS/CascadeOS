@@ -748,8 +748,6 @@ pub const PageTable = extern struct {
         }
 
         fn printSmallEntryFlags(entry: Entry, writer: *std.Io.Writer) !void {
-            std.debug.assert(!entry.huge.read());
-
             if (entry.present.read()) {
                 try writer.writeAll("Present ");
             } else {
@@ -875,12 +873,12 @@ pub const PageTable = extern struct {
     /// Print the page table.
     ///
     /// Assumes the page table is not modified during printing.
-    pub fn printPageTable(
-        entry: *const PageTable,
+    pub fn print(
+        page_table: *const PageTable,
         writer: *std.Io.Writer,
         comptime print_detailed_level1: bool,
-    ) !void {
-        for (entry.entries, 0..) |raw_level4_entry, level4_index| {
+    ) std.Io.Writer.Error!void {
+        for (page_table.entries, 0..) |raw_level4_entry, level4_index| {
             const level4_entry: Entry = raw_level4_entry.load();
 
             if (!level4_entry.present.read()) continue;
@@ -890,11 +888,11 @@ pub const PageTable = extern struct {
             // The level 4 part is sign extended to ensure the address is cannonical.
             const level4_part = signExtendAddress(level4_index << level_4_shift);
 
-            try writer.print("level 4 [{}] {f}    Flags: ", .{ level4_index, cascade.VirtualAddress.from(level4_part) });
+            try writer.print("level 4 [{}] 0x{x:0>16}    Flags: ", .{ level4_index, cascade.VirtualAddress.from(level4_part).value });
             try level4_entry.printDirectoryEntryFlags(writer);
             try writer.writeByte('\n');
 
-            const level3_table = try level4_entry.getNextLevel();
+            const level3_table = level4_entry.getNextLevel() catch return error.WriteFailed;
             for (level3_table.entries, 0..) |raw_level3_entry, level3_index| {
                 const level3_entry: Entry = raw_level3_entry.load();
 
@@ -905,17 +903,17 @@ pub const PageTable = extern struct {
                 if (level3_entry.huge.read()) {
                     const virtual = cascade.VirtualAddress.from(level4_part | level3_part);
                     const physical = level3_entry.getAddress1gib();
-                    try writer.print("  [{}] 1GIB {f} -> {f}    Flags: ", .{ level3_index, virtual, physical });
+                    try writer.print("  [{}] 1GIB 0x{x:0>16} -> 0x{x:0>16}    Flags: ", .{ level3_index, virtual.value, physical.value });
                     try level3_entry.printHugeEntryFlags(writer);
                     try writer.writeByte('\n');
                     continue;
                 }
 
-                try writer.print("  level 3 [{}] {f}    Flags: ", .{ level3_index, cascade.VirtualAddress.from(level4_part | level3_part) });
+                try writer.print("  level 3 [{}] 0x{x:0>16}    Flags: ", .{ level3_index, cascade.VirtualAddress.from(level4_part | level3_part).value });
                 try level3_entry.printDirectoryEntryFlags(writer);
                 try writer.writeByte('\n');
 
-                const level2_table = try level3_entry.getNextLevel();
+                const level2_table = level3_entry.getNextLevel() catch return error.WriteFailed;
                 for (level2_table.entries, 0..) |raw_level2_entry, level2_index| {
                     const level2_entry: Entry = raw_level2_entry.load();
 
@@ -926,20 +924,20 @@ pub const PageTable = extern struct {
                     if (level2_entry.huge.read()) {
                         const virtual = cascade.VirtualAddress.from(level4_part | level3_part | level2_part);
                         const physical = level2_entry.getAddress2mib();
-                        try writer.print("    [{}] 2MIB {f} -> {f}    Flags: ", .{ level2_index, virtual, physical });
+                        try writer.print("    [{}] 2MIB 0x{x:0>16} -> 0x{x:0>16}    Flags: ", .{ level2_index, virtual.value, physical.value });
                         try level2_entry.printHugeEntryFlags(writer);
                         try writer.writeByte('\n');
                         continue;
                     }
 
-                    try writer.print("    level 2 [{}] {f}    Flags: ", .{ level2_index, cascade.VirtualAddress.from(level4_part | level3_part | level2_part) });
+                    try writer.print("    level 2 [{}] 0x{x:0>16}    Flags: ", .{ level2_index, cascade.VirtualAddress.from(level4_part | level3_part | level2_part).value });
                     try level2_entry.printDirectoryEntryFlags(writer);
                     try writer.writeByte('\n');
 
                     // use only when `print_detailed_level1` is false
                     var level1_present_entries: usize = 0;
 
-                    const level1_table = try level2_entry.getNextLevel();
+                    const level1_table = level2_entry.getNextLevel() catch return error.WriteFailed;
                     for (level1_table.entries, 0..) |raw_level1_entry, level1_index| {
                         const level1_entry: Entry = raw_level1_entry.load();
 
@@ -950,13 +948,11 @@ pub const PageTable = extern struct {
                             continue;
                         }
 
-                        std.debug.assert(!level1_entry.huge.read());
-
                         const level1_part = level1_index << level_1_shift;
 
                         const virtual = cascade.VirtualAddress.from(level4_part | level3_part | level2_part | level1_part);
                         const physical = level1_entry.getAddress4kib();
-                        try writer.print("      [{}] 4KIB {f} -> {f}    Flags: ", .{ level1_index, virtual, physical });
+                        try writer.print("      [{}] 4KIB 0x{x:0>16} -> 0x{x:0>16}    Flags: ", .{ level1_index, virtual.value, physical.value });
                         try level1_entry.printSmallEntryFlags(writer);
                         try writer.writeByte('\n');
                     }
