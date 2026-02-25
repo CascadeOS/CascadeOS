@@ -945,7 +945,7 @@ pub const init = struct {
 
                     while (iter.next()) |entry| {
                         const cache_type: cascade.mem.MapType.Cache = switch (entry.type) {
-                            .free, .in_use, .bootloader_reclaimable, .acpi_reclaimable => .write_back,
+                            .free, .in_use, .bootloader_reclaimable, .acpi_reclaimable, .acpi_nvs => .write_back,
                             .framebuffer => .write_combining,
                             .reserved, .unusable, .unknown => continue,
                         };

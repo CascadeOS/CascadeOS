@@ -52,6 +52,7 @@ pub const MemoryMap = struct {
             reserved,
             bootloader_reclaimable,
             acpi_reclaimable,
+            acpi_nvs,
             framebuffer,
 
             unusable,
@@ -60,7 +61,7 @@ pub const MemoryMap = struct {
             pub fn isUsableForAllocation(entry_type: Type) bool {
                 return switch (entry_type) {
                     .free, .in_use, .bootloader_reclaimable, .acpi_reclaimable => true,
-                    .framebuffer, .reserved, .unusable, .unknown => false,
+                    .framebuffer, .acpi_nvs, .reserved, .unusable, .unknown => false,
                 };
             }
         };
