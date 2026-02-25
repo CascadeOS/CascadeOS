@@ -645,7 +645,7 @@ pub const PAT = packed struct(u64) {
         pat: PAT,
         writer: *std.Io.Writer,
     ) !void {
-        return pat.print(pat, writer, 0);
+        return pat.print(writer, 0);
     }
 
     const msr = MSR(u64, 0x277);
