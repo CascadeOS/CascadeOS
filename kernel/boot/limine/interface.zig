@@ -60,7 +60,8 @@ pub const MemoryMapIterator = struct {
                 .reserved => .reserved,
                 .acpi_nvs => .acpi_nvs,
                 .bootloader_reclaimable => .bootloader_reclaimable,
-                .acpi_reclaimable, .acpi_tables => .acpi_reclaimable,
+                .acpi_reclaimable => .acpi_reclaimable,
+                .reserved_mapped => .reserved_mapped,
                 .framebuffer => .framebuffer,
                 .bad_memory => .unusable,
                 _ => .unknown,
@@ -255,7 +256,7 @@ fn limineEntryPoint() callconv(.c) noreturn {
     @panic("`initStage1` returned");
 }
 
-const target_limine_revison: limine.BaseRevison.Revison = .@"4";
+const target_limine_revison: limine.BaseRevison.Revison = .@"5";
 var limine_revison: limine.BaseRevison.Revison = .@"0";
 
 pub fn exportRequests() void {

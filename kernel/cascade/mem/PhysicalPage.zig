@@ -377,7 +377,7 @@ pub const init = struct {
             switch (entry.type) {
                 .free, .in_use => {},
                 .framebuffer => framebuffer_memory.addInPlace(entry.range.size),
-                .reserved, .acpi_nvs => reserved_memory.addInPlace(entry.range.size),
+                .reserved, .acpi_nvs, .reserved_mapped => reserved_memory.addInPlace(entry.range.size),
                 .bootloader_reclaimable, .acpi_reclaimable => reclaimable_memory.addInPlace(entry.range.size),
                 .unusable, .unknown => unavailable_memory.addInPlace(entry.range.size),
             }

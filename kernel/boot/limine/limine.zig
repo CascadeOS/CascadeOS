@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 // SPDX-FileCopyrightText: 2022-2026 Mintsuki and contributors (https://codeberg.org/Limine/limine-protocol/src/branch/trunk/LICENSE)
 
-//! This module contains the definitions of the Limine protocol as of 8a888d7ab3b274fad1a357a922e799fc2ff20729.
+//! This module contains the definitions of the Limine protocol as of fd3197997ec608484a2eb4e3d2a8591378087e7d.
 //!
-//! [PROTOCOL DOC](https://codeberg.org/Limine/limine-protocol/src/commit/42e836e30242c2c14f889fd76c6f9a57b0c18ec2/PROTOCOL.md)
+//! [PROTOCOL DOC](https://codeberg.org/Limine/limine-protocol/src/commit/fd3197997ec608484a2eb4e3d2a8591378087e7d/PROTOCOL.md)
 
 const std = @import("std");
 
@@ -19,7 +19,7 @@ const UUID = @import("uuid").UUID;
 pub const BaseRevison = extern struct {
     id: [2]u64 = [_]u64{ 0xf9562b2d5c95a6c8, 0x6a7b384944536bdc },
 
-    /// The Limine boot protocol comes in several base revisions; so far, 5 base revisions are specified: 0 through 4.
+    /// The Limine boot protocol comes in several base revisions; so far, 6 base revisions are specified: 0 through 5.
     ///
     /// Base revision 0 through 3 are considered deprecated.
     /// Base revision 0 is the default base revision an executable is assumed to be requesting and complying to if no base
@@ -50,6 +50,7 @@ pub const BaseRevison = extern struct {
         @"2" = 2,
         @"3" = 3,
         @"4" = 4,
+        @"5" = 5,
 
         _,
 
@@ -873,14 +874,18 @@ pub const Memmap = extern struct {
             /// A region of the address space containing memory-mapped framebuffers.
             ///
             /// These entries exist for illustrative purposes only, and are not to be used to acquire the address of any framebuffer.
+            ///
             /// One must use the framebuffer feature for that.
             framebuffer = 7,
 
             /// A region of the address space containing ACPI tables, if the firmware did not already map them within either the ACPI
             /// reclaimable or an ACPI NVS region.
             ///
+            /// For base revision 5 or greater, these entries additionally contain SMBIOS tables, EFI Runtime Services code and data, and
+            /// the EFI system table along with the data it references.
+            ///
             /// Base revision 4 or greater.
-            acpi_tables = 8,
+            reserved_mapped = 8,
 
             _,
         };
@@ -1060,23 +1065,23 @@ pub const SMBIOS = extern struct {
 
     pub const Response = extern struct {
         revision: u64,
-        _entry_32: core.Address.Raw,
-        _entry_64: core.Address.Raw,
+        _entry_32: boot.Address.Raw,
+        _entry_64: boot.Address.Raw,
 
-        /// Address of the 32-bit SMBIOS entry point, `null` if not present. Physical for base revision >= 3.
-        pub fn entry32(response: *const Response, revision: BaseRevison.Revison) core.Address {
-            return if (revision.equalToOrGreaterThan(.@"3"))
-                .{ .physical = response._entry_32.physical }
-            else
-                .{ .virtual = response._entry_32.virtual };
+        /// Address of the 32-bit SMBIOS entry point, `null` if not present. Physical for base revision 3 or 4.
+        pub fn entry32(response: *const Response, revision: BaseRevison.Revison) boot.Address {
+            return switch (revision) {
+                .@"3", .@"4" => .{ .physical = response._entry_32.physical },
+                else => .{ .virtual = response._entry_32.virtual },
+            };
         }
 
-        /// Address of the 64-bit SMBIOS entry point, `null` if not present. Physical for base revision >= 3.
-        pub fn entry64(response: *const Response, revision: BaseRevison.Revison) core.Address {
-            return if (revision.equalToOrGreaterThan(.@"3"))
-                .{ .physical = response._entry_64.physical }
-            else
-                .{ .virtual = response._entry_64.virtual };
+        /// Address of the 64-bit SMBIOS entry point, `null` if not present. Physical for base revision 3 or 4.
+        pub fn entry64(response: *const Response, revision: BaseRevison.Revison) boot.Address {
+            return switch (revision) {
+                .@"3", .@"4" => .{ .physical = response._entry_64.physical },
+                else => .{ .virtual = response._entry_64.virtual },
+            };
         }
     };
 };
@@ -1090,14 +1095,14 @@ pub const EFISystemTable = extern struct {
 
     pub const Response = extern struct {
         revision: u64,
-        _address: core.Address.Raw,
+        _address: boot.Address.Raw,
 
-        /// Address of EFI system table. Physical for base revision >= 3.
-        pub fn address(response: *const Response, revision: BaseRevison.Revison) core.Address {
-            return if (revision.equalToOrGreaterThan(.@"3"))
-                .{ .physical = response._address.physical }
-            else
-                .{ .virtual = response._address.virtual };
+        /// Address of EFI system table. Physical for base revision 3 or 4.
+        pub fn address(response: *const Response, revision: BaseRevison.Revison) boot.Address {
+            return switch (revision) {
+                .@"3", .@"4" => .{ .physical = response._address.physical },
+                else => .{ .virtual = response._address.virtual },
+            };
         }
     };
 };
@@ -1234,6 +1239,11 @@ pub const DeviceTreeBlob = extern struct {
     };
 };
 
+/// Data provided by this feature is purely informational.
+///
+/// The ACPI Firmware Performance Data Table may have more correct data and should be preferred if it exists.
+///
+/// Bootloaders may implement this feature using the FPDT.
 pub const BootloaderPerformance = extern struct {
     id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x6b50ad9bf36d13ad, 0xdc4c7e88fc759e17 },
     revision: u64 = 0,
@@ -1244,6 +1254,11 @@ pub const BootloaderPerformance = extern struct {
         revision: u64,
 
         /// Time of system reset in microseconds relative to an arbitrary point in the past.
+        ///
+        /// The bootloader may assume `reset_usec` is zero if it cannot or does not know the time of system reset, due to implementation or
+        /// platform restrictions. `
+        ///
+        /// `reset_usec` will usually be 0 or a value near zero, but may be any value relative to any point in the past.
         reset_usec: u64,
 
         /// Time of bootloader initialisation in microseconds relative to an arbitrary point in the past.
@@ -1273,6 +1288,24 @@ pub const BootloaderPerformance = extern struct {
         pub inline fn format(response: *const Response, writer: *std.Io.Writer) !void {
             return response.print(writer, 0);
         }
+    };
+};
+
+/// If this feature is requested, the bootloader will not disable IOMMUs (Intel VT-d, AMD-Vi) that were enabled by the firmware.
+///
+/// This is intended for security-conscious kernels that wish to preserve DMA protection set up by firmware.
+///
+/// If this feature is not requested, the bootloader will disable any active IOMMUs before handing control to the executable.
+///
+/// On non-x86 platforms, no response will be provided.
+pub const x86_64_KeepIOMMU = extern struct {
+    id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x8ebaabe51f490179, 0x2aa86a59ffb4ab0f },
+    revision: u64 = 0,
+
+    response: ?*const Response = null,
+
+    pub const Response = extern struct {
+        revision: u64,
     };
 };
 
