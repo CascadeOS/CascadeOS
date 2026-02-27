@@ -139,6 +139,10 @@ pub fn captureEarlySystemInformation() void {
     log.debug("capturing cpuid information", .{});
     x64.info.cpu_id.capture() catch @panic("failed to capture cpuid information");
 
+    if (x64.info.cpu_id.physical_address_size.? > x64.paging.PageTable.maximum_physical_address_bit) {
+        std.debug.panic("unsupported physical address size: {}", .{x64.info.cpu_id.physical_address_size.?});
+    }
+
     if (!x64.info.cpu_id.mtrr) {
         @panic("MTRRs not supported");
     }

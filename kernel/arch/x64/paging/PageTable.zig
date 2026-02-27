@@ -1251,6 +1251,9 @@ pub const PageTable = extern struct {
         const init_log = cascade.debug.log.scoped(.paging_init);
     };
 
+    // TODO: this needs to be determined from CPUID, asserted in `init.captureEarlySystemInformation`
+    pub const maximum_physical_address_bit = 48;
+
     comptime {
         core.testing.expectSize(PageTable, small_page_size);
     }
@@ -1328,8 +1331,6 @@ const level_2_shift = 21;
 const level_3_shift = 30;
 const level_4_shift = 39;
 
-const maximum_physical_address_bit = 39;
-
-const length_of_4kib_aligned_address = maximum_physical_address_bit - level_1_shift;
-const length_of_2mib_aligned_address = maximum_physical_address_bit - level_2_shift;
-const length_of_1gib_aligned_address = maximum_physical_address_bit - level_3_shift;
+const length_of_4kib_aligned_address = PageTable.maximum_physical_address_bit - level_1_shift;
+const length_of_2mib_aligned_address = PageTable.maximum_physical_address_bit - level_2_shift;
+const length_of_1gib_aligned_address = PageTable.maximum_physical_address_bit - level_3_shift;

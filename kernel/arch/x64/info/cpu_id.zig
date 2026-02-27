@@ -46,6 +46,8 @@ pub fn capture() !void {
 
         capture40000010H();
     }
+
+    if (physical_address_size == null) physical_address_size = if (pae) 36 else 32;
 }
 
 /// Returns true if CPUID is available.
@@ -2473,9 +2475,9 @@ pub var amd_procpowerreporting: bool = false;
 
 /// Maximum physical address size in bits.
 ///
-///  When this is zero, this field also indicates the maximum guest physical address size.
+/// If CPUID.80000008H is not supported, 36 if CPUID.01H:EDX.PAE[6] = true else 32.
 ///
-/// CPUID.80000008H: EAX[7:0]
+/// CPUID.80000008H: EAX[7:0] or 36 if CPUID.01H:EDX.PAE[6] = true else 32.
 pub var physical_address_size: ?u8 = null;
 
 /// Maximum linear address size in bits.
