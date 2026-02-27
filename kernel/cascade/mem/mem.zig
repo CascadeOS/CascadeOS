@@ -941,6 +941,8 @@ pub const init = struct {
 
             switch (region.type) {
                 .direct_map => {
+                    const direct_map_base = region.range.address;
+
                     var iter = boot.memoryMap() catch @panic("no memory map");
 
                     while (iter.next()) |entry| {
@@ -949,18 +951,17 @@ pub const init = struct {
                             .framebuffer => .write_combining,
                             .reserved, .unusable, .unknown => continue,
                         };
-
-                        const range = entry.range.pageAlign();
+                        std.debug.assert(entry.range.pageAligned());
 
                         arch.paging.init.mapToPhysicalRangeAllPageSizes(
                             kernel_page_table,
                             cascade.KernelVirtualRange.from(
-                                region.range.address.moveForward(
-                                    cascade.PhysicalAddress.zero.difference(range.address),
+                                direct_map_base.moveForward(
+                                    cascade.PhysicalAddress.zero.difference(entry.range.address),
                                 ),
-                                range.size,
+                                entry.range.size,
                             ).toVirtualRange(),
-                            range,
+                            entry.range,
                             .{
                                 .type = .kernel,
                                 .protection = .read_write,
