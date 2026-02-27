@@ -100,6 +100,7 @@ fn constructKernel(
 
     kernel_exe.entry = .disabled;
     kernel_exe.want_lto = false;
+    kernel_exe.lto = .none;
     kernel_exe.pie = true; // allow kaslr
     kernel_exe.linkage = .static;
 
