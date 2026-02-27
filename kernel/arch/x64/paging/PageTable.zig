@@ -875,6 +875,7 @@ pub const PageTable = extern struct {
         writer: *std.Io.Writer,
         range: cascade.VirtualRange,
         comptime print_detailed_level1: bool,
+        comptime print_raw_flag_bits: bool,
     ) std.Io.Writer.Error!void {
         for (page_table.entries, 0..) |raw_level4_entry, level4_index| {
             const level4_entry: Entry = raw_level4_entry.load();
@@ -892,9 +893,18 @@ pub const PageTable = extern struct {
 
             if (!level4_range.anyOverlap(range)) continue;
 
-            try writer.print("level 4 [{}] 0x{x:0>16}    Flags: ", .{ level4_index, level4_range.address.value });
-            try level4_entry.printDirectoryEntryFlags(writer);
-            try writer.writeByte('\n');
+            if (print_raw_flag_bits) {
+                var flags_only = level4_entry;
+                flags_only.setAddress4kib(.zero);
+                try writer.print(
+                    "[{d:0>3}] 512GiB 0x{x:0>16} {f}\n",
+                    .{ level4_index, level4_range.address.value, BinaryWithUnderscores{ .value = flags_only._raw.value } },
+                );
+            } else {
+                try writer.print("[{d:0>3}] 512GiB 0x{x:0>16} ", .{ level4_index, level4_range.address.value });
+                try level4_entry.printDirectoryEntryFlags(writer);
+                try writer.writeByte('\n');
+            }
 
             const level3_table = level4_entry.getNextLevel() catch return error.WriteFailed;
             for (level3_table.entries, 0..) |raw_level3_entry, level3_index| {
@@ -913,18 +923,40 @@ pub const PageTable = extern struct {
 
                 if (level3_entry.huge.read()) {
                     const physical = level3_entry.getAddress1gib();
-                    try writer.print(
-                        "  [{}] 1GIB 0x{x:0>16} -> 0x{x:0>16}    Flags: ",
-                        .{ level3_index, level3_range.address.value, physical.value },
-                    );
-                    try level3_entry.printHugeEntryFlags(writer);
-                    try writer.writeByte('\n');
+
+                    if (print_raw_flag_bits) {
+                        var flags_only = level3_entry;
+                        flags_only.setAddress1gib(.zero);
+                        try writer.print(
+                            "  [{d:0>3}] 1GIB 0x{x:0>16} -> 0x{x:0>16} {f}\n",
+                            .{ level3_index, level3_range.address.value, physical.value, BinaryWithUnderscores{ .value = flags_only._raw.value } },
+                        );
+                    } else {
+                        try writer.print(
+                            "  [{d:0>3}] 1GIB 0x{x:0>16} -> 0x{x:0>16} ",
+                            .{ level3_index, level3_range.address.value, physical.value },
+                        );
+                        try level3_entry.printHugeEntryFlags(writer);
+                        try writer.writeByte('\n');
+                    }
                     continue;
                 }
 
-                try writer.print("  level 3 [{}] 0x{x:0>16}    Flags: ", .{ level3_index, level3_range.address.value });
-                try level3_entry.printDirectoryEntryFlags(writer);
-                try writer.writeByte('\n');
+                if (print_raw_flag_bits) {
+                    var flags_only = level3_entry;
+                    flags_only.setAddress4kib(.zero);
+                    try writer.print(
+                        "  [{d:0>3}] 1GIB 0x{x:0>16} {f}\n",
+                        .{ level3_index, level3_range.address.value, BinaryWithUnderscores{ .value = flags_only._raw.value } },
+                    );
+                } else {
+                    try writer.print(
+                        "  [{d:0>3}] 1GIB 0x{x:0>16} ",
+                        .{ level3_index, level3_range.address.value },
+                    );
+                    try level3_entry.printDirectoryEntryFlags(writer);
+                    try writer.writeByte('\n');
+                }
 
                 const level2_table = level3_entry.getNextLevel() catch return error.WriteFailed;
                 for (level2_table.entries, 0..) |raw_level2_entry, level2_index| {
@@ -943,18 +975,40 @@ pub const PageTable = extern struct {
 
                     if (level2_entry.huge.read()) {
                         const physical = level2_entry.getAddress2mib();
-                        try writer.print(
-                            "    [{}] 2MIB 0x{x:0>16} -> 0x{x:0>16}    Flags: ",
-                            .{ level2_index, level2_range.address.value, physical.value },
-                        );
-                        try level2_entry.printHugeEntryFlags(writer);
-                        try writer.writeByte('\n');
+
+                        if (print_raw_flag_bits) {
+                            var flags_only = level2_entry;
+                            flags_only.setAddress2mib(.zero);
+                            try writer.print(
+                                "    [{d:0>3}] 2MiB 0x{x:0>16} -> 0x{x:0>16} {f}\n",
+                                .{ level2_index, level2_range.address.value, physical.value, BinaryWithUnderscores{ .value = flags_only._raw.value } },
+                            );
+                        } else {
+                            try writer.print(
+                                "    [{d:0>3}] 2MiB 0x{x:0>16} -> 0x{x:0>16} ",
+                                .{ level3_index, level3_range.address.value, physical.value },
+                            );
+                            try level2_entry.printHugeEntryFlags(writer);
+                            try writer.writeByte('\n');
+                        }
                         continue;
                     }
 
-                    try writer.print("    level 2 [{}] 0x{x:0>16}    Flags: ", .{ level2_index, level2_range.address.value });
-                    try level2_entry.printDirectoryEntryFlags(writer);
-                    try writer.writeByte('\n');
+                    if (print_raw_flag_bits) {
+                        var flags_only = level2_entry;
+                        flags_only.setAddress4kib(.zero);
+                        try writer.print(
+                            "    [{d:0>3}] 2MiB 0x{x:0>16} {f}\n",
+                            .{ level2_index, level2_range.address.value, BinaryWithUnderscores{ .value = flags_only._raw.value } },
+                        );
+                    } else {
+                        try writer.print(
+                            "    [{d:0>3}] 2MiB 0x{x:0>16} ",
+                            .{ level2_index, level2_range.address.value },
+                        );
+                        try level2_entry.printDirectoryEntryFlags(writer);
+                        try writer.writeByte('\n');
+                    }
 
                     // use only when `print_detailed_level1` is false
                     var level1_present_entries: usize = 0;
@@ -980,12 +1034,22 @@ pub const PageTable = extern struct {
                         }
 
                         const physical = level1_entry.getAddress4kib();
-                        try writer.print(
-                            "      [{}] 4KIB 0x{x:0>16} -> 0x{x:0>16}    Flags: ",
-                            .{ level1_index, level1_range.address.value, physical.value },
-                        );
-                        try level1_entry.printSmallEntryFlags(writer);
-                        try writer.writeByte('\n');
+
+                        if (print_raw_flag_bits) {
+                            var flags_only = level1_entry;
+                            flags_only.setAddress4kib(.zero);
+                            try writer.print(
+                                "      [{d:0>3}] 4KiB 0x{x:0>16} -> 0x{x:0>16} {f}\n",
+                                .{ level1_index, level1_range.address.value, physical.value, BinaryWithUnderscores{ .value = flags_only._raw.value } },
+                            );
+                        } else {
+                            try writer.print(
+                                "      [{d:0>3}] 4KiB 0x{x:0>16} -> 0x{x:0>16} ",
+                                .{ level1_index, level1_range.address.value, physical.value },
+                            );
+                            try level1_entry.printSmallEntryFlags(writer);
+                            try writer.writeByte('\n');
+                        }
                     }
 
                     if (!print_detailed_level1) {
@@ -995,6 +1059,19 @@ pub const PageTable = extern struct {
             }
         }
     }
+
+    const BinaryWithUnderscores = struct {
+        value: usize,
+
+        pub fn format(v: BinaryWithUnderscores, writer: *std.Io.Writer) !void {
+            comptime var i = @bitSizeOf(usize);
+            inline while (i > 0) : (i -= 4) {
+                const value = bitjuggle.getBits(v.value, i - 4, 4);
+                try writer.printInt(value, 2, .lower, .{ .fill = '0', .width = 4, .alignment = .right });
+                if (i > 4) try writer.writeByte('_');
+            }
+        }
+    };
 
     pub const init = struct {
         /// This function fills in the top level of the page table for the given range.
