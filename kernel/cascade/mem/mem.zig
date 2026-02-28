@@ -482,11 +482,10 @@ pub const VirtualRangeBatch = struct {
         if (core.is_debug) std.debug.assert(range.pageAligned());
 
         switch (batch.ranges.len) {
-            0 => {
-                @branchHint(.unlikely);
-                batch.ranges.appendAssumeCapacity(range);
-            },
+            0 => batch.ranges.appendAssumeCapacity(range),
             cascade.config.mem.virtual_ranges_to_batch => {
+                @branchHint(.unlikely);
+
                 // we have hit the limit of virtual ranges to batch together so we always merge with the last range
                 const last: *cascade.VirtualRange = &batch.ranges.slice()[cascade.config.mem.virtual_ranges_to_batch - 1];
 
@@ -496,7 +495,6 @@ pub const VirtualRangeBatch = struct {
                 last.size.addInPlace(range.size);
             },
             else => |len| {
-                @branchHint(.likely);
                 const last: *cascade.VirtualRange = &batch.ranges.slice()[len - 1];
 
                 if (core.is_debug) std.debug.assert(range.address.greaterThanOrEqual(last.after()));
@@ -528,7 +526,6 @@ pub const VirtualRangeBatch = struct {
         const len = batch.ranges.len;
 
         if (len == 0) {
-            @branchHint(.unlikely);
             batch.ranges.appendAssumeCapacity(range);
             return true;
         }
@@ -546,7 +543,7 @@ pub const VirtualRangeBatch = struct {
         }
 
         if (batch.full()) {
-            @branchHint(.cold);
+            @branchHint(.unlikely);
             return false;
         }
 
@@ -590,7 +587,6 @@ pub const ChangeProtectionBatch = struct {
         const len = batch.ranges.len;
 
         if (len == 0) {
-            @branchHint(.unlikely);
             batch.ranges.appendAssumeCapacity(range);
             return true;
         }
@@ -610,7 +606,7 @@ pub const ChangeProtectionBatch = struct {
         }
 
         if (batch.full()) {
-            @branchHint(.cold);
+            @branchHint(.unlikely);
             return false;
         }
 

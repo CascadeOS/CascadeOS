@@ -427,7 +427,6 @@ fn findFreeRange(address_space: *AddressSpace, size: core.Size) ?FreeRange {
 
     for (address_space.entries.items) |entry| {
         if (candidate_range_last_address.lessThan(entry.range.address)) {
-            @branchHint(.unlikely);
             // the candidate range is entirely before the entry
             break;
         }
