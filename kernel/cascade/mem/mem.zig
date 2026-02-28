@@ -902,7 +902,7 @@ pub const init = struct {
     }
 
     fn registerPages(kernel_regions: *KernelMemoryRegion.List) void {
-        const number_of_usable_pages = blk: {
+        const page_entries_to_cover = blk: {
             var iter = boot.usableRangeIterator() catch @panic("no memory map");
 
             var last_page: cascade.PhysicalAddress = .zero;
@@ -916,7 +916,7 @@ pub const init = struct {
 
         const pages_range = kernel_regions.findFreeRange(
             core.Size.of(PhysicalPage)
-                .multiplyScalar(number_of_usable_pages)
+                .multiplyScalar(page_entries_to_cover)
                 .alignForward(arch.paging.standard_page_size_alignment),
             arch.paging.standard_page_size_alignment,
         ) orelse @panic("no space in kernel memory layout for the pages array");
