@@ -423,20 +423,20 @@ fn findFreeRange(address_space: *AddressSpace, size: core.Size) ?FreeRange {
 
     var candidate_insertion_index: usize = 0;
     var candidate_range: cascade.VirtualRange = .from(address_space.range.address, size);
-    var candidate_range_last_address = candidate_range.last();
+    var candidate_range_terminating_address = candidate_range.after();
 
     for (address_space.entries.items) |entry| {
-        if (candidate_range_last_address.lessThan(entry.range.address)) {
+        if (candidate_range_terminating_address.lessThanOrEqual(entry.range.address)) {
             // the candidate range is entirely before the entry
             break;
         }
 
         candidate_range.address = entry.range.after();
-        candidate_range_last_address = candidate_range.last();
+        candidate_range_terminating_address = candidate_range.after();
         candidate_insertion_index += 1;
     }
 
-    if (candidate_range_last_address.lessThanOrEqual(address_space.range.last())) {
+    if (candidate_range_terminating_address.lessThanOrEqual(address_space.range.after())) {
         // the candidate range does not extend past the end of the address space
         @branchHint(.likely);
         return .{

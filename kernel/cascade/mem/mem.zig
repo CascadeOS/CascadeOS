@@ -80,8 +80,8 @@ pub fn mapRangeAndBackWithPhysicalPages(
         std.debug.assert(virtual_range.pageAligned());
     }
 
-    const last_virtual_address = virtual_range.last();
     var current_virtual_address = virtual_range.address;
+    const terminating_virtual_address = virtual_range.after();
 
     errdefer {
         // Unmap all pages that have been mapped.
@@ -106,7 +106,7 @@ pub fn mapRangeAndBackWithPhysicalPages(
     //       this one is not as obviously good as the other TODO optimizations in this file as every arch will have to do
     //       the same physical page allocation and errdefer deallocation
 
-    while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
+    while (current_virtual_address.lessThan(terminating_virtual_address)) {
         const physical_page = try physical_page_allocator.allocate();
         errdefer {
             var deallocate_page_list: PhysicalPage.List = .{};
@@ -151,8 +151,8 @@ pub fn mapRangeToPhysicalRange(
         std.debug.assert(virtual_range.size.equal(physical_range.size));
     }
 
-    const last_virtual_address = virtual_range.last();
     var current_virtual_address = virtual_range.address;
+    const terminating_virtual_address = virtual_range.after();
 
     errdefer { // unmap all pages that have been mapped
         var unmap_batch: VirtualRangeBatch = .{};
@@ -175,7 +175,7 @@ pub fn mapRangeToPhysicalRange(
 
     var current_physical_address = physical_range.address;
 
-    while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
+    while (current_virtual_address.lessThan(terminating_virtual_address)) {
         try page_table.mapSinglePage(
             current_virtual_address,
             .fromAddress(current_physical_address),
@@ -685,18 +685,18 @@ pub const init = struct {
         );
 
         const direct_map_size = direct_map_size: {
-            var last_physical_address: cascade.PhysicalAddress = .zero;
+            var terminating_physical_address: cascade.PhysicalAddress = .zero;
 
             var iter = boot.memoryMap() catch @panic("no memory map");
 
             while (iter.next()) |entry| {
-                const range_last_address = entry.range.last();
-                if (range_last_address.greaterThan(last_physical_address)) {
-                    last_physical_address = range_last_address;
+                const range_terminating_address = entry.range.after();
+                if (range_terminating_address.greaterThan(terminating_physical_address)) {
+                    terminating_physical_address = range_terminating_address;
                 }
             }
 
-            break :direct_map_size cascade.PhysicalAddress.zero.difference(last_physical_address).add(.one);
+            break :direct_map_size cascade.PhysicalAddress.zero.difference(terminating_physical_address);
         };
 
         globals.direct_map = .from(

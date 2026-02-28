@@ -21,9 +21,9 @@ pub fn flushCache(virtual_range: cascade.VirtualRange) void {
     if (core.is_debug) std.debug.assert(virtual_range.pageAligned());
 
     var current_virtual_address = virtual_range.address;
-    const last_virtual_address = virtual_range.last();
+    const terminating_virtual_address = virtual_range.after();
 
-    while (current_virtual_address.lessThanOrEqual(last_virtual_address)) {
+    while (current_virtual_address.lessThan(terminating_virtual_address)) {
         x64.instructions.invlpg(current_virtual_address);
 
         current_virtual_address.moveForwardPageInPlace();

@@ -325,7 +325,7 @@ pub const init = struct {
                 current_pages_range.after().equal(entry_pages_range.address))
             {
                 std.debug.assert(current_pages_range.address.lessThanOrEqual(entry_pages_range.address));
-                opt_current_pages_range.?.size.addInPlace(current_pages_range.last().difference(entry_pages_range.last()));
+                opt_current_pages_range.?.size.addInPlace(current_pages_range.after().difference(entry_pages_range.after()));
                 continue;
             }
 
