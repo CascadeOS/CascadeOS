@@ -143,7 +143,7 @@ pub const interrupts = struct {
         arch_specific: *current_decls.interrupts.InterruptFrame,
 
         /// Creates a stack iterator for the context this interrupt was triggered from.
-        pub fn createStackIterator(self: InterruptFrame) std.debug.StackIterator {
+        pub fn createStackIterator(self: InterruptFrame) cascade.debug.StackIterator {
             // TODO: this is used during panics, so if it is not implemented we will panic during a panic
             return getFunction(
                 current_functions.interrupts,
@@ -910,7 +910,7 @@ pub const Functions = struct {
         /// Creates a stack iterator for the context this interrupt was triggered from.
         createStackIterator: ?fn (
             interrupt_frame: *const current_decls.interrupts.InterruptFrame,
-        ) std.debug.StackIterator = null,
+        ) cascade.debug.StackIterator = null,
 
         /// Returns the instruction pointer of the context this interrupt was triggered from.
         instructionPointer: ?fn (interrupt_frame: *const current_decls.interrupts.InterruptFrame) cascade.VirtualAddress = null,

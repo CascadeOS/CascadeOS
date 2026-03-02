@@ -8,6 +8,8 @@ const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
 
+pub const StackIterator = @import("StackIterator.zig");
+
 pub const log = @import("log.zig");
 
 pub fn hasAnExecutorPanicked() bool {
@@ -211,7 +213,7 @@ const formatting = struct {
         return_address: usize,
         symbol_source: ?SymbolSource,
     ) !void {
-        var stack_iter: std.debug.StackIterator = .init(return_address, @frameAddress());
+        var stack_iter: StackIterator = .init(return_address, @frameAddress());
 
         while (stack_iter.next()) |address| {
             try printSourceAtAddress(writer, .from(address), symbol_source);

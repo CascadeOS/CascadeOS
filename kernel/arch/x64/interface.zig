@@ -31,7 +31,7 @@ pub const functions: arch.Functions = .{
         .createStackIterator = struct {
             fn createStackIterator(
                 interrupt_frame: *const x64.interrupts.InterruptFrame,
-            ) std.debug.StackIterator {
+            ) cascade.debug.StackIterator {
                 return .init(null, interrupt_frame.rbp);
             }
         }.createStackIterator,
