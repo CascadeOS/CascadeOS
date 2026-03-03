@@ -149,7 +149,3 @@ const csi = esc ++ "[";
 inline fn comptimeCsi(comptime fmt: []const u8, args: anytype) []const u8 {
     return std.fmt.comptimePrint(csi ++ fmt, args);
 }
-
-comptime {
-    std.testing.refAllDeclsRecursive(@This());
-}

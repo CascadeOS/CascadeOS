@@ -784,5 +784,5 @@ const custom_atomic_file = struct {
 };
 
 comptime {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

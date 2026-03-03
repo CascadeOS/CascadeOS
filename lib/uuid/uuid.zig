@@ -147,5 +147,5 @@ test "invalid UUID" {
 }
 
 comptime {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

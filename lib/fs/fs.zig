@@ -15,5 +15,5 @@ pub const gpt = @import("gpt.zig");
 pub const mbr = @import("mbr.zig");
 
 comptime {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

@@ -35,7 +35,7 @@ pub fn output(
 }
 
 comptime {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }
 
 const LocationProgramBuilder = @This();

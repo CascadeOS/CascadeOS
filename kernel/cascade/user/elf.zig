@@ -1236,7 +1236,3 @@ const HeaderIdent = extern struct {
 
     const header_ident_size = 16;
 };
-
-comptime {
-    std.testing.refAllDeclsRecursive(@This());
-}

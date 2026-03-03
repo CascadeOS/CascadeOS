@@ -665,7 +665,7 @@ fn toResult(return_value: c_int) !void {
 }
 
 comptime {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }
 
 const c = @cImport({

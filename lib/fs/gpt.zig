@@ -328,5 +328,5 @@ pub const partition_types = struct {
 };
 
 comptime {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

@@ -201,7 +201,3 @@ fn argumentError(comptime msg: []const u8, args: anytype) noreturn {
 
     std.process.exit(1);
 }
-
-comptime {
-    std.testing.refAllDeclsRecursive(@This());
-}

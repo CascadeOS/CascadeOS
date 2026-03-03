@@ -1094,5 +1094,5 @@ pub const Creator = enum(u32) {
 };
 
 comptime {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

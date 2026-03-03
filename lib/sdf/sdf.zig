@@ -812,5 +812,5 @@ pub const LocationProgramInstruction = union(LocationProgramOpcode) {
 };
 
 comptime {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

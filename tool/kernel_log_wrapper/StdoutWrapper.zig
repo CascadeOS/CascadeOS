@@ -79,7 +79,3 @@ pub fn next(stdout_wrapper: *StdoutWrapper) !?[]const u8 {
 }
 
 const StdoutEnum = enum { stdout };
-
-comptime {
-    std.testing.refAllDeclsRecursive(@This());
-}

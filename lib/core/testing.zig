@@ -26,5 +26,5 @@ pub inline fn expectSize(comptime T: type, comptime size: core.Size) void {
 }
 
 comptime {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

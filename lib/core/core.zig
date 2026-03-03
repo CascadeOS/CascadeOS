@@ -108,5 +108,5 @@ pub const CleanupDecision = enum {
 };
 
 comptime {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

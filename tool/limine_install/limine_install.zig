@@ -84,5 +84,5 @@ fn err(comptime msg: []const u8, args: anytype) noreturn {
 extern fn limine_main(argc: c_int, argv: [*]const [*:0]const u8) c_int;
 
 comptime {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

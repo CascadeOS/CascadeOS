@@ -429,5 +429,5 @@ pub fn BoundedArrayAligned(
 }
 
 comptime {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

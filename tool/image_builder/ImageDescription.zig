@@ -202,5 +202,5 @@ pub const PartitionBuilder = struct {
 };
 
 comptime {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

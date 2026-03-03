@@ -1468,7 +1468,3 @@ const arch: Arch = switch (@import("builtin").cpu.arch) {
     .x86_64 => .x86_64,
     else => |e| @compileError("unsupported architecture " ++ @tagName(e)),
 };
-
-comptime {
-    std.testing.refAllDeclsRecursive(@This());
-}
