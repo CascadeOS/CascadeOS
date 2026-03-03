@@ -13,25 +13,15 @@ const Tool = @import("Tool.zig");
 pub fn registerQemuSteps(
     b: *std.Build,
     image_steps: ImageStep.Collection,
-    tools: Tool.Collection,
     options: Options,
     all_architectures: []const CascadeTarget.Architecture,
 ) !void {
-    const kernel_log_wrapper = tools.get("kernel_log_wrapper").?;
-
-    // the kernel log wrapper interferes with the qemu monitor
-    const kernel_log_wrapper_compile = if (!options.qemu_monitor and !options.no_kernel_log_wrapper)
-        kernel_log_wrapper.release_safe_exe
-    else
-        null;
-
     for (all_architectures) |architecture| {
         const image_step = image_steps.get(architecture).?;
 
         const qemu_step = try createQemuStep(
             b,
             architecture,
-            kernel_log_wrapper_compile,
             image_step.image_file,
             options,
         );
@@ -55,7 +45,6 @@ pub fn registerQemuSteps(
 fn createQemuStep(
     b: *std.Build,
     architecture: CascadeTarget.Architecture,
-    kernel_log_wrapper_compile: ?*std.Build.Step.Compile,
     image: std.Build.LazyPath,
     options: Options,
 ) !*std.Build.Step.Run {
@@ -64,12 +53,7 @@ fn createQemuStep(
     else
         .default;
 
-    const run_qemu = if (!options.display and kernel_log_wrapper_compile != null) run_qemu: {
-        const kernel_log_wrapper = kernel_log_wrapper_compile.?;
-        const run_qemu = b.addRunArtifact(kernel_log_wrapper);
-        run_qemu.addArg(qemuExecutable(architecture));
-        break :run_qemu run_qemu;
-    } else b.addSystemCommand(&.{qemuExecutable(architecture)});
+    const run_qemu = b.addSystemCommand(&.{qemuExecutable(architecture)});
 
     run_qemu.has_side_effects = true;
     run_qemu.stdio = .inherit;

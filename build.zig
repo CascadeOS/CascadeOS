@@ -71,7 +71,6 @@ pub fn build(b: *std.Build) !void {
     try qemu.registerQemuSteps(
         b,
         image_steps,
-        tools,
         options,
         all_architectures,
     );

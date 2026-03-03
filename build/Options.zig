@@ -90,11 +90,6 @@ kernel_log_level: ?ForceLogLevel,
 ///   - starts with `ioapic`
 kernel_log_scopes: []const []const u8,
 
-/// Disable the kernel log wrapper.
-///
-/// Defaults to false.
-no_kernel_log_wrapper: bool,
-
 /// Path to the TPM emulator (swtpm) socket.
 ///
 /// If not given no TPM device will be present in QEMU.
@@ -214,12 +209,6 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, all_architecture
         "In the kernel, force the provided log scopes to be logged (comma separated list of scope matchers, use '+' as a prefix or suffix wildcard).",
     ) orelse "";
 
-    const no_kernel_log_wrapper = b.option(
-        bool,
-        "no_log_wrapper",
-        "Disable the kernel log wrapper (defaults to false)",
-    ) orelse false;
-
     const tpm_socket = b.option(
         []const u8,
         "tpm_socket",
@@ -262,7 +251,6 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, all_architecture
         .no_kaslr = no_kaslr,
         .kernel_log_level = kernel_log_level,
         .kernel_log_scopes = kernel_log_scopes,
-        .no_kernel_log_wrapper = no_kernel_log_wrapper,
         .tpm_socket = tpm_socket,
 
         .kernel_option_module = try buildKernelOptionModule(

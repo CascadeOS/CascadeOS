@@ -5,7 +5,6 @@ const ToolDescription = @import("../build/ToolDescription.zig");
 
 pub const tools: []const ToolDescription = &.{
     .{ .name = "image_builder", .dependencies = &.{ "core", "fs", "uuid" } },
-    .{ .name = "kernel_log_wrapper", .dependencies = &.{"core"} },
     .{
         .name = "limine_install",
         .configuration = .{
