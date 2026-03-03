@@ -41,23 +41,16 @@ pub fn next(it: *StackIterator) ?usize {
     return address;
 }
 
-fn next_internal(it: *StackIterator) ?usize {
-    const fp = if (comptime native_arch.isSPARC())
-        // On SPARC the offset is positive. (!)
-        std.math.add(usize, it.fp, fp_offset) catch return null
-    else
-        std.math.sub(usize, it.fp, fp_offset) catch return null;
-
-    // Sanity check.
+pub fn next_internal(it: *StackIterator) ?usize {
+    const fp = std.math.sub(usize, it.fp, fp_offset) catch return null;
     if (fp == 0 or !std.mem.isAligned(fp, @alignOf(usize))) return null;
-    const new_fp = std.math.add(usize, fp, fp_bias) catch return null;
 
-    // Sanity check: the stack grows down thus all the parent frames must be
-    // be at addresses that are greater (or equal) than the previous one.
-    // A zero frame pointer often signals this is the last frame, that case
-    // is gracefully handled by the next call to next_internal.
+    const fp_ptr: *usize = @ptrFromInt(fp);
+    const new_fp = fp_ptr.*;
     if (new_fp != 0 and new_fp < it.fp) return null;
-    const new_pc = std.math.add(usize, fp, pc_offset) catch return null;
+
+    const new_pc_ptr: *usize = @ptrFromInt(std.math.add(usize, fp, pc_offset) catch return null);
+    const new_pc = new_pc_ptr.*;
 
     it.fp = new_fp;
 
@@ -70,20 +63,8 @@ const fp_offset = if (native_arch.isRISCV())
     // area, on pretty much every other architecture it points to the stack
     // slot where the previous frame pointer is saved.
     2 * @sizeOf(usize)
-else if (native_arch.isSPARC())
-    // On SPARC the previous frame pointer is stored at 14 slots past %fp+BIAS.
-    14 * @sizeOf(usize)
-else
-    0;
-
-const fp_bias = if (native_arch.isSPARC())
-    // On SPARC frame pointers are biased by a constant.
-    2047
 else
     0;
 
 // Positive offset of the saved PC wrt the frame pointer.
-const pc_offset = if (native_arch == .powerpc64le)
-    2 * @sizeOf(usize)
-else
-    @sizeOf(usize);
+const pc_offset = @sizeOf(usize);
