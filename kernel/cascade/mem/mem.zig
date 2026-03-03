@@ -786,37 +786,40 @@ pub const init = struct {
             extern const __data_end: u8;
         };
 
-        const sdf_slice = cascade.debug.sdfSlice() catch &.{};
-        const sdf_range: cascade.KernelVirtualRange = .fromSlice(u8, sdf_slice);
-
-        const sections: []const struct {
+        var sections: core.containers.BoundedArray(struct {
             cascade.KernelVirtualAddress,
             cascade.KernelVirtualAddress,
             KernelMemoryRegion.Type,
-        } = &.{
-            .{
-                .fromPtr(&linker_symbols.__text_start),
-                .fromPtr(&linker_symbols.__text_end),
-                .executable_section,
-            },
-            .{
-                .fromPtr(&linker_symbols.__rodata_start),
-                .fromPtr(&linker_symbols.__rodata_end),
-                .readonly_section,
-            },
-            .{
-                .fromPtr(&linker_symbols.__data_start),
-                .fromPtr(&linker_symbols.__data_end),
-                .writeable_section,
-            },
-            .{
+        }, 4) = .{};
+
+        sections.appendAssumeCapacity(.{
+            .fromPtr(&linker_symbols.__text_start),
+            .fromPtr(&linker_symbols.__text_end),
+            .executable_section,
+        });
+
+        sections.appendAssumeCapacity(.{
+            .fromPtr(&linker_symbols.__rodata_start),
+            .fromPtr(&linker_symbols.__rodata_end),
+            .readonly_section,
+        });
+
+        sections.appendAssumeCapacity(.{
+            .fromPtr(&linker_symbols.__data_start),
+            .fromPtr(&linker_symbols.__data_end),
+            .writeable_section,
+        });
+
+        if (cascade.debug.sdfSlice()) |sdf_slice| {
+            const sdf_range: cascade.KernelVirtualRange = .fromSlice(u8, sdf_slice);
+            sections.appendAssumeCapacity(.{
                 sdf_range.address,
                 sdf_range.after(),
                 .sdf_section,
-            },
-        };
+            });
+        } else |_| {}
 
-        for (sections) |section| {
+        for (sections.constSlice()) |section| {
             const start_address = section[0];
             const end_address = section[1];
             const region_type = section[2];
