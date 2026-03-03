@@ -14,18 +14,17 @@ const ImageDescription = @import("ImageDescription.zig");
 
 const disk_block_size: core.Size = .from(512, .byte);
 
-pub fn main() !void {
-    var gpa: std.heap.GeneralPurposeAllocator(.{}) = .{};
-    defer _ = gpa.deinit();
-    const allocator = gpa.allocator();
+pub fn main(init: std.process.Init) !void {
+    const arguments = try getArguments(init.arena.allocator(), init.io, init.minimal.args);
 
-    const arguments = try getArguments(allocator);
-    defer arguments.deinit(allocator);
-
-    var rand = std.Random.DefaultPrng.init(std.crypto.random.int(u64));
+    var rand = std.Random.DefaultPrng.init(blk: {
+        var int: u64 = undefined;
+        init.io.random(std.mem.asBytes(&int));
+        break :blk int;
+    });
     const random = rand.random();
 
-    try createDiskImage(allocator, arguments, random);
+    try createDiskImage(init.arena.allocator(), init.io, arguments, random);
 }
 
 const Arguments = struct {
@@ -49,41 +48,35 @@ fn usageError(err_msg: []const u8) noreturn {
     std.process.exit(1);
 }
 
-fn getArguments(allocator: std.mem.Allocator) !Arguments {
-    const args = try std.process.argsAlloc(allocator);
-    defer std.process.argsFree(allocator, args);
+fn getArguments(arena: std.mem.Allocator, io: std.Io, args: std.process.Args) !Arguments {
+    const args_slice = try args.toSlice(arena);
 
-    if (args.len != 3) { // first argument is the executable name
+    if (args_slice.len != 3) { // first argument is the executable name
         usageError("incorrect number of arguments given");
     }
 
-    const output_path = try allocator.dupe(u8, args[2]);
-    errdefer allocator.free(output_path);
-
     const image_description_contents = blk: {
-        const file = if (std.mem.eql(u8, args[1], "-"))
-            std.fs.File.stdin()
+        const file = if (std.mem.eql(u8, args_slice[1], "-"))
+            std.Io.File.stdin()
         else
-            try std.fs.cwd().openFile(args[1], .{});
-        defer file.close();
+            try std.Io.Dir.cwd().openFile(io, args_slice[1], .{});
+        defer file.close(io);
 
         var buf: [std.heap.page_size_min]u8 = undefined;
-        var reader = file.reader(&buf);
-        break :blk try reader.interface.allocRemaining(allocator, .unlimited);
+        var reader = file.reader(io, &buf);
+        break :blk try reader.interface.allocRemaining(arena, .unlimited);
     };
-    defer allocator.free(image_description_contents);
 
-    const image_description = try allocator.create(ImageDescription.Parsed);
-    errdefer allocator.destroy(image_description);
-    image_description.* = try ImageDescription.parse(allocator, image_description_contents);
+    const image_description = try arena.create(ImageDescription.Parsed);
+    image_description.* = try ImageDescription.parse(arena, image_description_contents);
 
     return .{
-        .output_path = output_path,
+        .output_path = args_slice[2],
         .image_description = image_description,
     };
 }
 
-fn createDiskImage(allocator: std.mem.Allocator, arguments: Arguments, random: std.Random) !void {
+fn createDiskImage(allocator: std.mem.Allocator, io: std.Io, arguments: Arguments, random: std.Random) !void {
     const image_description = arguments.image_description.image_description;
 
     const disk_size = blk: {
@@ -93,7 +86,7 @@ fn createDiskImage(allocator: std.mem.Allocator, arguments: Arguments, random: s
         break :blk core.Size.from(image_description.size, .byte);
     };
 
-    const disk_image = try createAndMapDiskImage(arguments.output_path, disk_size);
+    const disk_image = try createAndMapDiskImage(io, arguments.output_path, disk_size);
     defer std.posix.munmap(disk_image);
 
     const gpt_partitions = try allocator.alloc(GptPartition, image_description.partitions.len);
@@ -106,12 +99,12 @@ fn createDiskImage(allocator: std.mem.Allocator, arguments: Arguments, random: s
 
         switch (partition.filesystem) {
             .none => {},
-            .fat32 => try buildFATPartition(allocator, partition, partition_slice),
+            .fat32 => try buildFATPartition(allocator, io, partition, partition_slice),
         }
     }
 }
 
-fn buildFATPartition(allocator: std.mem.Allocator, partition: ImageDescription.Partition, slice: []u8) !void {
+fn buildFATPartition(allocator: std.mem.Allocator, io: std.Io, partition: ImageDescription.Partition, slice: []u8) !void {
     const sector_size = disk_block_size;
 
     const root_cluster = 2;
@@ -190,6 +183,7 @@ fn buildFATPartition(allocator: std.mem.Allocator, partition: ImageDescription.P
     const cluster_begin_sector = reserved_sectors + (number_of_fat * sectors_per_fat);
 
     var context = FATContext.init(
+        io,
         slice,
         fat_begin,
         number_of_fat_entries,
@@ -335,6 +329,8 @@ fn makeFATName(allocator: std.mem.Allocator, name: []const u8) !FATName {
 }
 
 const FATContext = struct {
+    io: std.Io,
+
     fat_partition: []u8,
 
     fat_table: []FAT32Entry,
@@ -353,6 +349,7 @@ const FATContext = struct {
     date_time: FATDateTime,
 
     pub fn init(
+        io: std.Io,
         fat_partition: []u8,
         fat_begin: u32,
         number_of_fat_entries: u32,
@@ -365,7 +362,8 @@ const FATContext = struct {
         if (core.is_debug) std.debug.assert(root_cluster == 2); // TODO: Remove this requirement
 
         const cluster_size = sector_size.multiplyScalar(sectors_per_cluster);
-        return FATContext{
+        return .{
+            .io = io,
             .fat_partition = fat_partition,
             .fat_table = asPtr(
                 [*]fat.FAT32Entry,
@@ -380,7 +378,7 @@ const FATContext = struct {
             .cluster_size = cluster_size,
             .cluster_begin_sector = cluster_begin_sector,
             .directory_entries_per_cluster = cluster_size.divide(core.Size.of(fat.DirectoryEntry)),
-            .date_time = getFATDateAndTime(),
+            .date_time = getFATDateAndTime(io),
             .number_of_clusters = number_of_clusters,
         };
     }
@@ -432,12 +430,12 @@ const FATContext = struct {
         entry: *fat.DirectoryEntry.StandardDirectoryEntry,
         path: []const u8,
     ) !void {
-        const file = try std.fs.cwd().openFile(path, .{});
-        defer file.close();
+        const io = fat_context.io;
 
-        const stat = try file.stat();
+        const file = try std.Io.Dir.cwd().openFile(io, path, .{});
+        defer file.close(io);
 
-        const file_size = core.Size.from(stat.size, .byte);
+        const file_size = core.Size.from(try file.length(io), .byte);
         const clusters_required = fat_context.cluster_size.amountToCover(file_size);
         if (core.is_debug) std.debug.assert(clusters_required != 0);
 
@@ -445,13 +443,17 @@ const FATContext = struct {
 
         entry.high_cluster_number = @truncate(current_cluster >> 16);
         entry.low_cluster_number = @truncate(current_cluster);
-        entry.size = @intCast(stat.size);
+        entry.size = @intCast(file_size.value);
+
+        var reader_buffer: [0x1000]u8 = undefined;
+        var file_reader = file.reader(io, &reader_buffer);
 
         var i: usize = 0;
 
         while (i < clusters_required) : (i += 1) {
             const cluster_ptr = fat_context.clusterSlice(current_cluster, 1);
-            const read = try file.readAll(cluster_ptr);
+
+            const read = try file_reader.interface.readSliceShort(cluster_ptr);
 
             const is_last_cluster = i == clusters_required - 1;
 
@@ -686,23 +688,27 @@ const FATContext = struct {
     };
 };
 
-fn createAndMapDiskImage(disk_image_path: []const u8, disk_size: core.Size) ![]align(std.heap.page_size_min) u8 {
+fn createAndMapDiskImage(io: std.Io, disk_image_path: []const u8, disk_size: core.Size) ![]align(std.heap.page_size_min) u8 {
     const file = if (std.fs.path.dirname(disk_image_path)) |dir_path| blk: {
-        var parent_directory = try std.fs.cwd().makeOpenPath(dir_path, .{});
-        defer parent_directory.close();
+        var parent_directory = try std.Io.Dir.cwd().createDirPathOpen(io, dir_path, .{});
+        defer parent_directory.close(io);
         break :blk try parent_directory.createFile(
+            io,
             std.fs.path.basename(disk_image_path),
             .{ .truncate = true, .read = true },
         );
-    } else try std.fs.cwd().createFile(disk_image_path, .{ .truncate = true, .read = true });
-    defer file.close();
+    } else try std.Io.Dir.cwd().createFile(io, disk_image_path, .{ .truncate = true, .read = true });
+    defer file.close(io);
 
-    try file.setEndPos(disk_size.value);
+    try file.setLength(io, disk_size.value);
 
     return std.posix.mmap(
         null,
         disk_size.value,
-        std.posix.PROT.READ | std.posix.PROT.WRITE,
+        .{
+            .READ = true,
+            .WRITE = true,
+        },
         .{ .TYPE = .SHARED },
         file.handle,
         0,
@@ -894,8 +900,8 @@ const FATDateTime = struct {
     subsecond: u8,
 };
 
-fn getFATDateAndTime() FATDateTime {
-    const unix_timestamp_ms = std.time.milliTimestamp();
+fn getFATDateAndTime(io: std.Io) FATDateTime {
+    const unix_timestamp_ms = std.Io.Timestamp.now(io, .real).toMilliseconds();
     const epoch_seconds = std.time.epoch.EpochSeconds{ .secs = @intCast(@divFloor(unix_timestamp_ms, std.time.ms_per_s)) };
 
     const epoch_days = epoch_seconds.getEpochDay();
@@ -962,5 +968,5 @@ const ebpb_boot_code = [_]u8{
 };
 
 comptime {
-    std.testing.refAllDeclsRecursive(@This());
+    std.testing.refAllDecls(@This());
 }

@@ -4,5 +4,6 @@
 zig-cache/
 .zig-cache/
 zig-out/
+zig-pkg/
 .gdb_history
 .gdbinit

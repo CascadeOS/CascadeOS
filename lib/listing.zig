@@ -5,10 +5,9 @@ const LibraryDescription = @import("../build/LibraryDescription.zig");
 
 pub const libraries: []const LibraryDescription = &.{
     .{ .name = "bitjuggle", .dependencies = &.{"core"} },
+    .{ .name = "cascade", .is_cascade_only = true },
     .{ .name = "core" },
     .{ .name = "fs", .dependencies = &.{ "core", "uuid" } },
     .{ .name = "sdf" },
-    // TODO: this should be called "cascade" but that confuses ZLS, techatrix has recently made some progress on this but it support zig 0.16 only
-    .{ .name = "user_cascade" },
     .{ .name = "uuid", .dependencies = &.{"core"} },
 };

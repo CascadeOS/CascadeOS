@@ -26,6 +26,8 @@ pub fn customConfiguration(
 
     // Add assembly files
     assembly_files_blk: {
+        const io = b.graph.io;
+
         const assembly_files_dir_path = b.pathJoin(&.{
             "kernel",
             "arch",
@@ -33,11 +35,15 @@ pub fn customConfiguration(
             "asm",
         });
 
-        var assembly_files_dir = std.fs.cwd().openDir(assembly_files_dir_path, .{ .iterate = true }) catch break :assembly_files_blk;
-        defer assembly_files_dir.close();
+        var assembly_files_dir = std.Io.Dir.cwd().openDir(
+            b.graph.io,
+            assembly_files_dir_path,
+            .{ .iterate = true },
+        ) catch break :assembly_files_blk;
+        defer assembly_files_dir.close(io);
 
         var iter = assembly_files_dir.iterateAssumeFirstIteration();
-        while (try iter.next()) |entry| {
+        while (try iter.next(io)) |entry| {
             if (entry.kind != .file) {
                 std.debug.panic(
                     "found entry '{s}' with unexpected type '{t}' in assembly directory '{s}'\n",

@@ -14,18 +14,22 @@ const StringTableBuilder = @import("StringTableBuilder.zig");
 
 const default_chunk_size = 8 * 1024;
 
-pub fn main() !void {
-    const allocator = std.heap.c_allocator;
+pub fn main(init: std.process.Init) !void {
+    const allocator = std.heap.smp_allocator;
 
-    const arguments = try getArguments(allocator);
+    const arguments = try getArguments(allocator, init.io, init.minimal.args);
 
     switch (arguments) {
-        .generate => |generate_arguments| try generate(allocator, generate_arguments),
-        .embed => |embed_arguments| try embed(embed_arguments),
+        .generate => |generate_arguments| try generate(allocator, generate_arguments, init.io),
+        .embed => |embed_arguments| try embed(embed_arguments, init.io),
     }
 }
 
-fn generate(allocator: std.mem.Allocator, generate_arguments: Arguments.GenerateArguments) !void {
+fn generate(
+    allocator: std.mem.Allocator,
+    generate_arguments: Arguments.GenerateArguments,
+    io: std.Io,
+) !void {
     const line_debug_info = try getDwarfLineDebugInfo(allocator, generate_arguments.binary_input_path);
 
     var string_table: StringTableBuilder = .{ .allocator = allocator };
@@ -51,89 +55,93 @@ fn generate(allocator: std.mem.Allocator, generate_arguments: Arguments.Generate
         &location_program,
     );
 
-    const output_file = try std.fs.cwd().createFile(generate_arguments.binary_output_path, .{});
-    defer output_file.close();
+    const output_file = try std.Io.Dir.cwd().createFile(io, generate_arguments.binary_output_path, .{});
+    defer output_file.close(io);
 
-    var writer = output_file.writer(&.{});
+    var writer = output_file.writer(io, &.{});
     try writer.interface.writeAll(created_debug_info);
 
     try writer.interface.flush();
 }
 
-fn embed(embed_arguments: Arguments.EmbedArguments) !void {
+fn embed(
+    embed_arguments: Arguments.EmbedArguments,
+    io: std.Io,
+) !void {
     var write_buffer: [4096]u8 = undefined;
     var read_buffer: [4096]u8 = undefined;
 
+    const cwd = std.Io.Dir.cwd();
+
     var atomic_output_file = blk: {
-        const binary_input_file = try std.fs.cwd().openFile(embed_arguments.binary_input_path, .{});
-        defer binary_input_file.close();
+        const binary_input_file = try cwd.openFile(io, embed_arguments.binary_input_path, .{});
+        defer binary_input_file.close(io);
 
-        const binary_input_file_stat = try binary_input_file.stat();
-
-        var atomic_output_file = try custom_atomic_file.atomicFileReadAndWrite(
-            std.fs.cwd(),
+        var atomic_output_file = try cwd.createFileAtomic(
+            io,
             embed_arguments.binary_output_path,
-            .{ .mode = binary_input_file_stat.mode, .write_buffer = &write_buffer },
+            .{},
         );
+        errdefer atomic_output_file.deinit(io);
 
-        var input_file_reader = binary_input_file.reader(&read_buffer);
+        var output_file_writer = atomic_output_file.file.writer(io, &write_buffer);
+        var input_file_reader = binary_input_file.reader(io, &read_buffer);
 
-        _ = try atomic_output_file.file_writer.interface.sendFileAll(
+        _ = try output_file_writer.interface.sendFileAll(
             &input_file_reader,
             .unlimited,
         );
 
+        try output_file_writer.flush();
+
         break :blk atomic_output_file;
     };
-    defer atomic_output_file.deinit();
+    defer atomic_output_file.deinit(io);
 
     // ensure sdf data is 8 byte aligned
     const sdf_pos = blk: {
-        const end_pos = try atomic_output_file.file_writer.file.getEndPos();
-        const aligned_end_pos = std.mem.alignForward(u64, end_pos, 8);
-        if (end_pos != aligned_end_pos) try atomic_output_file.file_writer.seekTo(aligned_end_pos);
-        break :blk aligned_end_pos;
+        const length = try atomic_output_file.file.length(io);
+        const aligned_length = std.mem.alignForward(u64, length, 8);
+        if (length != aligned_length) try atomic_output_file.file.setLength(io, aligned_length);
+        break :blk aligned_length;
     };
 
     // append sdf data to the end of the elf file
     const sdf_size = blk: {
-        const sdf_input_file = try std.fs.cwd().openFile(embed_arguments.sdf_input_path, .{});
-        defer sdf_input_file.close();
+        const sdf_input_file = try cwd.openFile(io, embed_arguments.sdf_input_path, .{});
+        defer sdf_input_file.close(io);
 
-        var sdf_file_reader = sdf_input_file.reader(&read_buffer);
+        var sdf_file_reader = sdf_input_file.reader(io, &read_buffer);
 
-        break :blk try atomic_output_file.file_writer.interface.sendFileAll(
+        var output_file_writer = atomic_output_file.file.writer(io, &write_buffer);
+        try output_file_writer.seekToUnbuffered(sdf_pos);
+
+        const size = try output_file_writer.interface.sendFileAll(
             &sdf_file_reader,
             .unlimited,
         );
+
+        try output_file_writer.flush();
+
+        break :blk size;
     };
 
-    try atomic_output_file.file_writer.interface.flush();
+    var memory_map = try atomic_output_file.file.createMemoryMap(io, .{
+        .len = atomic_output_file.file.length(io) catch unreachable,
+    });
+    defer memory_map.destroy(io);
 
-    const stat = try atomic_output_file.file_writer.file.stat();
+    try updateElf(io, &memory_map, sdf_pos, sdf_size);
 
-    const elf_mem = try std.posix.mmap(
-        null,
-        stat.size,
-        std.posix.PROT.READ | std.posix.PROT.WRITE,
-        .{ .TYPE = .SHARED },
-        atomic_output_file.file_writer.file.handle,
-        0,
-    );
-    defer std.posix.munmap(elf_mem);
+    cwd.deleteFile(io, embed_arguments.binary_output_path) catch {};
 
-    try updateElf(elf_mem, sdf_pos, sdf_size);
-
-    std.fs.cwd().deleteFile(embed_arguments.binary_output_path) catch {};
-
-    try atomic_output_file.file_writer.interface.flush();
-
-    try atomic_output_file.finish();
+    try atomic_output_file.link(io);
 }
 
 fn updateElfSpecific(
     comptime is_64: bool,
-    elf_mem: []align(std.heap.page_size_min) u8,
+    io: std.Io,
+    memory_map: *std.Io.File.MemoryMap,
     sdf_pos: u64,
     sdf_size: u64,
 ) !void {
@@ -142,7 +150,7 @@ fn updateElfSpecific(
     const ProgramHeaderT = if (is_64) std.elf.Elf64_Phdr else std.elf.Elf32_Phdr;
     const Offset = if (is_64) std.elf.Elf64_Off else std.elf.Elf32_Off;
 
-    const elf_header: *const HeaderT = std.mem.bytesAsValue(HeaderT, elf_mem);
+    const elf_header: *const HeaderT = std.mem.bytesAsValue(HeaderT, memory_map.memory);
     if (core.is_debug) {
         std.debug.assert(elf_header.e_shentsize == @as(u16, @sizeOf(SectionHeaderT)));
         std.debug.assert(elf_header.e_phentsize == @as(u16, @sizeOf(ProgramHeaderT)));
@@ -150,17 +158,17 @@ fn updateElfSpecific(
 
     const section_table: []align(1) SectionHeaderT = std.mem.bytesAsSlice(
         SectionHeaderT,
-        elf_mem[elf_header.e_shoff..][0 .. elf_header.e_shnum * @sizeOf(SectionHeaderT)],
+        memory_map.memory[elf_header.e_shoff..][0 .. elf_header.e_shnum * @sizeOf(SectionHeaderT)],
     );
 
     const section_header_strings = blk: {
         const section_string_table = section_table[elf_header.e_shstrndx];
-        break :blk elf_mem[section_string_table.sh_offset..][0..section_string_table.sh_size];
+        break :blk memory_map.memory[section_string_table.sh_offset..][0..section_string_table.sh_size];
     };
 
     const program_header_table: []align(1) ProgramHeaderT = std.mem.bytesAsSlice(
         ProgramHeaderT,
-        elf_mem[elf_header.e_phoff..][0 .. elf_header.e_phnum * @sizeOf(ProgramHeaderT)],
+        memory_map.memory[elf_header.e_phoff..][0 .. elf_header.e_phnum * @sizeOf(ProgramHeaderT)],
     );
 
     var previous_sdf_section_offset: Offset = undefined;
@@ -194,14 +202,17 @@ fn updateElfSpecific(
     sdf_program_header.p_offset = @intCast(sdf_pos);
     sdf_program_header.p_filesz = @intCast(sdf_size);
     sdf_program_header.p_memsz = @intCast(sdf_size);
+
+    try memory_map.write(io);
 }
 
 fn updateElf(
-    elf_mem: []align(std.heap.page_size_min) u8,
+    io: std.Io,
+    memory_map: *std.Io.File.MemoryMap,
     sdf_pos: u64,
     sdf_size: u64,
 ) !void {
-    const elf_header_elf32: *const std.elf.Elf32_Ehdr = std.mem.bytesAsValue(std.elf.Elf32_Ehdr, elf_mem);
+    const elf_header_elf32: *const std.elf.Elf32_Ehdr = std.mem.bytesAsValue(std.elf.Elf32_Ehdr, memory_map.memory);
 
     if (!std.mem.eql(u8, elf_header_elf32.e_ident[0..4], std.elf.MAGIC)) return error.InvalidElfMagic;
     if (elf_header_elf32.e_ident[std.elf.EI_VERSION] != 1) return error.InvalidElfVersion;
@@ -215,9 +226,9 @@ fn updateElf(
     };
 
     if (is_64)
-        try updateElfSpecific(true, elf_mem, sdf_pos, sdf_size)
+        try updateElfSpecific(true, io, memory_map, sdf_pos, sdf_size)
     else
-        try updateElfSpecific(false, elf_mem, sdf_pos, sdf_size);
+        try updateElfSpecific(false, io, memory_map, sdf_pos, sdf_size);
 }
 
 const Action = enum {
@@ -247,9 +258,9 @@ const usage =
     \\
 ;
 
-fn argumentError(comptime msg: []const u8, args: anytype) noreturn {
+fn argumentError(io: std.Io, comptime msg: []const u8, args: anytype) noreturn {
     var buf: [32]u8 = undefined;
-    var stderr = std.fs.File.stderr().writer(&buf);
+    var stderr = std.Io.File.stderr().writer(io, &buf);
     const writer = &stderr.interface;
 
     if (msg.len == 0) @compileError("no message given");
@@ -271,26 +282,26 @@ fn argumentError(comptime msg: []const u8, args: anytype) noreturn {
     std.process.exit(1);
 }
 
-fn getArguments(allocator: std.mem.Allocator) !Arguments {
-    var args_iter = try std.process.argsWithAllocator(allocator);
+fn getArguments(allocator: std.mem.Allocator, io: std.Io, args: std.process.Args) !Arguments {
+    var args_iter = try args.iterateAllocator(allocator);
     defer args_iter.deinit();
 
-    if (!args_iter.skip()) argumentError("no self path argument?", .{});
+    if (!args_iter.skip()) argumentError(io, "no self path argument?", .{});
 
     const action = blk: {
         const action_string = args_iter.next() orelse
-            argumentError("no action given", .{});
+            argumentError(io, "no action given", .{});
 
         break :blk std.meta.stringToEnum(Action, action_string) orelse
-            argumentError("'{s}' is not a valid action", .{action_string});
+            argumentError(io, "'{s}' is not a valid action", .{action_string});
     };
 
     const binary_input_path: [:0]const u8 = try allocator.dupeZ(u8, args_iter.next() orelse
-        argumentError("no binary_input_path given", .{}));
+        argumentError(io, "no binary_input_path given", .{}));
     errdefer allocator.free(binary_input_path);
 
     const binary_output_path: [:0]const u8 = try allocator.dupeZ(u8, args_iter.next() orelse
-        argumentError("no binary_output_path given", .{}));
+        argumentError(io, "no binary_output_path given", .{}));
     errdefer allocator.free(binary_output_path);
 
     switch (action) {
@@ -312,7 +323,7 @@ fn getArguments(allocator: std.mem.Allocator) !Arguments {
         },
         .embed => {
             const sdf_input_path: [:0]const u8 = try allocator.dupeZ(u8, args_iter.next() orelse
-                argumentError("no sdf_input_path given", .{}));
+                argumentError(io, "no sdf_input_path given", .{}));
             errdefer allocator.free(sdf_input_path);
 
             return .{
@@ -720,68 +731,6 @@ fn createSdfDebugInfo(
 
     return try output.toOwnedSlice();
 }
-
-const custom_atomic_file = struct {
-    /// The same as `std.fs.Dir.atomicFile` but it opens the file as read and write
-    fn atomicFileReadAndWrite(
-        parent_dir: std.fs.Dir,
-        dest_path: []const u8,
-        options: std.fs.Dir.AtomicFileOptions,
-    ) !std.fs.AtomicFile {
-        if (std.fs.path.dirname(dest_path)) |dirname| {
-            const dir = if (options.make_path)
-                try parent_dir.makeOpenPath(dirname, .{})
-            else
-                try parent_dir.openDir(dirname, .{});
-
-            return atomicFileInitReadAndWrite(
-                std.fs.path.basename(dest_path),
-                options.mode,
-                dir,
-                true,
-                options.write_buffer,
-            );
-        } else {
-            return atomicFileInitReadAndWrite(
-                dest_path,
-                options.mode,
-                parent_dir,
-                false,
-                options.write_buffer,
-            );
-        }
-    }
-
-    const random_bytes_len = 12;
-    const tmp_path_len = std.fs.base64_encoder.calcSize(random_bytes_len);
-
-    /// The same as `std.fs.AtomicFile.init` but it opens the file as read and write
-    fn atomicFileInitReadAndWrite(
-        dest_basename: []const u8,
-        mode: std.fs.File.Mode,
-        dir: std.fs.Dir,
-        close_dir_on_deinit: bool,
-        write_buffer: []u8,
-    ) std.fs.AtomicFile.InitError!std.fs.AtomicFile {
-        while (true) {
-            const random_integer = std.crypto.random.int(u64);
-            const tmp_sub_path = std.fmt.hex(random_integer);
-            const file = dir.createFile(&tmp_sub_path, .{ .mode = mode, .exclusive = true, .read = true }) catch |err| switch (err) {
-                error.PathAlreadyExists => continue,
-                else => |e| return e,
-            };
-            return .{
-                .file_writer = file.writer(write_buffer),
-                .random_integer = random_integer,
-                .dest_basename = dest_basename,
-                .file_open = true,
-                .file_exists = true,
-                .close_dir_on_deinit = close_dir_on_deinit,
-                .dir = dir,
-            };
-        }
-    }
-};
 
 comptime {
     std.testing.refAllDecls(@This());

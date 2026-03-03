@@ -10,7 +10,7 @@ const core = @import("core");
 const kernel_options = @import("kernel_options");
 const kernel_log_scopes = kernel_options.kernel_log_scopes;
 
-pub fn scoped(comptime scope: @Type(.enum_literal)) type {
+pub fn scoped(comptime scope: @EnumLiteral()) type {
     return struct {
         pub inline fn err(
             comptime format: []const u8,
@@ -219,7 +219,7 @@ pub const log_level: Level = blk: {
 /// Handles translating the std.log API to the kernel log API.
 pub fn stdLogImpl(
     comptime message_level: std.log.Level,
-    comptime scope: @TypeOf(.enum_literal),
+    comptime scope: @EnumLiteral(),
     comptime format: []const u8,
     args: anytype,
 ) void {
@@ -232,7 +232,7 @@ pub fn stdLogImpl(
 }
 
 /// Determine if a specific scope and log level pair is enabled for logging.
-inline fn loggingEnabledFor(comptime scope: @Type(.enum_literal), comptime message_level: Level) bool {
+inline fn loggingEnabledFor(comptime scope: @EnumLiteral(), comptime message_level: Level) bool {
     comptime {
         if (@intFromEnum(message_level) <= @intFromEnum(log_level)) return true;
         if (scopeMatcherMatches(scope)) return true;
@@ -241,7 +241,7 @@ inline fn loggingEnabledFor(comptime scope: @Type(.enum_literal), comptime messa
 }
 
 /// Checks if a scope matches one of the scope matchers.
-inline fn scopeMatcherMatches(comptime scope: @Type(.enum_literal)) bool {
+inline fn scopeMatcherMatches(comptime scope: @EnumLiteral()) bool {
     comptime {
         const tag = @tagName(scope);
 

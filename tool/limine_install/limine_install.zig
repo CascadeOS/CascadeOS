@@ -4,14 +4,15 @@
 
 const std = @import("std");
 
-pub fn main() u8 {
-    const parse_args_result = parseArgs(std.heap.smp_allocator);
+pub fn main(init: std.process.Init) u8 {
+    const parse_args_result = parseArgs(std.heap.smp_allocator, init.minimal.args);
 
-    const cwd = std.fs.cwd();
+    const cwd = std.Io.Dir.cwd();
     cwd.copyFile(
         parse_args_result.input_file_path,
         cwd,
         parse_args_result.output_file_path,
+        init.io,
         .{},
     ) catch |e| err("failed to copy file '{s}' to '{s}': {t}", .{
         parse_args_result.input_file_path,
@@ -32,9 +33,9 @@ const ParseArgResult = struct {
     limine_arguments: []const [*:0]const u8,
 };
 
-fn parseArgs(allocator: std.mem.Allocator) ParseArgResult {
-    var args: std.process.ArgIterator = try .initWithAllocator(allocator);
-    if (!args.skip()) err("no self path argument", .{});
+fn parseArgs(allocator: std.mem.Allocator, args: std.process.Args) ParseArgResult {
+    var args_iter = try args.iterateAllocator(allocator);
+    if (!args_iter.skip()) err("no self path argument", .{});
 
     var limine_arguments: std.ArrayListUnmanaged([*:0]const u8) = .{};
     limine_arguments.appendSlice(allocator, &.{ "limine", "bios-install" }) catch err("out of memory", .{});
@@ -43,13 +44,13 @@ fn parseArgs(allocator: std.mem.Allocator) ParseArgResult {
     var opt_input_file_path: ?[:0]const u8 = null;
     var opt_partition_index: ?[*:0]const u8 = null;
 
-    while (args.next()) |arg| {
+    while (args_iter.next()) |arg| {
         if (std.mem.eql(u8, "-o", arg)) {
-            opt_output_file_path = args.next() orelse err("expected output file path after '-o'", .{});
+            opt_output_file_path = args_iter.next() orelse err("expected output file path after '-o'", .{});
         } else if (std.mem.eql(u8, "-i", arg)) {
-            opt_input_file_path = args.next() orelse err("expected input file path after '-i'", .{});
+            opt_input_file_path = args_iter.next() orelse err("expected input file path after '-i'", .{});
         } else if (std.mem.eql(u8, "-p", arg)) {
-            opt_partition_index = args.next() orelse err("expected partition index after '-p'", .{});
+            opt_partition_index = args_iter.next() orelse err("expected partition index after '-p'", .{});
         } else {
             limine_arguments.append(allocator, arg.ptr) catch err("out of memory", .{});
         }

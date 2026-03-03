@@ -99,7 +99,6 @@ fn constructKernel(
     }
 
     kernel_exe.entry = .disabled;
-    kernel_exe.want_lto = false;
     kernel_exe.lto = .none;
     kernel_exe.pie = true; // allow kaslr
     kernel_exe.linkage = .static;
@@ -481,12 +480,12 @@ fn addFilesRecursive(
     files: *std.array_list.Managed([]const u8),
     target_path: []const u8,
 ) !void {
-    var dir = try std.fs.cwd().openDir(target_path, .{ .iterate = true });
-    defer dir.close();
+    var dir = try std.Io.Dir.cwd().openDir(b.graph.io, target_path, .{ .iterate = true });
+    defer dir.close(b.graph.io);
 
     var it = dir.iterate();
 
-    while (try it.next()) |file| {
+    while (try it.next(b.graph.io)) |file| {
         switch (file.kind) {
             .file => {
                 const extension = std.fs.path.extension(file.name);

@@ -3,12 +3,11 @@
 
 const std = @import("std");
 
-const cascade = @import("user_cascade");
+const cascade = @import("cascade");
 
-pub const _start = cascade._cascade_start;
+pub const _start = cascade.entry._cascade_entry;
 comptime {
-    // TODO: well this is dumb, probably need a custom test runner
-    if (!@import("builtin").is_test) @export(&_start, .{ .name = "_start" });
+    cascade.entry.exportEntry();
 }
 
 pub fn main() void {
