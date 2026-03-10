@@ -40,7 +40,7 @@ pub const scheduler = struct {
 
 pub const task = struct {
     /// The size of the usable region of a kernel stack.
-    pub const kernel_stack_size = arch.paging.standard_page_size.multiplyScalar(16);
+    pub const kernel_stack_size = arch.paging.standard_page_size.multiplyScalar(32); // TODO: why does it need to be this big? - maybe debug only?
 
     pub const task_name_length = 64;
 };

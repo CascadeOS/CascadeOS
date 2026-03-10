@@ -8,8 +8,6 @@ const core = @import("core");
 const cascade = @import("cascade");
 const Task = cascade.Task;
 
-pub const StackIterator = @import("StackIterator.zig");
-
 pub const log = @import("log.zig");
 
 pub fn hasAnExecutorPanicked() bool {
@@ -34,21 +32,6 @@ pub fn interruptSourcePanic(
     );
 }
 
-/// Entry point from the Zig language upon a panic.
-fn zigPanic(
-    msg: []const u8,
-    return_address_opt: ?usize,
-) noreturn {
-    @branchHint(.cold);
-    panicDispatch(
-        msg,
-        .{ .normal = .{
-            .return_address = return_address_opt orelse @returnAddress(),
-            .error_return_trace = @errorReturnTrace(),
-        } },
-    );
-}
-
 const PanicType = union(enum) {
     normal: struct {
         return_address: usize,
@@ -68,11 +51,7 @@ fn panicDispatch(
     switch (globals.panic_mode) {
         .no_op => {},
         .single_executor_init_panic => singleExecutorInitPanic(msg, panic_type),
-        .init_panic => initPanic(
-            .panicked(),
-            msg,
-            panic_type,
-        ),
+        .init_panic => initPanic(.panicked(), msg, panic_type),
     }
 
     arch.interrupts.disableAndHalt();
@@ -87,24 +66,25 @@ fn singleExecutorInitPanic(
     };
 
     cascade.init.Output.lock.poison();
+    const t: std.Io.Terminal = .{ .writer = cascade.init.Output.writer, .mode = .escape_codes };
 
     const nested_panic_count = static.nested_panic_count;
     static.nested_panic_count += 1;
 
     switch (nested_panic_count) {
         // on first panic attempt to print the full panic message
-        0 => formatting.printPanic(
-            cascade.init.Output.writer,
-            msg,
-            panic_type,
-        ) catch {},
+        0 => printPanic(t, msg, panic_type) catch {},
         // on second panic print a shorter message
-        1 => cascade.init.Output.writer.writeAll("\nPANIC IN PANIC\n") catch {},
+        1 => {
+            t.setColor(.red) catch {};
+            t.writer.writeAll("\nPANIC IN PANIC\n") catch {};
+            t.setColor(.reset) catch {};
+        },
         // don't trigger any more panics
         else => return,
     }
 
-    cascade.init.Output.writer.flush() catch {};
+    t.writer.flush() catch {};
 }
 
 fn initPanic(
@@ -128,6 +108,8 @@ fn initPanic(
     }
 
     cascade.init.Output.lock.poison();
+    const t: std.Io.Terminal = .{ .writer = cascade.init.Output.writer, .mode = .escape_codes };
+
     arch.interrupts.sendPanicIPI();
 
     const nested_panic_count = static.nested_panic_count;
@@ -135,382 +117,57 @@ fn initPanic(
 
     switch (nested_panic_count) {
         // on first panic attempt to print the full panic message
-        0 => formatting.printPanic(cascade.init.Output.writer, msg, panic_type) catch {},
+        0 => printPanic(t, msg, panic_type) catch {},
         // on second panic print a shorter message
-        1 => cascade.init.Output.writer.writeAll("\nPANIC IN PANIC\n") catch {},
+        1 => {
+            t.setColor(.red) catch {};
+            t.writer.writeAll("\nPANIC IN PANIC\n") catch {};
+            t.setColor(.reset) catch {};
+        },
         // don't trigger any more panics
         else => return,
     }
 
-    cascade.init.Output.writer.flush() catch {};
+    t.writer.flush() catch {};
 }
 
-const formatting = struct {
-    pub fn printPanic(
-        writer: *std.Io.Writer,
-        msg: []const u8,
-        panic_type: PanicType,
-    ) !void {
-        try printUserPanicMessage(writer, msg);
-        switch (panic_type) {
-            .normal => |normal| try printErrorAndCurrentStackTrace(
-                writer,
-                normal.error_return_trace,
-                normal.return_address,
-            ),
-            .interrupt => |interrupt| try printInterruptError(writer, interrupt),
+fn printPanic(
+    t: std.Io.Terminal,
+    msg: []const u8,
+    panic_type: PanicType,
+) !void {
+    try t.writer.writeByte('\n');
+    t.setColor(.red) catch {};
+    try t.writer.writeAll("PANIC");
+    t.setColor(.reset) catch {};
+
+    if (msg.len != 0) {
+        try t.writer.writeAll(" - ");
+
+        try t.writer.writeAll(msg);
+
+        if (msg[msg.len - 1] != '\n') {
+            try t.writer.writeByte('\n');
         }
+    } else {
+        try t.writer.writeByte('\n');
     }
 
-    fn printUserPanicMessage(writer: *std.Io.Writer, msg: []const u8) !void {
-        if (msg.len != 0) {
-            try writer.writeAll("\nPANIC - ");
-
-            try writer.writeAll(msg);
-
-            if (msg[msg.len - 1] != '\n') {
-                try writer.writeByte('\n');
-            }
-        } else {
-            try writer.writeAll("\nPANIC\n");
-        }
-    }
-
-    fn printInterruptError(writer: *std.Io.Writer, interrupt_frame: arch.interrupts.InterruptFrame) !void {
-        const symbol_source = SymbolSource.load();
-
-        try printSourceAtAddress(
-            writer,
-            interrupt_frame.instructionPointer(),
-            symbol_source,
-        );
-
-        var stack_iter = interrupt_frame.createStackIterator();
-
-        while (stack_iter.next()) |address| {
-            try printSourceAtAddress(writer, .from(address), symbol_source);
-        }
-    }
-
-    fn printErrorAndCurrentStackTrace(
-        writer: *std.Io.Writer,
-        error_return_trace: ?*const std.builtin.StackTrace,
-        return_address: usize,
-    ) !void {
-        const symbol_source = SymbolSource.load();
-
-        if (error_return_trace) |trace| {
-            if (trace.index != 0) {
-                try printStackTrace(writer, trace, symbol_source);
-            }
-        }
-
-        try printCurrentBackTrace(writer, return_address, symbol_source);
-    }
-
-    fn printCurrentBackTrace(
-        writer: *std.Io.Writer,
-        return_address: usize,
-        symbol_source: ?SymbolSource,
-    ) !void {
-        var stack_iter: StackIterator = .init(return_address, @frameAddress());
-
-        while (stack_iter.next()) |address| {
-            try printSourceAtAddress(writer, .from(address), symbol_source);
-        }
-    }
-
-    fn printStackTrace(
-        writer: *std.Io.Writer,
-        stack_trace: *const std.builtin.StackTrace,
-        symbol_source: ?SymbolSource,
-    ) !void {
-        var frame_index: usize = 0;
-        var frames_left: usize = @min(stack_trace.index, stack_trace.instruction_addresses.len);
-
-        var first_addr_opt: ?usize = null;
-        while (frames_left != 0) : ({
-            frames_left -= 1;
-            frame_index = (frame_index + 1) % stack_trace.instruction_addresses.len;
-        }) {
-            const return_address = stack_trace.instruction_addresses[frame_index];
-            if (first_addr_opt == null) first_addr_opt = return_address;
-
-            try printSourceAtAddress(writer, .from(return_address), symbol_source);
-        }
-    }
-
-    const indent = "  ";
-
-    fn printSourceAtAddress(writer: *std.Io.Writer, address: cascade.VirtualAddress, opt_symbol_source: ?SymbolSource) !void {
-        if (address.equal(.zero)) return;
-
-        const raw_kernel_address = switch (address.getType()) {
-            .kernel => address.toKernel(),
-            .user => {
-                try writer.print(
-                    comptime indent ++ "0x{x:0>16} - address in the user memory range\n",
-                    .{address.value},
-                );
-                return;
-            },
-            .invalid => {
-                try writer.print(
-                    comptime indent ++ "0x{x:0>16} - invalid address\n",
-                    .{address.value},
-                );
-                return;
-            },
-        };
-
-        const candidate_kernel_source_address = raw_kernel_address.applyKernelOffset();
-        const kernel_source_address = switch (candidate_kernel_source_address.getType()) {
-            .kernel => candidate_kernel_source_address.toKernel(),
-            else => {
-                try writer.print(
-                    comptime indent ++ "before: 0x{x:0>16} - after: 0x{x:0>16} - invalid address after applying kernel offset\n",
-                    .{ address.value, candidate_kernel_source_address.value },
-                );
-                return;
-            },
-        };
-
-        const symbol = blk: {
-            const symbol_source = opt_symbol_source orelse break :blk null;
-            break :blk symbol_source.getSymbol(kernel_source_address);
-        } orelse {
-            try writer.print(comptime indent ++ "0x{x:0>16} - ???\n", .{kernel_source_address.value});
-            return;
-        };
-
-        try printSymbol(writer, symbol);
-    }
-
-    fn printSymbol(writer: *std.Io.Writer, symbol: SymbolSource.Symbol) !void {
-        try writer.writeAll(indent);
-
-        // kernel/setup.zig:43:15 in setup
-        // ^^^^^^
-        try writer.writeAll(symbol.directory);
-
-        // kernel/setup.zig:43:15 in setup
-        //       ^
-        try writer.writeByte('/');
-
-        // kernel/setup.zig:43:15 in setup
-        //        ^^^^^^^^^
-        try writer.writeAll(symbol.file_name);
-
-        // kernel/setup.zig:43:15 in setup
-        //                 ^
-        try writer.writeByte(':');
-
-        // kernel/setup.zig:43:15 in setup
-        //                  ^^
-        try writer.printInt(symbol.line, 10, .lower, .{});
-
-        // kernel/setup.zig:43:15 in setup
-        //                    ^
-        try writer.writeByte(':');
-
-        // kernel/setup.zig:43:15 in setup
-        //                     ^^
-        try writer.printInt(
-            symbol.column,
-            10,
-            .lower,
-            .{},
-        );
-
-        // kernel/setup.zig:43:15 in setup
-        //                       ^^^^
-        try writer.writeAll(" in ");
-
-        // kernel/setup.zig:43:15 in setup
-        //                           ^^^^^
-        try writer.writeAll(symbol.name);
-
-        const line = switch (symbol.line_source) {
-            .source => |s| s,
-            .no_matching_file => {
-                try writer.writeAll(comptime "\n" ++ (indent ** 2));
-                try writer.writeAll("no such file in embedded source files\n\n");
-                return;
-            },
-            .no_such_line => {
-                try writer.writeAll(comptime "\n" ++ (indent ** 2));
-                try writer.writeAll("no such line in file?\n");
-                return;
-            },
-            .name_too_long => |file_name_buffer_len| {
-                try writer.writeAll(comptime "\n" ++ (indent ** 2));
-                try writer.print("file name exceeds {} bytes! '{s}/{s}'\n", .{
-                    file_name_buffer_len,
-                    symbol.directory,
-                    symbol.file_name,
-                });
-                return;
-            },
-        };
-
-        // trim any blank spaces at the beginning of the line that are present in the source file
-        var blank_spaces: usize = 0;
-        while (blank_spaces < line.len and line[blank_spaces] == ' ') {
-            blank_spaces += 1;
-        }
-
-        try writer.writeByte('\n');
-        try writer.writeAll(comptime indent ** 2);
-
-        //     @panic("some message");
-        //           ^
-        try writer.writeAll(line[blank_spaces..]);
-
-        try writer.writeAll(comptime "\n" ++ (indent ** 2));
-
-        try writer.splatByteAll(' ', symbol.column - 1 - blank_spaces);
-
-        try writer.writeAll("^\n");
-    }
-};
-
-const SymbolSource = struct {
-    const sdf = @import("sdf");
-
-    string_table: sdf.StringTable,
-    file_table: sdf.FileTable,
-    location_lookup: sdf.LocationLookup,
-    location_program: sdf.LocationProgram,
-
-    pub fn load() ?SymbolSource {
-        const sdf_slice = sdfSlice() catch return null;
-
-        const header = blk: {
-            var reader = std.Io.Reader.fixed(sdf_slice);
-            break :blk sdf.Header.read(&reader) catch return null;
-        };
-
-        return .{
-            .string_table = header.stringTable(sdf_slice),
-            .file_table = header.fileTable(sdf_slice),
-            .location_lookup = header.locationLookup(sdf_slice),
-            .location_program = header.locationProgram(sdf_slice),
-        };
-    }
-
-    pub fn getSymbol(symbol_source: SymbolSource, address: cascade.KernelVirtualAddress) ?Symbol {
-        const start_state = symbol_source.location_lookup.getStartState(address.value) catch return null;
-
-        const location = symbol_source.location_program.getLocation(start_state, address.value) catch return null;
-
-        const file = symbol_source.file_table.getFile(location.file_index) orelse return null;
-
-        const file_name = symbol_source.string_table.getString(file.file_offset);
-        const directory = symbol_source.string_table.getString(file.directory_offset);
-
-        const line_source: Symbol.LineSource = line_source: {
-            const file_contents = blk: {
-                var file_name_buffer: [512]u8 = undefined;
-
-                const full_file_path = std.fmt.bufPrint(
-                    &file_name_buffer,
-                    "{s}/{s}",
-                    .{ directory, file_name },
-                ) catch break :line_source .{ .name_too_long = file_name_buffer.len };
-
-                break :blk embedded_source_files.get(full_file_path) orelse {
-                    break :line_source .no_matching_file;
-                };
+    switch (panic_type) {
+        .normal => |normal| {
+            if (normal.error_return_trace) |trace| if (trace.index != 0) {
+                try t.writer.writeAll("error return context:\n");
+                try std.debug.writeStackTrace(trace, t);
+                try t.writer.writeAll("\nstack trace:\n");
             };
-
-            const line = findTargetLine(file_contents, location.line) orelse {
-                break :line_source .no_such_line;
-            };
-
-            break :line_source .{ .source = line };
-        };
-
-        return .{
-            .name = symbol_source.string_table.getString(location.symbol_offset),
-            .directory = directory,
-            .file_name = file_name,
-            .line = location.line,
-            .column = location.column,
-
-            .line_source = line_source,
-        };
+            try std.debug.writeCurrentStackTrace(.{ .first_address = normal.return_address }, t);
+        },
+        .interrupt => |interrupt| {
+            var context: std.debug.cpu_context.Native = undefined;
+            interrupt.fillContext(&context);
+            try std.debug.writeCurrentStackTrace(.{ .context = &context }, t);
+        },
     }
-
-    pub const Symbol = struct {
-        name: []const u8,
-        directory: []const u8,
-        file_name: []const u8,
-        line: u64,
-        column: u64,
-
-        line_source: LineSource,
-
-        pub const LineSource = union(enum) {
-            source: []const u8,
-            no_matching_file,
-            no_such_line,
-            name_too_long: usize,
-        };
-    };
-
-    /// Finds the target line in the given file contents.
-    ///
-    /// Returns the line contents if found, otherwise returns null.
-    fn findTargetLine(file_contents: []const u8, target_line_number: usize) ?[]const u8 {
-        var line_iter = std.mem.splitScalar(u8, file_contents, '\n');
-        var line_index: u64 = 1;
-
-        while (line_iter.next()) |line| : (line_index += 1) {
-            if (line_index != target_line_number) continue;
-            return line;
-        }
-
-        return null;
-    }
-
-    const embedded_source_files: std.StaticStringMap([]const u8) = .initComptime(embedded_source_files: {
-        @setEvalBranchQuota(1_000_000);
-
-        const embedded_source_files_import = @import("embedded_source_files");
-
-        var array: [embedded_source_files_import.file_paths.len]struct {
-            []const u8,
-            []const u8,
-        } = undefined;
-
-        for (embedded_source_files_import.file_paths, 0..) |name, i| {
-            array[i] = .{ name, @embedFile(name) };
-        }
-        break :embedded_source_files array[0..];
-    });
-};
-
-pub fn sdfSlice() ![]const u8 {
-    const static = struct {
-        const sdf = @import("sdf");
-
-        var opt_sdf_slice: ?[]const u8 = null;
-        extern const __sdf_start: u8;
-    };
-
-    if (static.opt_sdf_slice) |s| return s;
-
-    const ptr: [*]const u8 = @ptrCast(&static.__sdf_start);
-
-    const header = blk: {
-        var reader = std.Io.Reader.fixed(ptr[0..@sizeOf(static.sdf.Header)]);
-        break :blk try static.sdf.Header.read(&reader);
-    };
-
-    const slice = ptr[0..header.total_size_of_sdf_data];
-
-    static.opt_sdf_slice = slice;
-    return slice;
 }
 
 /// The panic mode the kernel is in.
@@ -547,6 +204,27 @@ pub fn setPanicMode(mode: PanicMode) void {
 }
 
 pub const panic_interface = std.debug.FullPanic(zigPanic);
+
+/// Entry point from the Zig language upon a panic.
+fn zigPanic(
+    msg: []const u8,
+    return_address_opt: ?usize,
+) noreturn {
+    @branchHint(.cold);
+    panicDispatch(
+        msg,
+        .{ .normal = .{
+            .return_address = return_address_opt orelse @returnAddress(),
+            .error_return_trace = @errorReturnTrace(),
+        } },
+    );
+}
+
+pub const std_debug_exports = struct {
+    pub const SelfInfo = @import("SelfInfo.zig");
+    pub const printLineFromFile = SelfInfo.printLineFromFile;
+    pub const getDebugInfoAllocator = SelfInfo.getDebugInfoAllocator;
+};
 
 const globals = struct {
     /// The executor that is currently panicking.

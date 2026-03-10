@@ -674,6 +674,8 @@ pub const init = struct {
 
     /// Determine the kernels various offsets and the direct map early in the boot process.
     pub fn determineEarlyMemoryLayout() void {
+        // TODO: do we actually need this to panic? we could just set these to sensible (non-undefined) values
+
         const base_address = boot.kernelBaseAddress() orelse @panic("no kernel base address");
         globals.virtual_base_address = base_address.virtual;
 
@@ -809,15 +811,6 @@ pub const init = struct {
             .fromPtr(&linker_symbols.__data_end),
             .writeable_section,
         });
-
-        if (cascade.debug.sdfSlice()) |sdf_slice| {
-            const sdf_range: cascade.KernelVirtualRange = .fromSlice(u8, sdf_slice);
-            sections.appendAssumeCapacity(.{
-                sdf_range.address,
-                sdf_range.after(),
-                .sdf_section,
-            });
-        } else |_| {}
 
         for (sections.constSlice()) |section| {
             const start_address = section[0];
@@ -974,7 +967,6 @@ pub const init = struct {
                 .writeable_section,
                 .readonly_section,
                 .executable_section,
-                .sdf_section,
                 => arch.paging.init.mapToPhysicalRangeAllPageSizes(
                     kernel_page_table,
                     region.range.toVirtualRange(),
@@ -984,7 +976,7 @@ pub const init = struct {
                     ),
                     switch (region.type) {
                         .executable_section => .{ .type = .kernel, .protection = .execute },
-                        .readonly_section, .sdf_section => .{ .type = .kernel, .protection = .read },
+                        .readonly_section => .{ .type = .kernel, .protection = .read },
                         .writeable_section => .{ .type = .kernel, .protection = .read_write },
                         else => unreachable,
                     },

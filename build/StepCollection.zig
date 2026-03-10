@@ -46,9 +46,9 @@ pub fn registerTool(step_collection: StepCollection, build_step: *Step, test_ste
 pub fn registerKernel(
     step_collection: StepCollection,
     architecture: CascadeTarget.Architecture,
-    install_both_kernel_binaries: *Step,
+    install_kernel: *Step,
 ) void {
-    step_collection.kernel_build_steps_per_architecture.get(architecture).?.dependOn(install_both_kernel_binaries);
+    step_collection.kernel_build_steps_per_architecture.get(architecture).?.dependOn(install_kernel);
 }
 
 /// Registers an image build step for an architecture.

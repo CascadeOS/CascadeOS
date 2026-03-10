@@ -14,7 +14,6 @@ PHDRS
     rodata  PT_LOAD    FLAGS((1 << 2));            /* Read only */
     data    PT_LOAD    FLAGS((1 << 1) | (1 << 2)); /* Write + Read */
     dynamic PT_DYNAMIC FLAGS((1 << 2));            /* Read only */
-    sdf     PT_LOAD    FLAGS((1 << 2));            /* Read only */
 }
 
 SECTIONS
@@ -51,6 +50,14 @@ SECTIONS
         *(.dynsym .dynsym.*)
     } :rodata
 
+    .eh_frame : {
+        *(.eh_frame .eh_frame.*)
+    } :rodata
+
+    .eh_frame_hdr : {
+        *(.eh_frame_hdr .eh_frame_hdr.*)
+     } :rodata
+
     __rodata_end = .;
 
     . = ALIGN(STANDARD_PAGE_SIZE);
@@ -72,17 +79,7 @@ SECTIONS
 
     __data_end = .;
 
-    . = ALIGN(STANDARD_PAGE_SIZE);
-
-    __sdf_start = .;
-
-    .sdf : { /* sdf_builder embeds the SDF data into this section */
-        . += STANDARD_PAGE_SIZE;
-    } :sdf
-
     /DISCARD/ : {
-        *(.eh_frame)
-        *(.eh_frame_hdr)
         *(.gnu.hash)
         *(.hash)
         *(.note .note.*)

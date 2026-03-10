@@ -11,11 +11,4 @@ pub const tools: []const ToolDescription = &.{
             .custom = @import("limine_install/custom_configuration.zig").customConfiguration,
         },
     },
-    .{
-        .name = "sdf_builder",
-        .dependencies = &.{ "core", "sdf" },
-        .configuration = .{
-            .custom = @import("sdf_builder/custom_configuration.zig").customConfiguration,
-        },
-    },
 };

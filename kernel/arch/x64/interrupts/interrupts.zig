@@ -221,6 +221,27 @@ pub const InterruptFrame = extern struct {
         };
     }
 
+    /// Provides the context this interrupt was triggered from.
+    pub fn fillContext(self: *const InterruptFrame, cpu_context: *std.debug.cpu_context.Native) void {
+        cpu_context.gprs.set(.rax, self.rax);
+        cpu_context.gprs.set(.rdx, self.rdx);
+        cpu_context.gprs.set(.rcx, self.rcx);
+        cpu_context.gprs.set(.rbx, self.rbx);
+        cpu_context.gprs.set(.rsi, self.rsi);
+        cpu_context.gprs.set(.rdi, self.rdi);
+        cpu_context.gprs.set(.rbp, self.rbp);
+        cpu_context.gprs.set(.rsp, self.rsp.value);
+        cpu_context.gprs.set(.r8, self.r8);
+        cpu_context.gprs.set(.r9, self.r9);
+        cpu_context.gprs.set(.r10, self.r10);
+        cpu_context.gprs.set(.r11, self.r11);
+        cpu_context.gprs.set(.r12, self.r12);
+        cpu_context.gprs.set(.r13, self.r13);
+        cpu_context.gprs.set(.r14, self.r14);
+        cpu_context.gprs.set(.r15, self.r15);
+        cpu_context.gprs.set(.rip, self.rip.value);
+    }
+
     pub fn print(
         value: *const InterruptFrame,
         writer: *std.Io.Writer,
