@@ -23,6 +23,14 @@ pub const KernelBaseAddress = struct {
     physical: cascade.PhysicalAddress,
 };
 
+/// Returns the kernel's ELF executable file provided by the bootloader, if any.
+pub fn kernelExecutableFile() ?[]align(arch.paging.standard_page_size_alignment.toByteUnits()) const u8 {
+    return switch (bootloader_api) {
+        .limine => limine_interface.kernelExecutableFile(),
+        .unknown => null,
+    };
+}
+
 /// Returns an iterator over the memory map entries.
 pub fn memoryMap() error{NoMemoryMap}!MemoryMap {
     return switch (bootloader_api) {

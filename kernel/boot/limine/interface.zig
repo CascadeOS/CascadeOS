@@ -21,6 +21,11 @@ pub fn kernelBaseAddress() ?boot.KernelBaseAddress {
     };
 }
 
+pub fn kernelExecutableFile() ?[]align(arch.paging.standard_page_size_alignment.toByteUnits()) const u8 {
+    const resp = requests.executable_file.response orelse return &.{};
+    return @alignCast(resp.executable_file.getContents());
+}
+
 pub fn memoryMap() error{NoMemoryMap}!boot.MemoryMap {
     const resp = requests.memmap.response orelse
         return error.NoMemoryMap;
@@ -269,6 +274,7 @@ pub fn exportRequests() void {
     @export(&requests.smp, .{ .name = "limine_smp_request" });
     @export(&requests.framebuffer, .{ .name = "limine_framebuffer_request" });
     @export(&requests.device_tree_blob, .{ .name = "limine_device_tree_blob_request" });
+    @export(&requests.executable_file, .{ .name = "limine_executable_file_request" });
     @export(&requests.stack_size, .{ .name = "limine_stack_size_request" });
 }
 
@@ -282,6 +288,7 @@ const requests = struct {
     var smp: limine.MP = .{ .flags = .{ .x2apic = true } };
     var framebuffer: limine.Framebuffer = .{};
     var device_tree_blob: limine.DeviceTreeBlob = .{};
+    var executable_file: limine.ExecutableFile = .{};
     var stack_size: limine.StackSize = .{
         .stack_size = cascade.config.task.kernel_stack_size,
     };
