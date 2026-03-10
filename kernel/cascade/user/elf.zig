@@ -378,6 +378,9 @@ pub const ProgramHeader = struct {
         /// Implementations need not support this program table entry.
         tls = 7,
 
+        /// .eh_frame_hdr segment
+        gnu_eh_frame = 0x6474e550,
+
         _,
 
         /// Beginning of OS-specific types
