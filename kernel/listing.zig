@@ -28,7 +28,6 @@ pub const components: []const KernelComponent = &.{
         .library_dependencies = &.{
             .{ .name = "cascade", .import_name = "user_cascade" },
             .{ .name = "core" },
-            .{ .name = "sdf" },
         },
         .configuration = @import("cascade/custom_configuration.zig").customConfiguration,
         .provide_source_file_modules = true,

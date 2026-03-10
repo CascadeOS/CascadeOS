@@ -8,6 +8,5 @@ pub const libraries: []const LibraryDescription = &.{
     .{ .name = "cascade", .is_cascade_only = true },
     .{ .name = "core" },
     .{ .name = "fs", .dependencies = &.{ "core", "uuid" } },
-    .{ .name = "sdf" },
     .{ .name = "uuid", .dependencies = &.{"core"} },
 };

@@ -18,7 +18,6 @@ pub const Type = enum {
     writeable_section,
     readonly_section,
     executable_section,
-    sdf_section,
 
     direct_map,
 

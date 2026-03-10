@@ -37,7 +37,6 @@ It is possible for these links or the text regarding versions to become out of d
   * [The slab allocator: an object-caching kernel memory allocator](https://dl.acm.org/doi/10.5555/1267257.1267263) by Jeff Bonwick
   * [Magazines and Vmem: Extending the Slab Allocator to Many CPUs and Arbitrary Resources](https://www.usenix.org/legacy/publications/library/proceedings/usenix01/full_papers/bonwick/bonwick.pdf) by Jeff Bonwick and Jonathan Adams
 * RISC-V - [Unprivileged and Privileged ISA](https://github.com/riscv/riscv-isa-manual)
-* SDF - [SDF Spec](lib/sdf/sdf.md)
 * TPM
   * [TCG ACPI Specification Version 1.4 Revision 15](https://trustedcomputinggroup.org/wp-content/uploads/TCG-ACPI-Specification-Version-1.4-Revision-15_pub.pdf)
 * PCI

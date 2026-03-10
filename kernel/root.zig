@@ -5,7 +5,6 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
-const core = @import("core");
 
 pub const panic = cascade.debug.panic_interface;
 
@@ -23,6 +22,10 @@ pub const std_options: std.Options = .{
 
     .side_channels_mitigations = .full,
 };
+
+pub const std_options_debug_io: std.Io = undefined;
+
+pub const debug = cascade.debug.std_debug_exports;
 
 comptime {
     @import("boot").exportEntryPoints();

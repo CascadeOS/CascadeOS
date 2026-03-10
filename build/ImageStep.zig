@@ -176,7 +176,7 @@ const ImageDescriptionStep = struct {
         };
 
         try image_description_step.step.addWatchInput(b.path(limine_conf));
-        image_description_step.step.dependOn(kernel.install_kernel_binaries);
+        image_description_step.step.dependOn(kernel.install_kernel);
 
         return image_description_step;
     }

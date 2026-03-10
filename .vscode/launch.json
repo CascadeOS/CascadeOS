@@ -20,7 +20,7 @@
             "name": "LLDB QEMU remote",
             "type": "lldb",
             "request": "attach",
-            "program": "${workspaceFolder}/zig-out/${input:arch}/kernel-dwarf",
+            "program": "${workspaceFolder}/zig-out/${input:arch}/kernel",
             "processCreateCommands": [
                 "gdb-remote 1234"
             ],

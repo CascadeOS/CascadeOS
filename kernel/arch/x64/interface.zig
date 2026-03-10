@@ -28,13 +28,7 @@ pub const functions: arch.Functions = .{
         .deallocateInterrupt = x64.interrupts.Interrupt.deallocate,
         .routeInterrupt = x64.interrupts.Interrupt.route,
 
-        .createStackIterator = struct {
-            fn createStackIterator(
-                interrupt_frame: *const x64.interrupts.InterruptFrame,
-            ) cascade.debug.StackIterator {
-                return .init(null, interrupt_frame.rbp);
-            }
-        }.createStackIterator,
+        .fillContext = x64.interrupts.InterruptFrame.fillContext,
         .instructionPointer = struct {
             fn instructionPointer(interrupt_frame: *const x64.interrupts.InterruptFrame) cascade.VirtualAddress {
                 return interrupt_frame.rip;

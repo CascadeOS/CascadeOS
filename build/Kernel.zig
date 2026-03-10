@@ -18,20 +18,16 @@ const Kernel = @This();
 
 final_kernel_binary_path: std.Build.LazyPath,
 
-/// Installs both the stripped and fat kernel binaries.
-install_kernel_binaries: *Step,
+install_kernel: *Step,
 
 pub fn getKernels(
     b: *std.Build,
     step_collection: StepCollection,
     libraries: Library.Collection,
-    tools: Tool.Collection,
     options: Options,
     all_architectures: []const CascadeTarget.Architecture,
     applications: Application.Collection,
 ) !Collection {
-    const sdf_builder = tools.get("sdf_builder").?;
-
     var kernels: Collection = .{};
     try kernels.ensureTotalCapacity(b.allocator, @intCast(all_architectures.len));
 
@@ -42,7 +38,6 @@ pub fn getKernels(
                 b,
                 step_collection,
                 libraries,
-                sdf_builder,
                 options,
                 architecture,
                 applications,
@@ -57,7 +52,6 @@ fn constructKernel(
     b: *std.Build,
     step_collection: StepCollection,
     all_libraries: Library.Collection,
-    sdf_builder: Tool,
     options: Options,
     architecture: CascadeTarget.Architecture,
     applications: Application.Collection,
@@ -103,7 +97,6 @@ fn constructKernel(
     kernel_exe.pie = true; // allow kaslr
     kernel_exe.linkage = .static;
 
-    // TODO: is there a better way to do this?
     kernel_exe.setLinkerScript(b.path(
         b.pathJoin(&.{
             "kernel",
@@ -113,84 +106,16 @@ fn constructKernel(
         }),
     ));
 
-    const generate_sdf = b.addRunArtifact(sdf_builder.release_safe_exe);
-    // action
-    generate_sdf.addArg("generate");
-    // binary_input_path
-    generate_sdf.addFileArg(kernel_exe.getEmittedBin());
-    // binary_output_path
-    const sdf_data_path = generate_sdf.addOutputFileArg("sdf.output");
-    // directory_prefixes_to_strip
-    generate_sdf.addArg(options.root_path);
-
-    const fat_kernel_with_sdf = blk: {
-        const embed_sdf = b.addRunArtifact(sdf_builder.release_safe_exe);
-        // action
-        embed_sdf.addArg("embed");
-        // binary_input_path
-        embed_sdf.addFileArg(kernel_exe.getEmittedBin());
-        // binary_output_path
-        const kernel_path = embed_sdf.addOutputFileArg("kernel");
-        // sdf_input_path
-        embed_sdf.addFileArg(sdf_data_path);
-
-        break :blk kernel_path;
-    };
-
-    const install_fat_kernel_with_sdf = b.addInstallFile(
-        fat_kernel_with_sdf,
-        b.pathJoin(&.{ @tagName(architecture), "kernel-dwarf" }),
-    );
-
-    const install_fat_kernel_with_sdf_to_stripped_filepath = b.addInstallFile(
-        fat_kernel_with_sdf,
+    const install_kernel = b.addInstallFile(
+        kernel_exe.getEmittedBin(),
         b.pathJoin(&.{ @tagName(architecture), "kernel" }),
     );
 
-    // TODO: strip dwarf debug info https://github.com/CascadeOS/CascadeOS/issues/103
-    // const stripped_kernel = blk: {
-    //     const copy = b.addObjCopy(kernel_exe.getEmittedBin(), .{
-    //         .basename = kernel_exe.out_filename,
-    //         .strip = .debug_and_symbols,
-    //     });
-    //     break :blk copy.getOutput();
-    // };
-
-    // const stripped_kernel_with_sdf = blk: {
-    //     const embed_sdf = b.addRunArtifact(sdf_builder.release_safe_exe);
-    //     // action
-    //     embed_sdf.addArg("embed");
-    //     // binary_input_path
-    //     embed_sdf.addFileArg(stripped_kernel);
-    //     // binary_output_path
-    //     const kernel_path = embed_sdf.addOutputFileArg("kernel");
-    //     // sdf_input_path
-    //     embed_sdf.addFileArg(sdf_data_path);
-
-    //     break :blk kernel_path;
-    // };
-
-    // const install_stripped_kernel_with_sdf = b.addInstallFile(
-    //     stripped_kernel_with_sdf,
-    //     b.pathJoin(&.{ @tagName(architecture), "kernel" }),
-    // );
-
-    const install_both_kernel_binaries = try b.allocator.create(Step);
-    install_both_kernel_binaries.* = Step.init(.{
-        .id = .custom,
-        .name = "install_both_kernel_binaries",
-        .owner = b,
-    });
-
-    install_both_kernel_binaries.dependOn(&install_fat_kernel_with_sdf.step);
-    install_both_kernel_binaries.dependOn(&install_fat_kernel_with_sdf_to_stripped_filepath.step);
-    // install_both_kernel_binaries.dependOn(&install_stripped_kernel_with_sdf.step);
-
-    step_collection.registerKernel(architecture, install_both_kernel_binaries);
+    step_collection.registerKernel(architecture, &install_kernel.step);
 
     return .{
-        .install_kernel_binaries = install_both_kernel_binaries,
-        .final_kernel_binary_path = fat_kernel_with_sdf,
+        .install_kernel = &install_kernel.step,
+        .final_kernel_binary_path = kernel_exe.getEmittedBin(),
     };
 }
 
@@ -219,8 +144,6 @@ fn constructKernelRootModule(
 
         .target = architecture.kernelTarget(b),
         .optimize = options.optimize,
-
-        // stop dwarf info from being stripped, we need it to generate the SDF data, it is split into a seperate file anyways
         .strip = false,
 
         .sanitize_c = switch (options.optimize) {
@@ -397,6 +320,7 @@ fn configureComponents(
             const source_file_modules = try getSourceFileModules(
                 b,
                 libraries,
+                options,
             );
             for (source_file_modules) |source_file_module| {
                 module.addImport(source_file_module.name, source_file_module.module);
@@ -426,7 +350,10 @@ fn configureComponents(
 fn getSourceFileModules(
     b: *std.Build,
     required_libraries: Library.Collection,
+    options: Options,
 ) ![]const SourceFileModule {
+    // TODO: allow each component to specify which files to include - this allows dependencies to be included
+
     var modules = std.array_list.Managed(SourceFileModule).init(b.allocator);
     errdefer modules.deinit();
 
@@ -447,6 +374,7 @@ fn getSourceFileModules(
     }
 
     const files_option = b.addOptions();
+    files_option.addOption([]const u8, "build_prefix", options.root_path);
     files_option.addOption([]const []const u8, "file_paths", file_paths.items);
     try modules.append(.{ .name = "embedded_source_files", .module = files_option.createModule() });
 
