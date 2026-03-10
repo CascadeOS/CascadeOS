@@ -269,6 +269,7 @@ pub fn exportRequests() void {
     @export(&requests.smp, .{ .name = "limine_smp_request" });
     @export(&requests.framebuffer, .{ .name = "limine_framebuffer_request" });
     @export(&requests.device_tree_blob, .{ .name = "limine_device_tree_blob_request" });
+    @export(&requests.stack_size, .{ .name = "limine_stack_size_request" });
 }
 
 const requests = struct {
@@ -281,4 +282,7 @@ const requests = struct {
     var smp: limine.MP = .{ .flags = .{ .x2apic = true } };
     var framebuffer: limine.Framebuffer = .{};
     var device_tree_blob: limine.DeviceTreeBlob = .{};
+    var stack_size: limine.StackSize = .{
+        .stack_size = cascade.config.task.kernel_stack_size,
+    };
 };
