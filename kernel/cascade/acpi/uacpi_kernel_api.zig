@@ -26,9 +26,11 @@ export fn uacpi_kernel_get_rsdp(out_rsdp_address: *cascade.PhysicalAddress) uacp
 
 /// Open a PCI device at 'address' for reading & writing.
 ///
-/// The handle returned via 'out_handle' is used to perform IO on the configuration space of the device.
+/// The device at 'address' might not actually exist on the system, in this case the api is allowed to return `Status.not_found` to
+/// indicate that, this error is handled gracefully by creating a dummy device internally that always returns 0xFF on reads and is no-op for
+/// writes. This is to support a common pattern in AML that probes for 0xFF reads to detect whether a device exists.
 ///
-/// Note that this must be able to open any arbitrary PCI device, not just those detected during kernel PCI enumeration.
+/// The handle returned via 'out_handle' is used to perform IO on the configuration space of the device.
 export fn uacpi_kernel_pci_device_open(
     address: cascade.pci.Address,
     out_handle: **volatile cascade.pci.Function,
@@ -425,6 +427,25 @@ export fn uacpi_kernel_free_event(handle: *anyopaque) void {
 export fn uacpi_kernel_get_thread_id() usize {
     log.verbose("uacpi_kernel_get_thread_id called", .{});
     return @intFromPtr(Task.Current.get().task);
+}
+
+/// Disable interrupts and return a kernel-defined value representing the "before" state.
+///
+/// This value is used in the subsequent call to restore the prior state.
+///
+/// Note that this is talking about ALL interrupts on the current CPU, not just those installed by uACPI. This is typically achieved by
+/// executing the 'cli' instruction on x86, 'msr daifset, #3' on aarch64 etc.
+export fn uacpi_kernel_disable_interrupts() uacpi.InterruptState {
+    const current: Task.Current = .get();
+    current.incrementInterruptDisable();
+    return current.task.interrupt_disable_count - 1;
+}
+
+/// Restore the state of the interrupt flags to the kernel-defined value provided in 'state'.
+export fn uacpi_kernel_restore_interrupts(state: uacpi.InterruptState) void {
+    const current: Task.Current = .get();
+    std.debug.assert(current.task.interrupt_disable_count == state + 1);
+    current.decrementInterruptDisable();
 }
 
 /// Try to acquire the mutex with a millisecond timeout.

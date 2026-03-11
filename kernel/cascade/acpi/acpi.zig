@@ -21,14 +21,7 @@ pub fn rsdpTable() *const tables.RSDP {
 
 pub fn tryShutdown() !void {
     if (!globals.acpi_initialized) return;
-
     try uacpi.prepareForSleep(.S5);
-
-    const current_task: Task.Current = .get();
-
-    current_task.incrementInterruptDisable();
-    defer current_task.decrementInterruptDisable();
-
     try uacpi.sleep(.S5);
 }
 
@@ -51,7 +44,7 @@ pub const init = struct {
     /// NOP if ACPI is not present.
     pub fn earlyInitialize() !void {
         const static = struct {
-            var buffer: [arch.paging.standard_page_size.value]u8 = undefined;
+            var buffer: [arch.paging.standard_page_size.value]u8 align(@sizeOf(usize)) = undefined;
         };
 
         const rsdp = switch (boot.rsdp() orelse return) {

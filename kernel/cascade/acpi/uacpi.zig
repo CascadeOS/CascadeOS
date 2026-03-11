@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: LicenseRef-NON-AI-MIT AND MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
-// SPDX-FileCopyrightText: 2022-2025 Daniil Tatianin (https://github.com/uACPI/uACPI/blob/e5e5deea6f4dea0ea81237db39ca061ead048e60/LICENSE)
+// SPDX-FileCopyrightText: 2022-2025 Daniil Tatianin (https://github.com/uACPI/uACPI/blob/e05715b2e6a3ae913aecdb86f4fd2dba30304e45/LICENSE)
 
-//! Provides a nice zig API wrapping uACPI 3.2.0 (e5e5deea6f4dea0ea81237db39ca061ead048e60).
+//! Provides a nice zig API wrapping uACPI 4.0.0 (e05715b2e6a3ae913aecdb86f4fd2dba30304e45).
 //!
 //! Most APIs are exposed with no loss of functionality, except for the following:
 //! - `Node.eval*`/`Node.execute*` have a non-null `parent_node` parameter meaning root relative requires passing the root node.
@@ -27,18 +27,38 @@ const acpi = cascade.acpi;
 ///   sizes, etc).
 /// - The 'temporary_buffer' is replaced with a normal heap buffer allocated via
 ///   uacpi_kernel_alloc() after the call to uacpi_initialize() and can therefore
-///   be reclaimed by the cascade.
+///   be reclaimed by the kernel.
+///
+/// The 'temporary_buffer' is expected to be aligned on the native pointer size boundary (4 on a 32-bit system, 8 on a 64-bit system),
+/// although any misalignment is handled gracefully and does not result in an error.
 ///
 /// The approximate overhead per table is 56 bytes, so a buffer of 4096 bytes
 /// yields about 73 tables in terms of capacity. uACPI also has an internal
 /// static buffer for tables, "UACPI_STATIC_TABLE_ARRAY_LEN", which is configured
 /// as 16 descriptors in length by default.
-pub fn setupEarlyTableAccess(temporary_buffer: []u8) !void {
+pub fn setupEarlyTableAccess(temporary_buffer: []align(@sizeOf(usize)) u8) !void {
     const ret: Status = @enumFromInt(c_uacpi.uacpi_setup_early_table_access(
         temporary_buffer.ptr,
         temporary_buffer.len,
     ));
     try ret.toError();
+}
+
+/// Returns true if the table subsystem is available for use by the kernel.
+///
+/// This happens after a successful call to either `setupEarlyTableAccess` or `initialize`.
+pub fn tableSubsystemAvailable() bool {
+    return c_uacpi.uacpi_table_subsystem_available();
+}
+
+/// Returns true if the current platform is reduced ACPI hardware.
+///
+/// This getter becomes available along with the table subsystem, use `tableSubsystemAvailable` to check.
+pub fn isPlatformReducedHardware() !bool {
+    var value: bool = undefined;
+    const ret: Status = @enumFromInt(c_uacpi.uacpi_is_platform_reduced_hardware(&value));
+    try ret.toError();
+    return value;
 }
 
 pub const InitalizeOptions = packed struct(u64) {
@@ -286,8 +306,6 @@ pub const SleepState = enum(c_uacpi.uacpi_sleep_state) {
 };
 
 /// Prepare for a given sleep state.
-///
-/// Must be caled with interrupts ENABLED.
 pub fn prepareForSleep(state: SleepState) !void {
     const ret: Status = @enumFromInt(c_uacpi.uacpi_prepare_for_sleep_state(
         @intFromEnum(state),
@@ -296,8 +314,6 @@ pub fn prepareForSleep(state: SleepState) !void {
 }
 
 /// Enter the given sleep state after preparation.
-///
-/// Must be called with interrupts DISABLED.
 pub fn sleep(state: SleepState) !void {
     const ret: Status = @enumFromInt(c_uacpi.uacpi_enter_sleep_state(
         @intFromEnum(state),
@@ -306,8 +322,6 @@ pub fn sleep(state: SleepState) !void {
 }
 
 /// Prepare to leave the given sleep state.
-///
-/// Must be called with interrupts DISABLED.
 pub fn prepareForWake(state: SleepState) !void {
     const ret: Status = @enumFromInt(c_uacpi.uacpi_prepare_for_wake_from_sleep_state(
         @intFromEnum(state),
@@ -316,8 +330,6 @@ pub fn prepareForWake(state: SleepState) !void {
 }
 
 /// Wake from the given sleep state.
-///
-/// Must be called with interrupts ENABLED.
 pub fn wake(state: SleepState) !void {
     const ret: Status = @enumFromInt(c_uacpi.uacpi_wake_from_sleep_state(
         @intFromEnum(state),
@@ -3670,6 +3682,7 @@ pub const WorkType = enum(c_uacpi.uacpi_work_type) {
 pub const WorkHandler = *const fn (*anyopaque) callconv(.c) void;
 pub const RawInterruptHandler = *const fn (?*anyopaque) callconv(.c) InterruptReturn;
 pub const CpuFlags = c_uacpi.uacpi_cpu_flags;
+pub const InterruptState = c_uacpi.uacpi_interrupt_state;
 
 pub const DataView = extern struct {
     bytes: [*]const u8,
