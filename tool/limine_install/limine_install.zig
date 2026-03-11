@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LicenseRef-NON-AI-MIT OR MIT
+// SPDX-License-Identifier: LicenseRef-NON-AI-MIT AND MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 // SPDX-FileCopyrightText: Copyright (c) 2025 Zig OSDev Community (https://github.com/zig-osdev/zig-limine-install)
 
