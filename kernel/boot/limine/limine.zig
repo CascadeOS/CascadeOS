@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 // SPDX-FileCopyrightText: 2022-2026 Mintsuki and contributors (https://codeberg.org/Limine/limine-protocol/src/branch/trunk/LICENSE)
 
-//! This module contains the definitions of the Limine protocol as of fd3197997ec608484a2eb4e3d2a8591378087e7d.
+//! This module contains the definitions of the Limine protocol as of e42d010a761e4e9ac6bad1b578110ba72c61e1d9.
 //!
-//! [PROTOCOL DOC](https://codeberg.org/Limine/limine-protocol/src/commit/fd3197997ec608484a2eb4e3d2a8591378087e7d/PROTOCOL.md)
+//! [PROTOCOL DOC](https://codeberg.org/Limine/limine-protocol/src/commit/e42d010a761e4e9ac6bad1b578110ba72c61e1d9/PROTOCOL.md)
 
 const std = @import("std");
 
@@ -1291,11 +1291,16 @@ pub const BootloaderPerformance = extern struct {
     };
 };
 
-/// If this feature is requested, the bootloader will not disable IOMMUs (Intel VT-d, AMD-Vi) that were enabled by the firmware.
+/// If this feature is requested, the bootloader will not disable IOMMUs (Intel VT-d, AMD-Vi) that were left enabled by the firmware at
+/// hand-off.
 ///
 /// This is intended for security-conscious kernels that wish to preserve DMA protection set up by firmware.
 ///
-/// If this feature is not requested, the bootloader will disable any active IOMMUs before handing control to the executable.
+/// If this feature is not requested, the bootloader reserves the right to disable any active IOMMUs before handing control to the
+/// executable.
+///
+/// This is especially of note for base revisions 5 and greater, where the bootloader is mandated to disable VT-d and AMD-Vi IOMMUs, unless
+/// this feature is requested.
 ///
 /// On non-x86 platforms, no response will be provided.
 pub const x86_64_KeepIOMMU = extern struct {
