@@ -7,7 +7,7 @@
     .version = "0.0.3",
 
     // Ensure this is kept in sync with `README.md`
-    .minimum_zig_version = "0.16.0-dev.2682+02142a54d",
+    .minimum_zig_version = "0.16.0-dev.2821+3edaef9e0",
 
     .dependencies = .{
         .devicetree = .{

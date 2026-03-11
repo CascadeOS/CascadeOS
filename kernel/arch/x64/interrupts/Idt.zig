@@ -97,7 +97,7 @@ pub const Entry = extern struct {
 };
 
 pub fn load(idt: *const Idt) void {
-    const Idtr = packed struct {
+    const Idtr = packed struct(u80) {
         limit: u16,
         address: u64,
     };

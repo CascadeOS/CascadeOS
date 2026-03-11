@@ -91,7 +91,7 @@ pub const Gdt = extern struct {
             : .{ .rax = true });
     }
 
-    const Gdtr = packed struct {
+    const Gdtr = packed struct(u80) {
         limit: u16,
         base: u64,
     };

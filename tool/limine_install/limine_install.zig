@@ -37,7 +37,7 @@ fn parseArgs(allocator: std.mem.Allocator, args: std.process.Args) ParseArgResul
     var args_iter = try args.iterateAllocator(allocator);
     if (!args_iter.skip()) err("no self path argument", .{});
 
-    var limine_arguments: std.ArrayListUnmanaged([*:0]const u8) = .{};
+    var limine_arguments: std.ArrayListUnmanaged([*:0]const u8) = .empty;
     limine_arguments.appendSlice(allocator, &.{ "limine", "bios-install" }) catch err("out of memory", .{});
 
     var opt_output_file_path: ?[:0]const u8 = null;

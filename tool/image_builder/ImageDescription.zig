@@ -95,7 +95,7 @@ pub const Builder = struct {
 
     used_size: u64 = 0,
 
-    partition_builders: std.ArrayListUnmanaged(*PartitionBuilder) = .{},
+    partition_builders: std.ArrayListUnmanaged(*PartitionBuilder) = .empty,
 
     pub fn create(allocator: std.mem.Allocator, size: u64) Builder {
         return .{
@@ -184,7 +184,7 @@ pub const PartitionBuilder = struct {
     filesystem: Filesystem,
     partition_type: PartitionType,
 
-    entries: std.ArrayListUnmanaged(Entry) = .{},
+    entries: std.ArrayListUnmanaged(Entry) = .empty,
 
     fn deinit(partition_builder: *PartitionBuilder) void {
         partition_builder.entries.deinit(partition_builder.allocator);

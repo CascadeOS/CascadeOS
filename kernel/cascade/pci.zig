@@ -244,7 +244,7 @@ pub const Function = extern struct {
             detected_parity_error: bool,
         };
 
-        pub const HeaderTypeField = packed struct {
+        pub const HeaderTypeField = packed struct(u8) {
             header_type: HeaderType,
 
             multi_function: bool,
