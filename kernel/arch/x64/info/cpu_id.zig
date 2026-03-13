@@ -3529,9 +3529,10 @@ fn capture40000000H() void {
 ///  - KVM
 fn capture40000010H() void {
     if (max_hypervisor_leaf < 0x40000010) return;
-    switch (hypervisor) { // TODO: Do other hypervisors support this?
+    switch (hypervisor) {
         .vmware, .kvm => {},
-        else => return,
+        // TODO: do these hypervisors support this?
+        .none, .tcg, .hyperv, .xen, .parallels, .virtualbox, .unknown => return,
     }
 
     const cpuid_result = raw(0x40000010, 0);

@@ -148,7 +148,7 @@ const ImageDescriptionStep = struct {
                 b.pathJoin(&.{ "build", "limine_no_kaslr_ramfb.conf" })
             else
                 b.pathJoin(&.{ "build", "limine_ramfb.conf" }),
-            else => if (disable_kaslr)
+            .riscv, .x64 => if (disable_kaslr)
                 b.pathJoin(&.{ "build", "limine_no_kaslr.conf" })
             else
                 b.pathJoin(&.{ "build", "limine.conf" }),

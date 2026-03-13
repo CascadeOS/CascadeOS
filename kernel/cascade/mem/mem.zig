@@ -357,20 +357,19 @@ fn onKernelPageFault(
                             "no memory available to handle page fault in kernel address space\n{f}",
                             .{page_fault_details},
                         ),
-                        else => |e| cascade.debug.interruptSourcePanic(
+                        error.Protection, error.NotMapped => |e| cascade.debug.interruptSourcePanic(
                             interrupt_frame,
                             "failed to handle page fault in kernel address space: {t}\n{f}",
                             .{ e, page_fault_details },
                         ),
                     };
                 },
-                else => {
+                else => |t| {
                     @branchHint(.cold);
-
                     cascade.debug.interruptSourcePanic(
                         interrupt_frame,
                         "kernel page fault in '{t}'\n{f}",
-                        .{ region_type, page_fault_details },
+                        .{ t, page_fault_details },
                     );
                 },
             }

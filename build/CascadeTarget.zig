@@ -13,7 +13,7 @@ pub fn getNative(b: *std.Build) ?CascadeTarget {
         .aarch64 => .{ .architecture = .arm, .context = .non_cascade },
         .riscv64 => .{ .architecture = .riscv, .context = .non_cascade },
         .x86_64 => .{ .architecture = .x64, .context = .non_cascade },
-        else => null,
+        else => |t| std.debug.panic("unsupported architecture {t}", .{t}),
     };
 }
 
@@ -62,7 +62,7 @@ pub const Architecture = enum {
             .aarch64 => architecture == .arm,
             .riscv64 => architecture == .riscv,
             .x86_64 => architecture == .x64,
-            else => false,
+            else => |t| std.debug.panic("unsupported architecture {t}", .{t}),
         };
     }
 

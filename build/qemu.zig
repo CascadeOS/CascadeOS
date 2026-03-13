@@ -227,7 +227,7 @@ fn createQemuStep(
                         firmware_var,
                     );
                 },
-                else => {
+                .arm, .x64 => {
                     run_qemu.addArg("-drive");
                     run_qemu.addPrefixedFileArg(
                         "if=pflash,format=raw,unit=0,readonly=on,file=",
