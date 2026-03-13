@@ -3,11 +3,9 @@
 
 const std = @import("std");
 
-const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const CascadeTarget = @import("CascadeTarget.zig");
 const ImageStep = @import("ImageStep.zig");
 const Options = @import("Options.zig");
-const StepCollection = @import("StepCollection.zig");
-const Tool = @import("Tool.zig");
 
 /// For each architecture, creates a step that runs the image for the architecture using QEMU.
 pub fn registerQemuSteps(

@@ -4,8 +4,7 @@
 const std = @import("std");
 const Step = std.Build.Step;
 
-const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
-const Options = @import("Options.zig");
+const CascadeTarget = @import("CascadeTarget.zig");
 
 const Steps = std.AutoHashMapUnmanaged(CascadeTarget.Architecture, *Step);
 

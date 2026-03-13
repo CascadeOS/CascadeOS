@@ -2,11 +2,9 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 const std = @import("std");
+const builtin = @import("builtin");
 
-const arch = @import("arch");
 const cascade = @import("cascade");
-const Task = cascade.Task;
-const Thread = cascade.user.Thread;
 const core = @import("core");
 
 const x64 = @import("x64.zig");
@@ -17,7 +15,7 @@ const x64 = @import("x64.zig");
 ///
 /// This function *must* be called before the task is scheduled and can only be called once.
 pub fn prepareTaskForScheduling(
-    task: *Task,
+    task: *cascade.Task,
     type_erased_call: core.TypeErasedCall,
 ) void {
     const impl = struct {
@@ -32,14 +30,14 @@ pub fn prepareTaskForScheduling(
                 \\pop %rcx       // type_erased_call.args[2]
                 \\pop %r8        // type_erased_call.args[3]
                 \\pop %r9        // type_erased_call.args[4]
-                \\pop %rax       // Task.internal.taskEntry
+                \\pop %rax       // cascade.Task.internal.taskEntry
                 \\jmp *%rax
             );
         }
     };
 
     if (core.is_debug) std.debug.assert(
-        task.stack.spaceFor(1 + // Task.internal.taskEntry
+        task.stack.spaceFor(1 + // cascade.Task.internal.taskEntry
             5 + // args
             1 + // type_erased_call.typeErased
             1 + // taskEntryTrampoline
@@ -48,7 +46,7 @@ pub fn prepareTaskForScheduling(
     );
 
     // used as the jump target in `taskEntryTrampoline`
-    task.stack.push(@intFromPtr(&Task.internal.taskEntry)) catch unreachable;
+    task.stack.push(@intFromPtr(&cascade.Task.internal.taskEntry)) catch unreachable;
 
     // task args
     task.stack.push(type_erased_call.args[4]) catch unreachable;
@@ -70,7 +68,7 @@ pub fn prepareTaskForScheduling(
 /// Page table switching and managing ability to access user memory has already been performed before this function is called.
 ///
 /// Interrupts are disabled when this function is called.
-pub fn beforeSwitchTask(transition: Task.Transition) void {
+pub fn beforeSwitchTask(transition: cascade.Task.Transition) void {
     const executor = transition.old_task.state.running;
 
     const per_executor: *x64.PerExecutor = .from(executor);
@@ -98,8 +96,8 @@ pub fn beforeSwitchTask(transition: Task.Transition) void {
 ///
 /// **Note**: It is the caller's responsibility to call `beforeSwitchTask` before calling this function.
 pub inline fn switchTask(
-    old_task: *Task,
-    new_task: *Task,
+    old_task: *cascade.Task,
+    new_task: *cascade.Task,
 ) void {
     asm volatile (
         \\.cfi_sections .debug_frame
@@ -144,7 +142,6 @@ pub inline fn switchTask(
         });
 
     comptime {
-        const builtin = @import("builtin");
         std.debug.assert(builtin.omit_frame_pointer == false);
     }
 }
@@ -153,7 +150,7 @@ pub inline fn switchTask(
 ///
 /// **Note**: It is the caller's responsibility to call `beforeSwitchTask` before calling this function.
 pub inline fn switchTaskNoSave(
-    new_task: *Task,
+    new_task: *cascade.Task,
 ) noreturn {
     // no clobbers are listed as the calling context is abandoned
     asm volatile (
@@ -175,8 +172,8 @@ pub inline fn switchTaskNoSave(
 
 /// Calls `type_erased_call` on `new_stack` and saves the state of `old_task`.
 pub inline fn call(
-    old_task: *Task,
-    new_stack: *Task.Stack,
+    old_task: *cascade.Task,
+    new_stack: *cascade.Task.Stack,
     type_erased_call: core.TypeErasedCall,
 ) void {
     asm volatile (
@@ -225,14 +222,13 @@ pub inline fn call(
         });
 
     comptime {
-        const builtin = @import("builtin");
         std.debug.assert(builtin.omit_frame_pointer == false);
     }
 }
 
 /// Calls `type_erased_call` on `new_stack`.
 pub inline fn callNoSave(
-    new_stack: *Task.Stack,
+    new_stack: *cascade.Task.Stack,
     type_erased_call: core.TypeErasedCall,
 ) noreturn {
     // no clobbers are listed as the calling context is abandoned

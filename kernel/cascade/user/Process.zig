@@ -7,8 +7,6 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
-const Task = cascade.Task;
-const Thread = cascade.user.Thread;
 const core = @import("core");
 
 const log = cascade.debug.log.scoped(.user_process);
@@ -25,7 +23,7 @@ reference_count: std.atomic.Value(usize),
 address_space: cascade.mem.AddressSpace,
 
 threads_lock: cascade.sync.RwLock = .{},
-threads: std.AutoArrayHashMapUnmanaged(*Thread, void) = .{},
+threads: std.AutoArrayHashMapUnmanaged(*cascade.user.Thread, void) = .{},
 
 /// Tracks if this process has been queued for cleanup.
 queued_for_cleanup: std.atomic.Value(bool) = .init(false),
@@ -68,7 +66,7 @@ pub fn create(options: CreateOptions) !*Process {
 }
 
 pub const CreateThreadOptions = struct {
-    name: ?Task.Name = null,
+    name: ?cascade.Task.Name = null,
     entry: core.TypeErasedCall,
 };
 
@@ -78,9 +76,9 @@ pub const CreateThreadOptions = struct {
 pub fn createThread(
     process: *Process,
     options: CreateThreadOptions,
-) !*Thread {
+) !*cascade.user.Thread {
     const thread = blk: {
-        const thread = try Thread.internal.create(
+        const thread = try cascade.user.Thread.internal.create(
             process,
             .{
                 .name = if (options.name) |provided_name|
@@ -97,7 +95,7 @@ pub fn createThread(
         errdefer {
             thread.task.state = .{ .dropped = .{} }; // `destroy` will assert this
             thread.task.reference_count.store(0, .monotonic); // `destroy` will assert this
-            Thread.internal.destroy(thread);
+            cascade.user.Thread.internal.destroy(thread);
         }
 
         process.threads_lock.writeLock();
@@ -131,18 +129,18 @@ pub fn decrementReferenceCount(process: *Process) void {
 /// Returns the process that the given task belongs to.
 ///
 /// Asserts that the task is a user task.
-pub inline fn from(task: *Task) *Process {
+pub inline fn from(task: *cascade.Task) *Process {
     if (core.is_debug) std.debug.assert(task.type == .user);
-    const thread: *Thread = .from(task);
+    const thread: *cascade.user.Thread = .from(task);
     return thread.process;
 }
 
 /// Returns the process that the given task belongs to.
 ///
 /// Asserts that the task is a user task.
-pub inline fn fromConst(task: *const Task) *const Process {
+pub inline fn fromConst(task: *const cascade.Task) *const Process {
     if (core.is_debug) std.debug.assert(task.type == .user);
-    const thread: *const Thread = .fromConst(task);
+    const thread: *const cascade.user.Thread = .fromConst(task);
     return thread.process;
 }
 
@@ -154,13 +152,13 @@ pub fn format(process: *const Process, writer: *std.Io.Writer) !void {
 pub const Name = core.containers.BoundedArray(u8, cascade.config.user.process_name_length);
 
 const ProcessCleanup = struct {
-    task: *Task,
+    task: *cascade.Task,
     parker: cascade.sync.Parker,
     incoming: core.containers.AtomicSinglyLinkedList,
 
     pub fn init(process_cleanup: *ProcessCleanup) !void {
         process_cleanup.* = .{
-            .task = try Task.createKernelTask(.{
+            .task = try cascade.Task.createKernelTask(.{
                 .name = try .fromSlice("process cleanup"),
                 .entry = .prepare(ProcessCleanup.execute, .{process_cleanup}),
             }),

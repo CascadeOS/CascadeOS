@@ -5,15 +5,8 @@
 //!
 //! Only supports writes.
 
-const std = @import("std");
-
 const arch = @import("arch");
-const cascade = @import("cascade");
-const Task = cascade.Task;
-const core = @import("core");
 const sbi = @import("sbi");
-
-const riscv = @import("riscv.zig");
 
 pub fn detect() bool {
     return sbi.debug_console.available();

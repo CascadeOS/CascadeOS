@@ -7,9 +7,8 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const core = @import("core");
 const cascade = @import("cascade");
-const Task = cascade.Task;
+const core = @import("core");
 
 pub const VirtualAddress = extern union {
     _kernel: KernelVirtualAddress,
@@ -194,7 +193,7 @@ pub const UserVirtualAddress = extern struct {
     /// **REQUIREMENTS**:
     /// - The current task must have enabled access to user memory.
     pub inline fn ptr(address: UserVirtualAddress, comptime PtrT: type) PtrT {
-        if (core.is_debug) std.debug.assert(Task.Current.get().task.enable_access_to_user_memory_count != 0);
+        if (core.is_debug) std.debug.assert(cascade.Task.Current.get().task.enable_access_to_user_memory_count != 0);
         return @ptrFromInt(address.value);
     }
 
@@ -452,7 +451,7 @@ pub const UserVirtualRange = struct {
     /// **REQUIREMENTS**:
     /// - The current task must have enabled access to user memory.
     pub inline fn byteSlice(range: UserVirtualRange) []u8 {
-        if (core.is_debug) std.debug.assert(Task.Current.get().task.enable_access_to_user_memory_count != 0);
+        if (core.is_debug) std.debug.assert(cascade.Task.Current.get().task.enable_access_to_user_memory_count != 0);
         return range.address.ptr([*]u8)[0..range.size.value];
     }
 

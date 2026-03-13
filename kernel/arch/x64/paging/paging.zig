@@ -3,16 +3,12 @@
 
 const std = @import("std");
 
-const arch = @import("arch");
-const core = @import("core");
 const cascade = @import("cascade");
-const Task = cascade.Task;
+const core = @import("core");
 
 const x64 = @import("../x64.zig");
 pub const PageFaultErrorCode = @import("PageFaultErrorCode.zig").PageFaultErrorCode;
 pub const PageTable = @import("PageTable.zig").PageTable;
-
-const log = cascade.debug.log.scoped(.paging);
 
 /// Flushes the cache for the given virtual range on the current executor.
 ///

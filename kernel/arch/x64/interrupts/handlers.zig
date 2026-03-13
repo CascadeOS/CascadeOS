@@ -5,14 +5,12 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
-const Task = cascade.Task;
-const core = @import("core");
 
 const x64 = @import("../x64.zig");
 
 pub fn nonMaskableInterruptHandler(
     interrupt_frame: arch.interrupts.InterruptFrame,
-    _: Task.Current.StateBeforeInterrupt,
+    _: cascade.Task.Current.StateBeforeInterrupt,
 ) void {
     if (!cascade.debug.hasAnExecutorPanicked()) {
         std.debug.panic("non-maskable interrupt\n{f}", .{interrupt_frame});
@@ -24,7 +22,7 @@ pub fn nonMaskableInterruptHandler(
 
 pub fn pageFaultHandler(
     interrupt_frame: arch.interrupts.InterruptFrame,
-    state_before_interrupt: Task.Current.StateBeforeInterrupt,
+    state_before_interrupt: cascade.Task.Current.StateBeforeInterrupt,
 ) void {
     const faulting_address = x64.registers.Cr2.readAddress();
 
@@ -60,7 +58,7 @@ pub fn pageFaultHandler(
 /// Handler for page faults that occur before the standard page fault handler is installed.
 pub fn earlyPageFaultHandler(
     interrupt_frame: arch.interrupts.InterruptFrame,
-    _: Task.Current.StateBeforeInterrupt,
+    _: cascade.Task.Current.StateBeforeInterrupt,
 ) void {
     const faulting_address = x64.registers.Cr2.readAddress();
 
@@ -79,7 +77,7 @@ pub fn earlyPageFaultHandler(
 
 pub fn flushRequestHandler(
     _: arch.interrupts.InterruptFrame,
-    _: Task.Current.StateBeforeInterrupt,
+    _: cascade.Task.Current.StateBeforeInterrupt,
 ) void {
     cascade.mem.FlushRequest.processFlushRequests();
     // eoi after all current flush requests have been handled
@@ -88,16 +86,16 @@ pub fn flushRequestHandler(
 
 pub fn perExecutorPeriodicHandler(
     _: arch.interrupts.InterruptFrame,
-    _: Task.Current.StateBeforeInterrupt,
+    _: cascade.Task.Current.StateBeforeInterrupt,
 ) void {
     // eoi before calling `maybePreempt` as we may get scheduled out and need to re-enable timer interrupts
     x64.apic.eoi();
-    Task.Current.get().maybePreempt();
+    cascade.Task.Current.get().maybePreempt();
 }
 
 pub fn unhandledException(
     interrupt_frame: arch.interrupts.InterruptFrame,
-    _: Task.Current.StateBeforeInterrupt,
+    _: cascade.Task.Current.StateBeforeInterrupt,
 ) void {
     const arch_interrupt_frame: *const x64.interrupts.InterruptFrame = .from(interrupt_frame);
     switch (arch_interrupt_frame.context()) {
@@ -115,10 +113,10 @@ pub fn unhandledException(
 /// Used during early initialization as well as during normal kernel operation.
 pub fn unhandledInterrupt(
     interrupt_frame: arch.interrupts.InterruptFrame,
-    _: Task.Current.StateBeforeInterrupt,
+    _: cascade.Task.Current.StateBeforeInterrupt,
 ) void {
     std.debug.panic(
         "unhandled interrupt on {f}\n{f}",
-        .{ Task.Current.get().knownExecutor(), interrupt_frame },
+        .{ cascade.Task.Current.get().knownExecutor(), interrupt_frame },
     );
 }

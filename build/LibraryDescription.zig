@@ -1,9 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-NON-AI-MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-
-const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const CascadeTarget = @import("CascadeTarget.zig");
 
 /// The name of the library:
 ///   - used as the name of the module provided `@import("{name}");` (unless overridden with `LibraryDependency.import_name`)

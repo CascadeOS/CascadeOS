@@ -5,14 +5,13 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 const core = @import("core");
 
 const log = cascade.debug.log.scoped(.task);
 
 const Current = @This();
 
-task: *Task,
+task: *cascade.Task,
 
 /// Returns the executor that the current task is running on if it is known.
 ///
@@ -82,7 +81,7 @@ pub fn maybePreempt(current_task: Current) void {
         std.debug.assert(current_task.task.state == .running);
     }
 
-    const scheduler_handle: Task.SchedulerHandle = .get();
+    const scheduler_handle: cascade.Task.SchedulerHandle = .get();
     defer scheduler_handle.unlock();
 
     if (scheduler_handle.isEmpty()) return;

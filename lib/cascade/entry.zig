@@ -3,7 +3,6 @@
 
 const std = @import("std");
 const builtin = @import("builtin");
-const native_os = builtin.os.tag;
 const root = @import("root");
 
 const cascade = @import("cascade");

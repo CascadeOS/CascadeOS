@@ -2,12 +2,11 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 const std = @import("std");
-const Step = std.Build.Step;
 
 const build_zig_zon = @import("build.zig.zon");
 
 const Application = @import("build/Application.zig");
-const CascadeTarget = @import("build/CascadeTarget.zig").CascadeTarget;
+const CascadeTarget = @import("build/CascadeTarget.zig");
 const ImageStep = @import("build/ImageStep.zig");
 const Kernel = @import("build/Kernel.zig");
 const Library = @import("build/Library.zig");

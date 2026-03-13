@@ -3,11 +3,9 @@
 
 const std = @import("std");
 
-const arch = @import("arch");
-const core = @import("core");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 const acpi = cascade.acpi;
+const core = @import("core");
 
 /// The Multiple APIC Description Table (MADT), provides OSPM with information necessary for operation on systems with
 /// APIC, SAPIC, GIC, or LPIC implementations.

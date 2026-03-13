@@ -3,11 +3,9 @@
 
 const std = @import("std");
 
-const arch = @import("arch");
-const core = @import("core");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 const acpi = cascade.acpi;
+const core = @import("core");
 
 /// PCI-Express Memory Mapped Configuration Table (MCFG)
 pub const MCFG = extern struct {

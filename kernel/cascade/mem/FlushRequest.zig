@@ -5,8 +5,6 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
-const Task = cascade.Task;
-const Process = cascade.user.Process;
 const core = @import("core");
 
 const FlushRequest = @This();
@@ -22,7 +20,7 @@ pub const Node = struct {
 };
 
 pub fn submitAndWait(flush_request: *FlushRequest) void {
-    const current_task: Task.Current = .get();
+    const current_task: cascade.Task.Current = .get();
 
     {
         current_task.incrementInterruptDisable();
@@ -54,7 +52,7 @@ pub fn submitAndWait(flush_request: *FlushRequest) void {
 }
 
 pub fn processFlushRequests() void {
-    const current_task: Task.Current = .get();
+    const current_task: cascade.Task.Current = .get();
     if (core.is_debug) std.debug.assert(current_task.task.interrupt_disable_count != 0);
 
     const executor = current_task.knownExecutor();
@@ -66,7 +64,7 @@ pub fn processFlushRequests() void {
 }
 
 fn flush(flush_request: *FlushRequest) void {
-    const current_task: Task.Current = .get();
+    const current_task: cascade.Task.Current = .get();
     if (core.is_debug) std.debug.assert(current_task.task.interrupt_disable_count != 0);
 
     defer _ = flush_request.count.fetchSub(1, .monotonic);
@@ -76,7 +74,7 @@ fn flush(flush_request: *FlushRequest) void {
         .user => |target_process| switch (current_task.task.type) {
             .kernel => return,
             .user => {
-                const current_process: *Process = .from(current_task.task);
+                const current_process: *cascade.user.Process = .from(current_task.task);
                 if (current_process != target_process) return;
             },
         },

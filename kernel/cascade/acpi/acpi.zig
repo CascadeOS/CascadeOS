@@ -4,10 +4,7 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const core = @import("core");
 const cascade = @import("cascade");
-const Task = cascade.Task;
-const acpi = cascade.acpi;
 
 pub const Address = @import("Address.zig").Address;
 pub const tables = @import("tables/tables.zig");

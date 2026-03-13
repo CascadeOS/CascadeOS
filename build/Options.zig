@@ -2,9 +2,8 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
 const std = @import("std");
-const Step = std.Build.Step;
 
-const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const CascadeTarget = @import("CascadeTarget.zig");
 
 const Modules = std.AutoHashMapUnmanaged(CascadeTarget.Architecture, *std.Build.Module);
 const Options = @This();

@@ -5,9 +5,7 @@ const std = @import("std");
 
 const arch = @import("arch");
 const boot = @import("boot");
-const core = @import("core");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 
 const limine = @import("limine.zig");
 

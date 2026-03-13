@@ -5,12 +5,11 @@ const std = @import("std");
 const Step = std.Build.Step;
 
 const Application = @import("Application.zig");
-const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const CascadeTarget = @import("CascadeTarget.zig");
 const KernelComponent = @import("KernelComponent.zig");
 const Library = @import("Library.zig");
 const Options = @import("Options.zig");
 const StepCollection = @import("StepCollection.zig");
-const Tool = @import("Tool.zig");
 
 pub const Collection = std.AutoHashMapUnmanaged(CascadeTarget.Architecture, Kernel);
 

@@ -5,12 +5,10 @@
 
 const std = @import("std");
 
-const arch = @import("arch");
 const boot = @import("boot");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 const uart = cascade.init.Output.uart;
-const core = @import("core");
+
 pub const DeviceTree = @import("DeviceTree");
 
 const log = cascade.debug.log.scoped(.devicetree);

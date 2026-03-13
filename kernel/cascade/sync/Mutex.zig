@@ -7,14 +7,12 @@
 
 const std = @import("std");
 
-const arch = @import("arch");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 const core = @import("core");
 
 const Mutex = @This();
 
-locked_by: std.atomic.Value(?*Task) = .init(null),
+locked_by: std.atomic.Value(?*cascade.Task) = .init(null),
 
 unlock_type: UnlockType = .unlocked,
 
@@ -22,7 +20,7 @@ spinlock: cascade.sync.TicketSpinLock = .{},
 wait_queue: cascade.sync.WaitQueue = .{},
 
 pub fn lock(mutex: *Mutex) void {
-    const current_task: Task.Current = .get();
+    const current_task: cascade.Task.Current = .get();
 
     while (true) {
         var locked_by = mutex.locked_by.cmpxchgWeak(
@@ -83,7 +81,7 @@ pub fn lock(mutex: *Mutex) void {
 
 /// Try to lock the mutex.
 pub fn tryLock(mutex: *Mutex) bool {
-    const current_task: Task.Current = .get();
+    const current_task: cascade.Task.Current = .get();
 
     const locked_by = mutex.locked_by.cmpxchgStrong(
         null,
@@ -108,7 +106,7 @@ pub fn unlock(mutex: *Mutex) void {
     mutex.spinlock.lock();
     defer mutex.spinlock.unlock();
 
-    const current_task: Task.Current = .get();
+    const current_task: cascade.Task.Current = .get();
 
     const waiting_task = mutex.wait_queue.firstTask() orelse {
         mutex.unlock_type = .unlocked;

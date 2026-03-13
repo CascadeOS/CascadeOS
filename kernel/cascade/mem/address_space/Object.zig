@@ -16,15 +16,11 @@
 
 const std = @import("std");
 
-const arch = @import("arch");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 const PhysicalPage = cascade.mem.PhysicalPage;
 const core = @import("core");
 
 const PhysicalPageChunkMap = @import("chunk_map.zig").ChunkMap(PhysicalPage);
-
-const log = cascade.debug.log.scoped(.address_space);
 
 const Object = @This();
 

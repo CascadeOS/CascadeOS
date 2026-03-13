@@ -5,10 +5,10 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 const core = @import("core");
 
 const devicetree = @import("../devicetree.zig");
+const framebuffer = @import("framebuffer.zig");
 pub const uart = @import("uart.zig");
 
 const log = cascade.debug.log.scoped(.output_init);
@@ -35,7 +35,7 @@ pub fn registerOutputsNoMemorySystem() void {
     globals.serial_output = getSerialOutput(false);
     if (globals.serial_output) |serial_output| serial_output.writeFn(serial_output.state, cascade_starting_message);
 
-    globals.graphical_output = @import("framebuffer.zig").tryGetFramebufferOutput(false);
+    globals.graphical_output = framebuffer.tryGetFramebufferOutput(false);
     if (globals.graphical_output) |*graphical_output| graphical_output.writeFn(graphical_output.state, cascade_starting_message);
 
     if (log.levelEnabled(.debug)) {
@@ -61,7 +61,7 @@ pub fn registerOutputsWithMemorySystem() void {
     }
 
     if (globals.graphical_output == null) {
-        globals.graphical_output = @import("framebuffer.zig").tryGetFramebufferOutput(true);
+        globals.graphical_output = framebuffer.tryGetFramebufferOutput(true);
         if (globals.graphical_output) |*graphical_output| graphical_output.writeFn(graphical_output.state, cascade_starting_message);
     }
 

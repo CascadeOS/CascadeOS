@@ -4,7 +4,6 @@
 const std = @import("std");
 
 const core = @import("core");
-const fs = @import("fs");
 const UUID = @import("uuid").UUID;
 
 // TODO: This file is *very* WIP.

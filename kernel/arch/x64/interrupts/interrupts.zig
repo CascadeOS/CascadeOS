@@ -5,10 +5,7 @@ const std = @import("std");
 
 const arch = @import("arch");
 const Handler = arch.interrupts.Interrupt.Handler;
-const core = @import("core");
 const cascade = @import("cascade");
-const Task = cascade.Task;
-const Thread = cascade.user.Thread;
 
 const x64 = @import("../x64.zig");
 const Idt = @import("Idt.zig");
@@ -25,7 +22,7 @@ export fn interruptDispatch(interrupt_frame: *InterruptFrame) callconv(.c) void 
     defer {
         switch (interrupt_frame.cs.selector) {
             .user_code, .user_code_32bit => {
-                const per_thread: *x64.user.PerThread = .from(.from(Task.Current.get().task));
+                const per_thread: *x64.user.PerThread = .from(.from(cascade.Task.Current.get().task));
                 x64.instructions.enableSSEUsage();
                 per_thread.extended_state.load();
             },
@@ -34,7 +31,7 @@ export fn interruptDispatch(interrupt_frame: *InterruptFrame) callconv(.c) void 
         }
     }
 
-    const state_before_interrupt = Task.Current.onInterruptEntry();
+    const state_before_interrupt = cascade.Task.Current.onInterruptEntry();
     defer state_before_interrupt.onInterruptExit();
 
     var handler = globals.handlers[interrupt_frame.vector_number.full];
@@ -336,8 +333,6 @@ const globals = struct {
 };
 
 pub const init = struct {
-    const init_log = cascade.debug.log.scoped(.interrupt_init);
-
     /// Ensure that any exceptions/faults that occur during early initialization are handled.
     ///
     /// The handler is not expected to do anything other than panic.

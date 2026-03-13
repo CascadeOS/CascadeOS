@@ -1,11 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-NON-AI-MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-
-const arch = @import("arch");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 const acpi = cascade.acpi;
 const core = @import("core");
 

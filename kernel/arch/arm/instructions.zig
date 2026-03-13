@@ -1,15 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-NON-AI-MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-const Task = cascade.Task;
-const core = @import("core");
-
-const arm = @import("arm.zig");
-
 pub inline fn readPhysicalCount() u64 {
     return asm ("mrs %[ret], cntpct_el0"
         : [ret] "=r" (-> u64),

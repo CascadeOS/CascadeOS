@@ -4,9 +4,8 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const core = @import("core");
 const cascade = @import("cascade");
-const Task = cascade.Task;
+const core = @import("core");
 
 pub const elf = @import("elf.zig");
 pub const Process = @import("Process.zig");
@@ -19,7 +18,7 @@ const log = cascade.debug.log.scoped(.user);
 /// Interrupts are disabled on entry.
 pub fn onSyscall(syscall_frame: arch.user.SyscallFrame) void {
     if (core.is_debug) {
-        const current_task: Task.Current = .get();
+        const current_task: cascade.Task.Current = .get();
         std.debug.assert(current_task.task.interrupt_disable_count == 0);
         std.debug.assert(current_task.task.enable_access_to_user_memory_count == 0);
         std.debug.assert(!arch.interrupts.areEnabled());
@@ -36,7 +35,7 @@ pub fn onSyscall(syscall_frame: arch.user.SyscallFrame) void {
 
     switch (syscall) {
         .exit_thread => {
-            const scheduler_handle: Task.SchedulerHandle = .get();
+            const scheduler_handle: cascade.Task.SchedulerHandle = .get();
             scheduler_handle.drop();
             unreachable;
         },
@@ -44,8 +43,6 @@ pub fn onSyscall(syscall_frame: arch.user.SyscallFrame) void {
 }
 
 pub const init = struct {
-    const init_log = cascade.debug.log.scoped(.user_init);
-
     pub fn initialize() !void {
         try Process.init.initializeProcesses();
         try Thread.init.initializeThreads();

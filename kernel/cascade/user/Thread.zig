@@ -7,26 +7,22 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
-const Task = cascade.Task;
-const Process = cascade.user.Process;
 const core = @import("core");
-
-const log = cascade.debug.log.scoped(.user_thread);
 
 const Thread = @This();
 
-task: Task,
+task: cascade.Task,
 
-process: *Process,
+process: *cascade.user.Process,
 
 arch_specific: arch.user.PerThread,
 
-pub inline fn from(task: *Task) *Thread {
+pub inline fn from(task: *cascade.Task) *Thread {
     if (core.is_debug) std.debug.assert(task.type == .user);
     return @fieldParentPtr("task", task);
 }
 
-pub inline fn fromConst(task: *const Task) *const Thread {
+pub inline fn fromConst(task: *const cascade.Task) *const Thread {
     if (core.is_debug) std.debug.assert(task.type == .user);
     return @fieldParentPtr("task", task);
 }
@@ -42,8 +38,8 @@ pub fn format(thread: *const Thread, writer: *std.Io.Writer) !void {
 
 pub const internal = struct {
     pub fn create(
-        process: *Process,
-        options: Task.internal.InitOptions,
+        process: *cascade.user.Process,
+        options: cascade.Task.internal.InitOptions,
     ) !*Thread {
         const thread = try globals.cache.allocate();
         errdefer globals.cache.deallocate(thread);
@@ -54,7 +50,7 @@ pub const internal = struct {
             .arch_specific = thread.arch_specific, // reinitialized below
         };
 
-        try Task.internal.init(&thread.task, options);
+        try cascade.Task.internal.init(&thread.task, options);
         arch.user.initializeThread(thread);
 
         return thread;

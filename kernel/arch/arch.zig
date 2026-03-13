@@ -8,11 +8,8 @@
 
 const std = @import("std");
 
-const arch = @import("arch");
-const core = @import("core");
 const cascade = @import("cascade");
-const Task = cascade.Task;
-const Thread = cascade.user.Thread;
+const core = @import("core");
 const user_cascade = @import("user_cascade");
 
 pub const current_arch = @import("cascade_architecture").arch;
@@ -98,7 +95,7 @@ pub const interrupts = struct {
 
         pub const Handler = core.TypeErasedCall.Templated(&.{
             InterruptFrame,
-            Task.Current.StateBeforeInterrupt,
+            cascade.Task.Current.StateBeforeInterrupt,
         });
 
         pub const AllocateError = error{InterruptAllocationFailed};
@@ -456,7 +453,7 @@ pub const scheduling = struct {
     ///
     /// This function *must* be called before the task is scheduled and can only be called once.
     pub fn prepareTaskForScheduling(
-        task: *Task,
+        task: *cascade.Task,
         type_erased_call: core.TypeErasedCall,
     ) callconv(core.inline_in_non_debug) void {
         return getFunction(
@@ -470,7 +467,7 @@ pub const scheduling = struct {
     /// Page table switching and managing ability to access user memory has already been performed before this function is called.
     ///
     /// Interrupts are disabled when this function is called.
-    pub fn beforeSwitchTask(transition: Task.Transition) callconv(core.inline_in_non_debug) void {
+    pub fn beforeSwitchTask(transition: cascade.Task.Transition) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.scheduling,
             "beforeSwitchTask",
@@ -483,8 +480,8 @@ pub const scheduling = struct {
     ///
     /// **Note**: It is the caller's responsibility to call `beforeSwitchTask` before calling this function.
     pub fn switchTask(
-        old_task: *Task,
-        new_task: *Task,
+        old_task: *cascade.Task,
+        new_task: *cascade.Task,
     ) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.scheduling,
@@ -496,7 +493,7 @@ pub const scheduling = struct {
     ///
     /// **Note**: It is the caller's responsibility to call `beforeSwitchTask` before calling this function.
     pub fn switchTaskNoSave(
-        new_task: *Task,
+        new_task: *cascade.Task,
     ) callconv(core.inline_in_non_debug) noreturn {
         getFunction(
             current_functions.scheduling,
@@ -508,8 +505,8 @@ pub const scheduling = struct {
     ///
     /// Asserts that the provided `type_erased_call` is noreturn.
     pub fn call(
-        old_task: *Task,
-        new_stack: *Task.Stack,
+        old_task: *cascade.Task,
+        new_stack: *cascade.Task.Stack,
         type_erased_call: core.TypeErasedCall,
     ) callconv(core.inline_in_non_debug) void {
         if (core.is_debug) std.debug.assert(type_erased_call.return_type.isNoReturn());
@@ -525,7 +522,7 @@ pub const scheduling = struct {
     ///
     /// Asserts that the provided `type_erased_call` is noreturn.
     pub fn callNoSave(
-        new_stack: *Task.Stack,
+        new_stack: *cascade.Task.Stack,
         type_erased_call: core.TypeErasedCall,
     ) callconv(core.inline_in_non_debug) noreturn {
         if (core.is_debug) std.debug.assert(type_erased_call.return_type.isNoReturn());
@@ -565,7 +562,7 @@ pub const user = struct {
     ///
     /// This function is called in the `Thread` cache constructor.
     pub fn createThread(
-        thread: *Thread,
+        thread: *cascade.user.Thread,
     ) callconv(core.inline_in_non_debug) cascade.mem.cache.ConstructorError!void {
         return getFunction(
             current_functions.user,
@@ -578,7 +575,7 @@ pub const user = struct {
     /// Non-architecture specific destruction has not already been performed.
     ///
     /// This function is called in the `Thread` cache destructor.
-    pub fn destroyThread(thread: *Thread) callconv(core.inline_in_non_debug) void {
+    pub fn destroyThread(thread: *cascade.user.Thread) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.user,
             "destroyThread",
@@ -590,7 +587,7 @@ pub const user = struct {
     /// All non-architecture specific initialization has already been performed.
     ///
     /// This function is called in `Thread.internal.create`.
-    pub fn initializeThread(thread: *Thread) callconv(core.inline_in_non_debug) void {
+    pub fn initializeThread(thread: *cascade.user.Thread) callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.user,
             "initializeThread",
@@ -647,7 +644,7 @@ pub const user = struct {
     ///
     /// Asserts that the current task is a user task.
     pub fn enterUserspace(options: EnterUserspaceOptions) callconv(core.inline_in_non_debug) noreturn {
-        if (core.is_debug) std.debug.assert(Task.Current.get().task.type == .user);
+        if (core.is_debug) std.debug.assert(cascade.Task.Current.get().task.type == .user);
 
         getFunction(
             current_functions.user,
@@ -1057,7 +1054,7 @@ pub const Functions = struct {
         ///
         /// This function is called in the `Thread` cache constructor.
         createThread: ?fn (
-            thread: *Thread,
+            thread: *cascade.user.Thread,
         ) cascade.mem.cache.ConstructorError!void = null,
 
         /// Destroy the `PerThread` data of a thread.
@@ -1065,14 +1062,14 @@ pub const Functions = struct {
         /// Non-architecture specific destruction has not already been performed.
         ///
         /// This function is called in the `Thread` cache destructor.
-        destroyThread: ?fn (thread: *Thread) void = null,
+        destroyThread: ?fn (thread: *cascade.user.Thread) void = null,
 
         /// Initialize the `PerThread` data of a thread.
         ///
         /// All non-architecture specific initialization has already been performed.
         ///
         /// This function is called in `Thread.internal.create`.
-        initializeThread: ?fn (thread: *Thread) void = null,
+        initializeThread: ?fn (thread: *cascade.user.Thread) void = null,
 
         /// Enter userspace for the first time in the current task.
         enterUserspace: ?fn (options: user.EnterUserspaceOptions) noreturn = null,
@@ -1116,7 +1113,7 @@ pub const Functions = struct {
         ///
         /// This function *must* be called before the task is scheduled and can only be called once.
         prepareTaskForScheduling: ?fn (
-            task: *Task,
+            task: *cascade.Task,
             type_erased_call: core.TypeErasedCall,
         ) void = null,
 
@@ -1125,30 +1122,30 @@ pub const Functions = struct {
         /// Page table switching and managing ability to access user memory has already been performed before this function is called.
         ///
         /// Interrupts are disabled when this function is called.
-        beforeSwitchTask: ?fn (transition: Task.Transition) void = null,
+        beforeSwitchTask: ?fn (transition: cascade.Task.Transition) void = null,
 
         /// Switches to `new_task`.
         ///
         /// The state of `old_task` is saved to allow it to be resumed later.
         ///
         /// **Note**: It is the caller's responsibility to call `beforeSwitchTask` before calling this function.
-        switchTask: ?fn (old_task: *Task, new_task: *Task) callconv(.@"inline") void = null,
+        switchTask: ?fn (old_task: *cascade.Task, new_task: *cascade.Task) callconv(.@"inline") void = null,
 
         /// Switches to `new_task`.
         ///
         /// **Note**: It is the caller's responsibility to call `beforeSwitchTask` before calling this function.
-        switchTaskNoSave: ?fn (new_task: *Task) callconv(.@"inline") noreturn = null,
+        switchTaskNoSave: ?fn (new_task: *cascade.Task) callconv(.@"inline") noreturn = null,
 
         /// Calls `type_erased_call` on `new_stack` and saves the state of `old_task`.
         call: ?fn (
-            old_task: *Task,
-            new_stack: *Task.Stack,
+            old_task: *cascade.Task,
+            new_stack: *cascade.Task.Stack,
             type_erased_call: core.TypeErasedCall,
         ) callconv(.@"inline") void = null,
 
         /// Calls `type_erased_call` on `new_stack`.
         callNoSave: ?fn (
-            new_stack: *Task.Stack,
+            new_stack: *cascade.Task.Stack,
             type_erased_call: core.TypeErasedCall,
         ) callconv(.@"inline") noreturn = null,
     },

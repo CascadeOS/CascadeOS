@@ -4,9 +4,7 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const core = @import("core");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 
 pub const log = @import("log.zig");
 
@@ -21,7 +19,7 @@ pub fn interruptSourcePanic(
 ) noreturn {
     @branchHint(.cold);
 
-    const current_task: Task.Current = .get();
+    const current_task: cascade.Task.Current = .get();
 
     current_task.incrementInterruptDisable(); // ensure the executor is not going to change underneath us
     const executor = current_task.knownExecutor();
@@ -88,7 +86,7 @@ fn singleExecutorInitPanic(
 }
 
 fn initPanic(
-    current_task: Task.Current,
+    current_task: cascade.Task.Current,
     msg: []const u8,
     panic_type: PanicType,
 ) void {
@@ -137,9 +135,9 @@ fn printPanic(
     panic_type: PanicType,
 ) !void {
     try t.writer.writeByte('\n');
-    t.setColor(.red) catch {};
+    try t.setColor(.red);
     try t.writer.writeAll("PANIC");
-    t.setColor(.reset) catch {};
+    try t.setColor(.reset);
 
     if (msg.len != 0) {
         try t.writer.writeAll(" - ");

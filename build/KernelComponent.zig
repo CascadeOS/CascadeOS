@@ -3,10 +3,8 @@
 
 const std = @import("std");
 
-const CascadeTarget = @import("CascadeTarget.zig").CascadeTarget;
+const CascadeTarget = @import("CascadeTarget.zig");
 const Options = @import("Options.zig");
-
-const KernelComponent = @This();
 
 /// The name of the kernel component:
 ///   - used as the name of the module provided `@import("{name}");`

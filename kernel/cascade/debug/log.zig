@@ -5,7 +5,6 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 const core = @import("core");
 const kernel_options = @import("kernel_options");
 const kernel_log_scopes = kernel_options.kernel_log_scopes;
@@ -121,7 +120,7 @@ fn logFn(
                 return;
             };
 
-            writer.print("{f} | ", .{Task.Current.get().task}) catch {
+            writer.print("{f} | ", .{cascade.Task.Current.get().task}) catch {
                 @branchHint(.cold);
                 _ = writer.consumeAll();
                 return;
@@ -153,7 +152,7 @@ fn logFn(
                 return;
             };
 
-            writer.print("{f} | ", .{Task.Current.get().task}) catch {
+            writer.print("{f} | ", .{cascade.Task.Current.get().task}) catch {
                 @branchHint(.cold);
                 _ = writer.consumeAll();
                 return;

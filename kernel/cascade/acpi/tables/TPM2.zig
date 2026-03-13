@@ -3,11 +3,9 @@
 
 const std = @import("std");
 
-const arch = @import("arch");
-const core = @import("core");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 const acpi = cascade.acpi;
+const core = @import("core");
 
 /// TCG Hardware Interface Description Table Format for TPM 2.0
 ///

@@ -4,10 +4,9 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const core = @import("core");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 const acpi = cascade.acpi;
+const core = @import("core");
 
 const uacpi = @import("uacpi.zig");
 
@@ -426,7 +425,7 @@ export fn uacpi_kernel_free_event(handle: *anyopaque) void {
 /// The returned thread id cannot be UACPI_THREAD_ID_NONE.
 export fn uacpi_kernel_get_thread_id() usize {
     log.verbose("uacpi_kernel_get_thread_id called", .{});
-    return @intFromPtr(Task.Current.get().task);
+    return @intFromPtr(cascade.Task.Current.get().task);
 }
 
 /// Disable interrupts and return a kernel-defined value representing the "before" state.
@@ -436,14 +435,14 @@ export fn uacpi_kernel_get_thread_id() usize {
 /// Note that this is talking about ALL interrupts on the current CPU, not just those installed by uACPI. This is typically achieved by
 /// executing the 'cli' instruction on x86, 'msr daifset, #3' on aarch64 etc.
 export fn uacpi_kernel_disable_interrupts() uacpi.InterruptState {
-    const current: Task.Current = .get();
+    const current: cascade.Task.Current = .get();
     current.incrementInterruptDisable();
     return current.task.interrupt_disable_count - 1;
 }
 
 /// Restore the state of the interrupt flags to the kernel-defined value provided in 'state'.
 export fn uacpi_kernel_restore_interrupts(state: uacpi.InterruptState) void {
-    const current: Task.Current = .get();
+    const current: cascade.Task.Current = .get();
     std.debug.assert(current.task.interrupt_disable_count == state + 1);
     current.decrementInterruptDisable();
 }
@@ -531,7 +530,7 @@ export fn uacpi_kernel_install_interrupt_handler(
     const HandlerWrapper = struct {
         fn HandlerWrapper(
             _: arch.interrupts.InterruptFrame,
-            _: Task.Current.StateBeforeInterrupt,
+            _: cascade.Task.Current.StateBeforeInterrupt,
             inner_handler: uacpi.RawInterruptHandler,
             inner_ctx: *anyopaque,
         ) void {

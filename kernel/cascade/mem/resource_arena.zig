@@ -10,10 +10,9 @@ const std = @import("std");
 const Wyhash = std.hash.Wyhash;
 
 const arch = @import("arch");
-const core = @import("core");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 const RawCache = cascade.mem.cache.RawCache;
+const core = @import("core");
 
 const log = cascade.debug.log.scoped(.resource_arena);
 

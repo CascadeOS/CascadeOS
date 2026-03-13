@@ -3,9 +3,7 @@
 
 const std = @import("std");
 
-const arch = @import("arch");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 const Tick = cascade.time.wallclock.Tick;
 const core = @import("core");
 

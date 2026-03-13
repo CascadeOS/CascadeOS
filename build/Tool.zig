@@ -5,7 +5,6 @@ const std = @import("std");
 const Step = std.Build.Step;
 
 const Library = @import("Library.zig");
-const Options = @import("Options.zig");
 const StepCollection = @import("StepCollection.zig");
 const ToolDescription = @import("ToolDescription.zig");
 

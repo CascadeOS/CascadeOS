@@ -5,8 +5,6 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
-const Task = cascade.Task;
-const MapType = cascade.mem.MapType;
 const core = @import("core");
 
 const KernelMemoryRegion = @This();

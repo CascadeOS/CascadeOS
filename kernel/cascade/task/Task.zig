@@ -9,8 +9,6 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
-const Process = cascade.user.Process;
-const Thread = cascade.user.Thread;
 const core = @import("core");
 
 pub const Current = @import("Current.zig");
@@ -134,7 +132,7 @@ pub fn format(
             "Kernel<{s}>",
             .{task.name.constSlice()},
         ),
-        .user => return Thread.fromConst(task).format(writer),
+        .user => return cascade.user.Thread.fromConst(task).format(writer),
     }
 }
 
@@ -281,7 +279,7 @@ const TaskCleanup = struct {
                 globals.kernel_task_cache.deallocate(task);
             },
             .user => {
-                const thread: *Thread = .from(task);
+                const thread: *cascade.user.Thread = .from(task);
 
                 {
                     thread.process.threads_lock.writeLock();
@@ -308,7 +306,7 @@ const TaskCleanup = struct {
                 cascade.debug.log.scoped(.user_thread).debug("destroying {f}", .{thread});
 
                 thread.process.decrementReferenceCount();
-                Thread.internal.destroy(thread);
+                cascade.user.Thread.internal.destroy(thread);
             },
         }
     }

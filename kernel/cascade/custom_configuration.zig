@@ -3,7 +3,7 @@
 
 const std = @import("std");
 
-const CascadeTarget = @import("../../build/CascadeTarget.zig").CascadeTarget;
+const CascadeTarget = @import("../../build/CascadeTarget.zig");
 const Options = @import("../../build/Options.zig");
 
 pub fn customConfiguration(

@@ -4,21 +4,15 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const core = @import("core");
 const cascade = @import("cascade");
-const Task = cascade.Task;
-const Process = cascade.user.Process;
-const Thread = cascade.user.Thread;
-
+const core = @import("core");
 const user_cascade = @import("user_cascade");
 
 const x64 = @import("x64.zig");
 
-const log = cascade.debug.log.scoped(.user_x64);
-
 /// Enter userspace for the first time in the current task.
 pub fn enterUserspace(options: arch.user.EnterUserspaceOptions) noreturn {
-    const per_thread: *x64.user.PerThread = .from(.from(Task.Current.get().task));
+    const per_thread: *x64.user.PerThread = .from(.from(cascade.Task.Current.get().task));
     if (core.is_debug) std.debug.assert(per_thread.extended_state.state == .memory);
 
     const frame: EnterUserspaceFrame = .{
@@ -103,7 +97,7 @@ const EnterUserspaceFrame = extern struct {
 export fn syscallDispatch(syscall_frame: *SyscallFrame) callconv(.c) void {
     x64.instructions.disableSSEUsage();
     defer {
-        const per_thread: *PerThread = .from(.from(Task.Current.get().task));
+        const per_thread: *PerThread = .from(.from(cascade.Task.Current.get().task));
         x64.instructions.enableSSEUsage();
         per_thread.extended_state.load();
     }
@@ -205,7 +199,7 @@ pub fn syscallEntry() callconv(.naked) noreturn {
             \\sysretq
         , .{
             .user_rsp_scratch_offset = @offsetOf(cascade.Task, "arch_specific") + @offsetOf(x64.PerTask, "user_rsp_scratch"),
-            .kernel_stack_pointer_offset = @offsetOf(Task, "stack") + @offsetOf(Task.Stack, "top_stack_pointer"),
+            .kernel_stack_pointer_offset = @offsetOf(cascade.Task, "stack") + @offsetOf(cascade.Task.Stack, "top_stack_pointer"),
         }));
 }
 
@@ -329,7 +323,7 @@ pub const PerThread = struct {
     /// Non-architecture specific creation has already been performed but no initialization.
     ///
     /// This function is called in the `Thread` cache constructor.
-    pub fn createThread(thread: *Thread) cascade.mem.cache.ConstructorError!void {
+    pub fn createThread(thread: *cascade.user.Thread) cascade.mem.cache.ConstructorError!void {
         const per_thread: *x64.user.PerThread = .from(thread);
 
         per_thread.* = .{
@@ -346,7 +340,7 @@ pub const PerThread = struct {
     /// Non-architecture specific destruction has not already been performed.
     ///
     /// This function is called in the `Thread` cache destructor.
-    pub fn destroyThread(thread: *Thread) void {
+    pub fn destroyThread(thread: *cascade.user.Thread) void {
         const per_thread: *x64.user.PerThread = .from(thread);
 
         globals.xsave_area_cache.deallocate(per_thread.extended_state.xsave_area);
@@ -357,12 +351,12 @@ pub const PerThread = struct {
     /// All non-architecture specific initialization has already been performed.
     ///
     /// This function is called in `Thread.internal.create`.
-    pub fn initializeThread(thread: *Thread) void {
+    pub fn initializeThread(thread: *cascade.user.Thread) void {
         const per_thread: *x64.user.PerThread = .from(thread);
         per_thread.extended_state.zero();
     }
 
-    pub inline fn from(thread: *Thread) *PerThread {
+    pub inline fn from(thread: *cascade.user.Thread) *PerThread {
         return &thread.arch_specific;
     }
 

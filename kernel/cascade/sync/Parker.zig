@@ -5,15 +5,13 @@
 
 const std = @import("std");
 
-const arch = @import("arch");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 const core = @import("core");
 
 const Parker = @This();
 
 lock: cascade.sync.TicketSpinLock = .{},
-parked_task: ?*Task,
+parked_task: ?*cascade.Task,
 unpark_attempts: std.atomic.Value(usize) = .init(0),
 
 pub const empty: Parker = .{ .parked_task = null };
@@ -24,7 +22,7 @@ pub const empty: Parker = .{ .parked_task = null };
 ///
 /// It is the caller's responsibility to ensure that the task is not currently running, queued for scheduling,
 /// or blocked.
-pub fn withParkedTask(parked_task: *Task) Parker {
+pub fn withParkedTask(parked_task: *cascade.Task) Parker {
     if (core.is_debug) std.debug.assert(parked_task.state == .ready);
     parked_task.state = .blocked;
     return .{ .parked_task = parked_task };
@@ -34,13 +32,13 @@ pub fn withParkedTask(parked_task: *Task) Parker {
 ///
 /// Spurious wakeups are possible.
 pub fn park(parker: *Parker) void {
-    if (core.is_debug) std.debug.assert(Task.Current.get().task.state == .running);
+    if (core.is_debug) std.debug.assert(cascade.Task.Current.get().task.state == .running);
 
     if (parker.unpark_attempts.swap(0, .acq_rel) != 0) {
         return; // there were some wakeups, they might be spurious
     }
 
-    const scheduler_handle: Task.SchedulerHandle = .get();
+    const scheduler_handle: cascade.Task.SchedulerHandle = .get();
     defer scheduler_handle.unlock();
 
     // recheck for unpark attempts that happened while we were locking the scheduler
@@ -62,7 +60,7 @@ pub fn park(parker: *Parker) void {
     scheduler_handle.dropWithDeferredAction(
         .{
             .action = struct {
-                fn action(old_task: *Task, arg: usize) void {
+                fn action(old_task: *cascade.Task, arg: usize) void {
                     const inner_parker: *Parker = @ptrFromInt(arg);
 
                     old_task.state = .blocked;
@@ -100,7 +98,7 @@ pub fn unpark(parker: *Parker) void {
 
     parked_task.state = .ready;
 
-    const maybe_locked: Task.SchedulerHandle.MaybeLocked = .get();
+    const maybe_locked: cascade.Task.SchedulerHandle.MaybeLocked = .get();
     defer maybe_locked.unlock();
 
     maybe_locked.scheduler_handle.queueTask(parked_task);

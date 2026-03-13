@@ -1,13 +1,6 @@
 // SPDX-License-Identifier: LicenseRef-NON-AI-MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-
-const arch = @import("arch");
-const cascade = @import("cascade");
-const Task = cascade.Task;
-const core = @import("core");
-
 pub const apic = @import("apic.zig");
 pub const config = @import("config.zig");
 pub const Gdt = @import("Gdt.zig").Gdt;

@@ -3,20 +3,15 @@
 
 const std = @import("std");
 
-const arch = @import("arch");
 const cascade = @import("cascade");
-const Task = cascade.Task;
-const Process = cascade.Process;
 const core = @import("core");
-
-const log = cascade.debug.log.scoped(.scheduler);
 
 const Scheduler = @This();
 
 ticket_spin_lock: cascade.sync.TicketSpinLock = .{},
 ready_to_run: core.containers.FIFO = .{},
 
-pub fn queueTask(scheduler: *Scheduler, task: *Task) void {
+pub fn queueTask(scheduler: *Scheduler, task: *cascade.Task) void {
     scheduler.ready_to_run.append(&task.next_task_node);
 }
 
@@ -24,9 +19,9 @@ pub fn isEmpty(scheduler: *const Scheduler) bool {
     return scheduler.ready_to_run.isEmpty();
 }
 
-pub fn getNextTask(scheduler: *Scheduler) ?*Task {
+pub fn getNextTask(scheduler: *Scheduler) ?*cascade.Task {
     const task_node = scheduler.ready_to_run.pop() orelse return null; // no tasks to run
-    const task: *Task = .fromNode(task_node);
+    const task: *cascade.Task = .fromNode(task_node);
 
     if (core.is_debug) {
         std.debug.assert(!task.is_scheduler_task);
@@ -38,18 +33,18 @@ pub fn getNextTask(scheduler: *Scheduler) ?*Task {
 
 pub fn lock(scheduler: *Scheduler) void {
     scheduler.ticket_spin_lock.lock();
-    Task.Current.get().task.scheduler_locked = true;
+    cascade.Task.Current.get().task.scheduler_locked = true;
 }
 
 pub fn unlock(scheduler: *Scheduler) void {
-    Task.Current.get().task.scheduler_locked = false;
+    cascade.Task.Current.get().task.scheduler_locked = false;
     scheduler.ticket_spin_lock.unlock();
 }
 
 /// Asserts that the scheduler lock is held by the current task.
 pub inline fn assertLocked(scheduler: *const Scheduler) void {
     if (core.is_debug) {
-        std.debug.assert(Task.Current.get().task.scheduler_locked);
+        std.debug.assert(cascade.Task.Current.get().task.scheduler_locked);
         std.debug.assert(scheduler.ticket_spin_lock.isLockedByCurrent());
     }
 }
@@ -57,7 +52,7 @@ pub inline fn assertLocked(scheduler: *const Scheduler) void {
 /// Asserts that the scheduler lock is not held by the current task.
 pub inline fn assertNotLocked(scheduler: *const Scheduler) void {
     if (core.is_debug) {
-        std.debug.assert(!Task.Current.get().task.scheduler_locked);
+        std.debug.assert(!cascade.Task.Current.get().task.scheduler_locked);
         std.debug.assert(!scheduler.ticket_spin_lock.isLockedByCurrent());
     }
 }

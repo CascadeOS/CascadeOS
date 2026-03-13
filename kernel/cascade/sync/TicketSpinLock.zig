@@ -9,7 +9,6 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 const core = @import("core");
 
 const TicketSpinLock = @This();
@@ -19,7 +18,7 @@ holding_executor: ?*const cascade.Executor = null,
 
 /// Locks the spinlock.
 pub fn lock(ticket_spin_lock: *TicketSpinLock) void {
-    const current_task: Task.Current = .get();
+    const current_task: cascade.Task.Current = .get();
 
     current_task.incrementInterruptDisable();
 
@@ -45,7 +44,7 @@ pub fn tryLock(ticket_spin_lock: *TicketSpinLock) bool {
     // no need to check if we already have the lock as the below logic will not allow us
     // to acquire it again
 
-    const current_task: Task.Current = .get();
+    const current_task: cascade.Task.Current = .get();
 
     current_task.incrementInterruptDisable();
 
@@ -83,7 +82,7 @@ pub fn tryLock(ticket_spin_lock: *TicketSpinLock) bool {
 ///
 /// Asserts that the current executor is the one that locked the spinlock.
 pub fn unlock(ticket_spin_lock: *TicketSpinLock) void {
-    const current_task: Task.Current = .get();
+    const current_task: cascade.Task.Current = .get();
 
     if (core.is_debug) {
         std.debug.assert(current_task.task.spinlocks_held != 0);
@@ -111,7 +110,7 @@ pub fn poison(ticket_spin_lock: *TicketSpinLock) void {
 
 /// Returns true if the spinlock is locked by the current executor.
 pub fn isLockedByCurrent(ticket_spin_lock: *const TicketSpinLock) bool {
-    const executor = Task.Current.get().task.known_executor orelse return false;
+    const executor = cascade.Task.Current.get().task.known_executor orelse return false;
     return ticket_spin_lock.holding_executor == executor;
 }
 

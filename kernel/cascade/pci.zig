@@ -3,11 +3,8 @@
 
 const std = @import("std");
 
-const arch = @import("arch");
 const core = @import("core");
 const cascade = @import("cascade");
-const Task = cascade.Task;
-const acpi = cascade.acpi;
 
 /// Returns a `Function` representing the PCI function at 'address'.
 pub fn getFunction(address: Address) ?*volatile Function {

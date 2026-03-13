@@ -5,10 +5,9 @@ const std = @import("std");
 
 const arch = @import("arch");
 const bitjuggle = @import("bitjuggle");
-const core = @import("core");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 const MapType = cascade.mem.MapType;
+const core = @import("core");
 
 const x64 = @import("../x64.zig");
 

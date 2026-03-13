@@ -1,13 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-NON-AI-MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-const std = @import("std");
-
-const arch = @import("arch");
-const core = @import("core");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 const acpi = cascade.acpi;
+const core = @import("core");
 
 /// The Fixed ACPI Description Table (FADT) defines various fixed hardware ACPI information vital to an ACPI-compatible
 /// OS, such as the base address for the following hardware registers blocks:

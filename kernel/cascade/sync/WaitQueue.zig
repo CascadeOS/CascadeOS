@@ -3,9 +3,7 @@
 
 const std = @import("std");
 
-const arch = @import("arch");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 const core = @import("core");
 
 const WaitQueue = @This();
@@ -17,7 +15,7 @@ waiting_tasks: core.containers.FIFO = .{},
 /// Does not remove the task from the wait queue.
 ///
 /// Not thread-safe.
-pub fn firstTask(wait_queue: *WaitQueue) ?*Task {
+pub fn firstTask(wait_queue: *WaitQueue) ?*cascade.Task {
     const node = wait_queue.waiting_tasks.first_node orelse return null;
     return .fromNode(node);
 }
@@ -25,7 +23,7 @@ pub fn firstTask(wait_queue: *WaitQueue) ?*Task {
 /// Removes the first task from the wait queue.
 ///
 /// Not thread-safe.
-pub fn popFirst(wait_queue: *WaitQueue) ?*Task {
+pub fn popFirst(wait_queue: *WaitQueue) ?*cascade.Task {
     const node = wait_queue.waiting_tasks.pop() orelse return null;
     return .fromNode(node);
 }
@@ -38,17 +36,17 @@ pub fn wakeOne(
     spinlock: *const cascade.sync.TicketSpinLock,
 ) void {
     if (core.is_debug) {
-        std.debug.assert(Task.Current.get().task.interrupt_disable_count != 0);
+        std.debug.assert(cascade.Task.Current.get().task.interrupt_disable_count != 0);
         std.debug.assert(spinlock.isLockedByCurrent());
     }
 
     const task_to_wake_node = wait_queue.waiting_tasks.pop() orelse return;
-    const task_to_wake: *Task = .fromNode(task_to_wake_node);
+    const task_to_wake: *cascade.Task = .fromNode(task_to_wake_node);
 
     if (core.is_debug) std.debug.assert(task_to_wake.state == .blocked);
     task_to_wake.state = .ready;
 
-    const maybe_locked: Task.SchedulerHandle.MaybeLocked = .get();
+    const maybe_locked: cascade.Task.SchedulerHandle.MaybeLocked = .get();
     defer maybe_locked.unlock();
 
     maybe_locked.scheduler_handle.queueTask(task_to_wake);
@@ -63,7 +61,7 @@ pub fn wait(
     wait_queue: *WaitQueue,
     spinlock: *cascade.sync.TicketSpinLock,
 ) void {
-    const current_task: Task.Current = .get();
+    const current_task: cascade.Task.Current = .get();
 
     if (core.is_debug) {
         std.debug.assert(current_task.task.interrupt_disable_count != 0);
@@ -72,13 +70,13 @@ pub fn wait(
 
     wait_queue.waiting_tasks.append(&current_task.task.next_task_node);
 
-    const scheduler_handle: Task.SchedulerHandle = .get();
+    const scheduler_handle: cascade.Task.SchedulerHandle = .get();
     defer scheduler_handle.unlock();
 
     scheduler_handle.dropWithDeferredAction(
         .{
             .action = struct {
-                fn action(old_task: *Task, arg: usize) void {
+                fn action(old_task: *cascade.Task, arg: usize) void {
                     const inner_spinlock: *cascade.sync.TicketSpinLock = @ptrFromInt(arg);
 
                     old_task.state = .blocked;

@@ -5,8 +5,6 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
-const Task = cascade.Task;
-const Process = cascade.user.Process;
 const core = @import("core");
 
 pub const AddressSpace = @import("address_space/AddressSpace.zig");
@@ -17,8 +15,6 @@ pub const KernelMemoryRegion = @import("KernelMemoryRegion.zig");
 pub const MapType = @import("MapType.zig");
 pub const PhysicalPage = @import("PhysicalPage.zig");
 pub const resource_arena = @import("resource_arena.zig");
-
-const log = cascade.debug.log.scoped(.mem);
 
 pub inline fn kernelRegions() *KernelMemoryRegion.List {
     return &globals.regions;
@@ -287,7 +283,7 @@ pub fn onPageFault(
     page_fault_details: PageFaultDetails,
     interrupt_frame: arch.interrupts.InterruptFrame,
 ) void {
-    const current_task: Task.Current = .get();
+    const current_task: cascade.Task.Current = .get();
     current_task.decrementInterruptDisable();
 
     switch (page_fault_details.faulting_context) {
@@ -308,8 +304,8 @@ fn onKernelPageFault(
 ) void {
     switch (page_fault_details.faulting_address.getType()) {
         .user => {
-            const process: *Process = blk: {
-                const current_task: Task.Current = .get();
+            const process: *cascade.user.Process = blk: {
+                const current_task: cascade.Task.Current = .get();
 
                 break :blk switch (current_task.task.type) {
                     .kernel => {

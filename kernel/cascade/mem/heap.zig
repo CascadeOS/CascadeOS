@@ -7,7 +7,6 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 const resource_arena = cascade.mem.resource_arena;
 const core = @import("core");
 

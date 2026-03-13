@@ -11,11 +11,9 @@
 
 const std = @import("std");
 
-const arch = @import("arch");
-const core = @import("core");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 const acpi = cascade.acpi;
+const core = @import("core");
 
 /// Set up early access to the table subsystem. What this means is:
 /// - uacpi_table_find() and similar API becomes usable before the call to

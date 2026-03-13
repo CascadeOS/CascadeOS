@@ -5,9 +5,7 @@ const std = @import("std");
 
 const arch = @import("arch");
 const boot = @import("boot");
-const core = @import("core");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 
 pub const Output = @import("output/Output.zig");
 
@@ -71,7 +69,7 @@ pub fn initStage1() !noreturn {
     try arch.interrupts.init.initializeInterruptRouting();
 
     log.debug("initializing tasks", .{});
-    try Task.init.initializeTasks();
+    try cascade.Task.init.initializeTasks();
 
     log.debug("initializing user processes and threads", .{});
     try cascade.user.init.initialize();
@@ -147,14 +145,14 @@ fn initStage3() !noreturn {
 
         log.debug("creating and scheduling init stage 4 task", .{});
         {
-            const init_stage4_task: *Task = try .createKernelTask(
+            const init_stage4_task: *cascade.Task = try .createKernelTask(
                 .{
                     .name = try .fromSlice("init stage 4"),
                     .entry = .prepare(initStage4, .{}),
                 },
             );
 
-            const scheduler_handle: Task.SchedulerHandle = .get();
+            const scheduler_handle: cascade.Task.SchedulerHandle = .get();
             defer scheduler_handle.unlock();
 
             scheduler_handle.queueTask(init_stage4_task);
@@ -163,7 +161,7 @@ fn initStage3() !noreturn {
         static.stage3_barrier.complete();
     }
 
-    const scheduler_handle: Task.SchedulerHandle = .get();
+    const scheduler_handle: cascade.Task.SchedulerHandle = .get();
     scheduler_handle.drop();
     unreachable;
 }
@@ -186,7 +184,7 @@ fn initStage4() !void {
         .{ .entry = .prepare(loadHelloWorld, .{}) },
     );
 
-    const scheduler_handle: Task.SchedulerHandle = .get();
+    const scheduler_handle: cascade.Task.SchedulerHandle = .get();
     defer scheduler_handle.unlock();
     scheduler_handle.queueTask(&hello_world_main_thread.task);
 
@@ -198,7 +196,7 @@ fn initStage4() !void {
 
 fn constructAndLoadBootstrapExecutorAndTask() !void {
     const static = struct {
-        var bootstrap_init_task: Task = undefined;
+        var bootstrap_init_task: cascade.Task = undefined;
         var bootstrap_executor: cascade.Executor = .{
             .id = @enumFromInt(0),
             ._current_task = undefined, // set by `setCurrentTask`
@@ -207,7 +205,7 @@ fn constructAndLoadBootstrapExecutorAndTask() !void {
         };
     };
 
-    try Task.init.initializeBootstrapInitTask(
+    try cascade.Task.init.initializeBootstrapInitTask(
         &static.bootstrap_init_task,
         &static.bootstrap_executor,
     );
@@ -254,8 +252,8 @@ fn createExecutors() !struct { []cascade.Executor, *cascade.Executor } {
             .scheduler_task = undefined, // set below by `Task.init.initializeSchedulerTask`
         };
 
-        try Task.init.createAndAssignInitTask(executor);
-        try Task.init.initializeSchedulerTask(&executor.scheduler_task, executor);
+        try cascade.Task.init.createAndAssignInitTask(executor);
+        try cascade.Task.init.initializeSchedulerTask(&executor.scheduler_task, executor);
 
         arch.init.prepareExecutor(
             executor,
@@ -327,7 +325,7 @@ const StageBarrier = struct {
 fn loadHelloWorld() !void {
     const hello_world_elf = @embedFile("hello_world");
 
-    const current_task: Task.Current = .get();
+    const current_task: cascade.Task.Current = .get();
     const process: *cascade.user.Process = .from(current_task.task);
 
     const header = try cascade.user.elf.Header.parse(hello_world_elf);

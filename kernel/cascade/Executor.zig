@@ -5,7 +5,6 @@ const std = @import("std");
 
 const arch = @import("arch");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 const core = @import("core");
 
 const Executor = @This();
@@ -15,10 +14,10 @@ const Executor = @This();
 /// As no executor hotswapping is supported this is guaranteed to be the index of this executor in `globals.executors`.
 id: Id,
 
-_current_task: *Task,
+_current_task: *cascade.Task,
 
 /// Used as the current task during idle and also during the transition between tasks when executing a deferred action.
-scheduler_task: Task,
+scheduler_task: cascade.Task,
 
 arch_specific: arch.PerExecutor,
 
@@ -31,7 +30,7 @@ interrupt_source_panic_buffer: [
 ]u8 = undefined,
 const interrupt_source_panic_truncated = " (msg truncated)";
 
-pub fn setCurrentTask(executor: *Executor, task: *Task) void {
+pub fn setCurrentTask(executor: *Executor, task: *cascade.Task) void {
     executor._current_task = task;
     arch.scheduling.setCurrentTask(task);
 }

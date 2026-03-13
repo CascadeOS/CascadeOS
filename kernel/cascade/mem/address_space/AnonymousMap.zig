@@ -17,10 +17,8 @@
 const std = @import("std");
 
 const arch = @import("arch");
-const core = @import("core");
 const cascade = @import("cascade");
-const Task = cascade.Task;
-const Cache = cascade.mem.cache.Cache;
+const core = @import("core");
 
 const AddressSpace = @import("AddressSpace.zig");
 const AnonymousPage = @import("AnonymousPage.zig");
@@ -336,7 +334,7 @@ pub inline fn format(_: *const *AnonymousMap, _: *std.Io.Writer) !void {
 
 const globals = struct {
     /// Initialized during `init.initializeCaches`.
-    var anonymous_map_cache: Cache(AnonymousMap, null) = undefined;
+    var anonymous_map_cache: cascade.mem.cache.Cache(AnonymousMap, null) = undefined;
 };
 
 pub const init = struct {

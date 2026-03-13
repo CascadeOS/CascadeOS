@@ -4,14 +4,15 @@
 
 //! A helper type for loading an ELF file and collecting its DWARF debug information, unwind
 //! information, and symbol table.
-const ElfFile = @This();
 
 const std = @import("std");
-const Io = std.Io;
 const Endian = std.builtin.Endian;
 const Dwarf = std.debug.Dwarf;
 const Allocator = std.mem.Allocator;
 const elf = std.elf;
+const builtin = @import("builtin");
+
+const ElfFile = @This();
 
 is_64: bool,
 endian: Endian,
@@ -200,7 +201,7 @@ pub fn searchSymtab(ef: *ElfFile, gpa: Allocator, vaddr: u64) error{
 
     if (symtab.bytes.len % symtab.entry_size != 0) return error.BadSymtab;
 
-    const swap_endian = ef.endian != @import("builtin").cpu.arch.endian();
+    const swap_endian = ef.endian != builtin.cpu.arch.endian();
 
     switch (ef.is_64) {
         inline true, false => |is_64| {
@@ -251,7 +252,7 @@ fn buildSymbolSearchTable(gpa: Allocator, endian: Endian, comptime Sym: type, sy
     var result: std.ArrayList(usize) = .empty;
     defer result.deinit(gpa);
 
-    const swap_endian = endian != @import("builtin").cpu.arch.endian();
+    const swap_endian = endian != builtin.cpu.arch.endian();
 
     for (symbols, 0..) |sym_orig, sym_index| {
         var sym = sym_orig;

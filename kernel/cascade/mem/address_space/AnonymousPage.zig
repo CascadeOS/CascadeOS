@@ -16,14 +16,10 @@
 
 const std = @import("std");
 
-const arch = @import("arch");
 const cascade = @import("cascade");
-const Task = cascade.Task;
 const Cache = cascade.mem.cache.Cache;
 const PhysicalPage = cascade.mem.PhysicalPage;
 const core = @import("core");
-
-const log = cascade.debug.log.scoped(.address_space);
 
 const AnonymousPage = @This();
 
@@ -106,7 +102,7 @@ pub const init = struct {
     const init_log = cascade.debug.log.scoped(.anonymous_page_init);
 
     pub fn initializeCaches() !void {
-        log.debug("initializing anonymous page cache", .{});
+        init_log.debug("initializing anonymous page cache", .{});
 
         globals.anonymous_page_cache.init(.{
             .name = try .fromSlice("anonymous page"),

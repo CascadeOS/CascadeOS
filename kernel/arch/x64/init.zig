@@ -6,9 +6,7 @@ const std = @import("std");
 const arch = @import("arch");
 const SerialPort = arch.init.InitOutput.Output.uart.IoPort16550;
 const cascade = @import("cascade");
-const Task = cascade.Task;
 const AcpiTable = cascade.acpi.init.AcpiTable;
-const core = @import("core");
 
 const x64 = @import("x64.zig");
 
@@ -90,16 +88,16 @@ pub fn prepareExecutor(executor: *cascade.Executor, architecture_processor_id: u
     prepareExecutorShared(
         executor,
         @intCast(architecture_processor_id),
-        Task.init.earlyCreateStack() catch @panic("failed to allocate double fault stack"),
-        Task.init.earlyCreateStack() catch @panic("failed to allocate NMI stack"),
+        cascade.Task.init.earlyCreateStack() catch @panic("failed to allocate double fault stack"),
+        cascade.Task.init.earlyCreateStack() catch @panic("failed to allocate NMI stack"),
     );
 }
 
 fn prepareExecutorShared(
     executor: *cascade.Executor,
     apic_id: u32,
-    double_fault_stack: Task.Stack,
-    non_maskable_interrupt_stack: Task.Stack,
+    double_fault_stack: cascade.Task.Stack,
+    non_maskable_interrupt_stack: cascade.Task.Stack,
 ) void {
     const per_executor: *x64.PerExecutor = .from(executor);
 
@@ -308,7 +306,7 @@ fn disablePic() void {
 ///  - By every executor after `captureSystemInformation` has been called
 pub fn configurePerExecutorSystemFeatures() void {
     if (x64.info.cpu_id.rdtscp) {
-        x64.registers.IA32_TSC_AUX.write(@intFromEnum(Task.Current.get().knownExecutor().id));
+        x64.registers.IA32_TSC_AUX.write(@intFromEnum(cascade.Task.Current.get().knownExecutor().id));
     }
 
     // TODO: be more thorough with setting up these registers
