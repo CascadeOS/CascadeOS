@@ -1335,11 +1335,8 @@ const NUMBER_OF_FREELISTS = @bitSizeOf(usize);
 const UsizeShiftInt: type = std.math.Log2Int(usize);
 
 const TAGS_PER_SPAN_CREATE = 2;
-const TAGS_PER_EXACT_ALLOCATION = 0;
 const TAGS_PER_PARTIAL_ALLOCATION = 1;
 const MAX_TAGS_PER_ALLOCATION = TAGS_PER_SPAN_CREATE + TAGS_PER_PARTIAL_ALLOCATION;
-
-const TAGS_PER_PAGE = arch.paging.standard_page_size.value / @sizeOf(BoundaryTag);
 
 const globals = struct {
     /// Initialized during `init.initializeCaches`.
