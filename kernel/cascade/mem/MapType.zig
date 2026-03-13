@@ -30,7 +30,7 @@ pub const Protection = enum(u8) {
 
     /// Execute only.
     ///
-    /// Reads may still be possible if the architecture does not support execute only.
+    /// Reads may be possible if the architecture does not support execute only.
     execute = 2,
 
     /// Read and write.
