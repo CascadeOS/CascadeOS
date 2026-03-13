@@ -312,55 +312,6 @@ const Section = struct {
     const Array = std.enums.EnumArray(Section.Id, ?Section);
 };
 
-fn loadSeparateDebugFile(
-    arena: Allocator,
-    io: Io,
-    main_loaded: *LoadInnerResult,
-    opt_crc: ?u32,
-    comptime fmt: []const u8,
-    args: anytype,
-) Allocator.Error!?[]align(std.heap.page_size_min) const u8 {
-    const path = try std.fmt.allocPrint(arena, fmt, args);
-    const elf_file = Io.Dir.cwd().openFile(io, path, .{}) catch return null;
-    defer elf_file.close(io);
-
-    const result = loadInner(arena, io, elf_file, opt_crc) catch |err| switch (err) {
-        error.OutOfMemory => |e| return e,
-        error.CrcMismatch => return null,
-        else => return null,
-    };
-    errdefer comptime unreachable;
-
-    const have_debug_sections = inline for (@as([]const []const u8, &.{
-        "debug_info",
-        "debug_abbrev",
-        "debug_str",
-        "debug_line",
-    })) |name| {
-        const s = @field(Section.Id, name);
-        if (main_loaded.sections.get(s) == null and result.sections.get(s) == null) {
-            break false;
-        }
-    } else true;
-
-    if (result.is_64 != main_loaded.is_64 or
-        result.endian != main_loaded.endian or
-        !have_debug_sections)
-    {
-        std.posix.munmap(result.mapped_mem);
-        return null;
-    }
-
-    inline for (@typeInfo(Dwarf.Section.Id).@"enum".fields) |f| {
-        const id = @field(Section.Id, f.name);
-        if (main_loaded.sections.get(id) == null) {
-            main_loaded.sections.set(id, result.sections.get(id));
-        }
-    }
-
-    return result.mapped_mem;
-}
-
 const LoadInnerResult = struct {
     is_64: bool,
     endian: Endian,
