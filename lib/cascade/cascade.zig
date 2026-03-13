@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-NON-AI-MIT
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 
-pub const entry = @import("entry.zig");
+pub const exportEntry = @import("entry.zig").exportEntry;
 pub const Syscall = @import("syscall.zig").Syscall;
 
 pub fn exitThread() noreturn {

@@ -3,11 +3,12 @@
 
 const cascade = @import("cascade");
 
-pub const _start = cascade.entry._cascade_entry;
-comptime {
-    cascade.entry.exportEntry();
-}
-
 pub fn main() void {
     // TODO: actually print "hello world"...
+}
+
+// TODO: we only want this decl when building for cascade, this is not currently possible - needs seperate root files atm
+pub const _start = void;
+comptime {
+    cascade.exportEntry();
 }

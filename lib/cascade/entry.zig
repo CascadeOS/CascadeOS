@@ -7,28 +7,19 @@ const root = @import("root");
 
 const cascade = @import("cascade");
 
-/// The entry function must be exported and aliased in the root file:
+/// Exports the cascade entry point, must be called at comptime, a pub `_start` decl must also be declared in the root file:
 ///
 /// ```zig
-/// pub const _start = cascade.entry._cascade_entry;
+/// pub const _start = void;
 /// comptime {
-///     cascade.entry.exportEntry();
+///     cascade.exportEntry();
 /// }
 /// ```
 pub fn exportEntry() void {
-    comptime if (@import("cascade_flag").is_cascade)
-        @export(&_cascade_entry, .{ .name = "_start" });
+    comptime if (@import("cascade_flag").is_cascade) @export(&_cascade_entry, .{ .name = "_start" });
 }
 
-/// This function must be exported and aliased in the root file:
-///
-/// ```zig
-/// pub const _start = cascade.entry._cascade_entry;
-/// comptime {
-///     cascade.entry.exportEntry();
-/// }
-/// ```
-pub fn _cascade_entry() callconv(.naked) noreturn {
+fn _cascade_entry() callconv(.naked) noreturn {
     if (builtin.unwind_tables != .none or !builtin.strip_debug_info) {
         switch (builtin.cpu.arch) {
             .aarch64 => asm volatile (".cfi_undefined lr"),
