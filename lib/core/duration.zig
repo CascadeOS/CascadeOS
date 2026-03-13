@@ -103,17 +103,6 @@ pub const Duration = extern struct {
         duration.value /= value;
     }
 
-    // Must be kept in descending order due to the logic in `print`
-    const unit_table = .{
-        .{ .value = @intFromEnum(Unit.day), .name = "d" },
-        .{ .value = @intFromEnum(Unit.hour), .name = "h" },
-        .{ .value = @intFromEnum(Unit.minute), .name = "m" },
-        .{ .value = @intFromEnum(Unit.second), .name = "s" },
-        .{ .value = @intFromEnum(Unit.millisecond), .name = "ms" },
-        .{ .value = @intFromEnum(Unit.microsecond), .name = "us" },
-        .{ .value = @intFromEnum(Unit.nanosecond), .name = "ns" },
-    };
-
     pub fn print(duration: Duration, writer: *std.Io.Writer, indent: usize) !void {
         _ = indent;
 
