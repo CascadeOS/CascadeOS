@@ -734,8 +734,8 @@ pub const init = struct {
         init_log.debug("initializing caches", .{});
         try cache.init.initializeCaches();
         try resource_arena.init.initializeCaches();
-        try AddressSpace.AnonymousMap.init.initializeCaches();
-        try AddressSpace.AnonymousPage.init.initializeCaches();
+        try AddressSpace.AnonMap.init.initializeCaches();
+        try AddressSpace.AnonPage.init.initializeCaches();
         try AddressSpace.Entry.init.initializeCaches();
 
         init_log.debug("initializing kernel and special heap", .{});

@@ -22,8 +22,10 @@ const Cache = cascade.mem.cache.Cache;
 const Protection = cascade.mem.MapType.Protection;
 const core = @import("core");
 
-const AnonymousMap = @import("AnonymousMap.zig");
+const AnonMap = @import("AnonMap.zig");
 const Object = @import("Object.zig");
+
+const log = cascade.debug.log.scoped(.address_space);
 
 const Entry = @This();
 
@@ -32,7 +34,7 @@ range: cascade.VirtualRange,
 protection: Protection,
 max_protection: Protection,
 
-anonymous_map_reference: AnonymousMap.Reference,
+anonymous_map_reference: AnonMap.Reference,
 object_reference: Object.Reference,
 
 /// If `true` all writes must occur in anonymous memory.
@@ -367,10 +369,8 @@ const globals = struct {
 };
 
 pub const init = struct {
-    const init_log = cascade.debug.log.scoped(.address_space_entry_init);
-
     pub fn initializeCaches() !void {
-        init_log.debug("initializing address space entry cache", .{});
+        log.debug("initializing address space entry cache", .{});
 
         globals.entry_cache.init(.{
             .name = try .fromSlice("address space entry"),

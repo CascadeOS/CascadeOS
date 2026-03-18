@@ -21,13 +21,13 @@ const cascade = @import("cascade");
 const core = @import("core");
 
 const AddressSpace = @import("AddressSpace.zig");
-const AnonymousPage = @import("AnonymousPage.zig");
+const AnonPage = @import("AnonPage.zig");
 const Entry = @import("Entry.zig");
 
-const AnonymousPageChunkMap = @import("chunk_map.zig").ChunkMap(AnonymousPage);
+const AnonPageChunkMap = @import("chunk_map.zig").ChunkMap(AnonPage);
 const log = cascade.debug.log.scoped(.address_space);
 
-const AnonymousMap = @This();
+const AnonMap = @This();
 
 lock: cascade.sync.RwLock = .{},
 
@@ -37,12 +37,12 @@ number_of_pages: PageCount,
 
 pages_in_use: PageCount = .zero,
 
-anonymous_page_chunks: AnonymousPageChunkMap = .{},
+anonymous_page_chunks: AnonPageChunkMap = .{},
 
 // /// If `true` this anonymous map is shared between multiple entries.
 // shared: bool, // TODO: properly support shared anonymous maps
 
-pub fn create(size: core.Size) error{OutOfMemory}!*AnonymousMap {
+pub fn create(size: core.Size) error{OutOfMemory}!*AnonMap {
     if (core.is_debug) std.debug.assert(size.aligned(arch.paging.standard_page_size_alignment));
 
     const anonymous_map = globals.anonymous_map_cache.allocate() catch return error.OutOfMemory;
@@ -55,7 +55,7 @@ pub fn create(size: core.Size) error{OutOfMemory}!*AnonymousMap {
 /// Increment the reference count.
 ///
 /// When called a write lock must be held.
-pub fn incrementReferenceCount(anonymous_map: *AnonymousMap) void {
+pub fn incrementReferenceCount(anonymous_map: *AnonMap) void {
     if (core.is_debug) {
         std.debug.assert(anonymous_map.reference_count != 0);
         std.debug.assert(anonymous_map.lock.isWriteLocked());
@@ -67,7 +67,7 @@ pub fn incrementReferenceCount(anonymous_map: *AnonymousMap) void {
 /// Decrement the reference count.
 ///
 /// When called a write lock must be held, upon return the lock is unlocked.
-pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, deallocate_page_list: *cascade.mem.PhysicalPage.List) void {
+pub fn decrementReferenceCount(anonymous_map: *AnonMap, deallocate_page_list: *cascade.mem.PhysicalPage.List) void {
     if (core.is_debug) {
         std.debug.assert(anonymous_map.reference_count != 0);
         std.debug.assert(anonymous_map.lock.isWriteLocked());
@@ -94,7 +94,7 @@ pub fn decrementReferenceCount(anonymous_map: *AnonymousMap, deallocate_page_lis
 ///
 /// Called `amap_wipeout` in OpenBSD uvm.
 fn destroy(
-    anonymous_map: *AnonymousMap,
+    anonymous_map: *AnonMap,
     deallocate_page_list: *cascade.mem.PhysicalPage.List,
 ) void {
     if (core.is_debug) {
@@ -147,11 +147,11 @@ pub fn copy(
         return;
     }
 
-    @panic("NOT IMPLEMENTED - AnonymousMap.copy"); // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_amap.c#L576
+    @panic("NOT IMPLEMENTED - AnonMap.copy"); // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_amap.c#L576
 }
 
 pub const Reference = struct {
-    anonymous_map: ?*AnonymousMap,
+    anonymous_map: ?*AnonMap,
     start_offset: core.Size,
 
     /// Lookup up a page in the referenced anonymous map for the given entry and faulting address.
@@ -162,7 +162,7 @@ pub const Reference = struct {
     /// The anonymous map must be locked by the caller. (read or write)
     ///
     /// Called `amap_lookups` in OpenBSD uvm, but this implementation only returns a single page.
-    pub fn lookup(reference: Reference, entry: *const Entry, faulting_address: cascade.VirtualAddress) ?*AnonymousPage {
+    pub fn lookup(reference: Reference, entry: *const Entry, faulting_address: cascade.VirtualAddress) ?*AnonPage {
         if (core.is_debug) {
             std.debug.assert(reference.anonymous_map != null);
             std.debug.assert(reference.start_offset.aligned(arch.paging.standard_page_size_alignment));
@@ -194,7 +194,7 @@ pub const Reference = struct {
         reference: Reference,
         entry: *const Entry,
         faulting_address: cascade.VirtualAddress,
-        anonymous_page: *AnonymousPage,
+        anonymous_page: *AnonPage,
         operation: AddOperation,
     ) error{OutOfMemory}!void {
         if (core.is_debug) {
@@ -215,7 +215,7 @@ pub const Reference = struct {
         const chunk = anonymous_map.anonymous_page_chunks.ensureChunk(target_index) catch
             return error.OutOfMemory;
 
-        const chunk_offset = AnonymousPageChunkMap.chunkOffset(target_index);
+        const chunk_offset = AnonPageChunkMap.chunkOffset(target_index);
 
         switch (operation) {
             .add => {
@@ -248,7 +248,7 @@ pub const Reference = struct {
         const new_indent = indent + 2;
 
         if (anonymous_map_reference.anonymous_map) |anonymous_map| {
-            try writer.writeAll("AnonymousMap.Reference{\n");
+            try writer.writeAll("AnonMap.Reference{\n");
 
             try writer.splatByteAll(' ', new_indent);
             try writer.print("start_offset: {f}\n", .{anonymous_map_reference.start_offset});
@@ -263,7 +263,7 @@ pub const Reference = struct {
             try writer.splatByteAll(' ', indent);
             try writer.writeAll("}");
         } else {
-            try writer.writeAll("AnonymousMap.Reference{ none }");
+            try writer.writeAll("AnonMap.Reference{ none }");
         }
     }
 
@@ -304,7 +304,7 @@ pub const PageCount = extern struct {
 ///
 /// Locks the spinlock.
 pub fn print(
-    anonymous_map: *AnonymousMap,
+    anonymous_map: *AnonMap,
     writer: *std.Io.Writer,
     indent: usize,
 ) !void {
@@ -313,7 +313,7 @@ pub fn print(
     anonymous_map.lock.readLock();
     defer anonymous_map.lock.readUnlock();
 
-    try writer.writeAll("AnonymousMap{\n");
+    try writer.writeAll("AnonMap{\n");
 
     try writer.splatByteAll(' ', new_indent);
     try writer.print("reference_count: {d}\n", .{anonymous_map.reference_count});
@@ -328,20 +328,18 @@ pub fn print(
     try writer.writeAll("}");
 }
 
-pub inline fn format(_: *const *AnonymousMap, _: *std.Io.Writer) !void {
-    @compileError("use `AnonymousMap.print` instead");
+pub inline fn format(_: *const *AnonMap, _: *std.Io.Writer) !void {
+    @compileError("use `AnonMap.print` instead");
 }
 
 const globals = struct {
     /// Initialized during `init.initializeCaches`.
-    var anonymous_map_cache: cascade.mem.cache.Cache(AnonymousMap, null) = undefined;
+    var anonymous_map_cache: cascade.mem.cache.Cache(AnonMap, null) = undefined;
 };
 
 pub const init = struct {
-    const init_log = cascade.debug.log.scoped(.anonymous_map_init);
-
     pub fn initializeCaches() !void {
-        init_log.debug("initializing anonymous map cache", .{});
+        log.debug("initializing anonymous map cache", .{});
 
         globals.anonymous_map_cache.init(.{
             .name = try .fromSlice("anonymous map"),

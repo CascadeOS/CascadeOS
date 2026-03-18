@@ -21,7 +21,9 @@ const Cache = cascade.mem.cache.Cache;
 const PhysicalPage = cascade.mem.PhysicalPage;
 const core = @import("core");
 
-const AnonymousPage = @This();
+const log = cascade.debug.log.scoped(.address_space);
+
+const AnonPage = @This();
 
 lock: cascade.sync.RwLock = .{},
 
@@ -29,7 +31,7 @@ reference_count: u32 = 1,
 
 physical_page: PhysicalPage.Index,
 
-pub fn create(physical_page: PhysicalPage.Index) !*AnonymousPage {
+pub fn create(physical_page: PhysicalPage.Index) !*AnonPage {
     const anonymous_page = try globals.anonymous_page_cache.allocate();
     anonymous_page.* = .{
         .physical_page = physical_page,
@@ -40,7 +42,7 @@ pub fn create(physical_page: PhysicalPage.Index) !*AnonymousPage {
 /// Increment the reference count.
 ///
 /// When called the lock must be held.
-pub fn incrementReferenceCount(anonymous_page: *AnonymousPage) void {
+pub fn incrementReferenceCount(anonymous_page: *AnonPage) void {
     if (core.is_debug) {
         std.debug.assert(anonymous_page.reference_count != 0);
         std.debug.assert(anonymous_page.lock.isLockedByCurrent());
@@ -53,7 +55,7 @@ pub fn incrementReferenceCount(anonymous_page: *AnonymousPage) void {
 ///
 /// When called the a write lock must be held, upon return the lock is unlocked.
 pub fn decrementReferenceCount(
-    anonymous_page: *AnonymousPage,
+    anonymous_page: *AnonPage,
     deallocate_page_list: *cascade.mem.PhysicalPage.List,
 ) void {
     if (core.is_debug) {
@@ -79,7 +81,7 @@ pub fn decrementReferenceCount(
 ///
 /// Called `uvm_anfree` in OpenBSD uvm.
 fn destroy(
-    anonymous_page: *AnonymousPage,
+    anonymous_page: *AnonPage,
     deallocate_page_list: *cascade.mem.PhysicalPage.List,
 ) void {
     if (core.is_debug) {
@@ -95,14 +97,12 @@ fn destroy(
 
 const globals = struct {
     /// Initialized during `init.initializeCaches`.
-    var anonymous_page_cache: Cache(AnonymousPage, null) = undefined;
+    var anonymous_page_cache: Cache(AnonPage, null) = undefined;
 };
 
 pub const init = struct {
-    const init_log = cascade.debug.log.scoped(.anonymous_page_init);
-
     pub fn initializeCaches() !void {
-        init_log.debug("initializing anonymous page cache", .{});
+        log.debug("initializing anonymous page cache", .{});
 
         globals.anonymous_page_cache.init(.{
             .name = try .fromSlice("anonymous page"),

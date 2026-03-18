@@ -21,8 +21,8 @@ const cascade = @import("cascade");
 const Protection = cascade.mem.MapType.Protection;
 const core = @import("core");
 
-pub const AnonymousMap = @import("AnonymousMap.zig");
-pub const AnonymousPage = @import("AnonymousPage.zig");
+pub const AnonMap = @import("AnonMap.zig");
+pub const AnonPage = @import("AnonPage.zig");
 pub const Entry = @import("Entry.zig");
 const FaultInfo = @import("FaultInfo.zig");
 const Object = @import("Object.zig");
@@ -1114,7 +1114,7 @@ pub fn handlePageFault(
     };
 
     while (true) {
-        var opt_anonymous_page: ?*AnonymousPage = null;
+        var opt_anonymous_page: ?*AnonPage = null;
 
         fault_info.faultCheck(
             &opt_anonymous_page,

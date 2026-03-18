@@ -22,8 +22,8 @@ const PhysicalPage = cascade.mem.PhysicalPage;
 const core = @import("core");
 
 const AddressSpace = @import("AddressSpace.zig");
-const AnonymousMap = @import("AnonymousMap.zig");
-const AnonymousPage = @import("AnonymousPage.zig");
+const AnonMap = @import("AnonMap.zig");
+const AnonPage = @import("AnonPage.zig");
 const Entry = @import("Entry.zig");
 const Object = @import("Object.zig");
 
@@ -66,12 +66,12 @@ const FaultCheckError =
 ///  - Lookup the entry that containing the faulting address.
 ///  - Check the protection of the entry.
 ///  - Handle the `needs_copy` flag of the entry.
-///  - Lookup anons (if AnonymousMap exists).
+///  - Lookup anons (if AnonMap exists).
 ///
 /// Called `uvm_faultcheck` in OpenBSD uvm.
 pub fn faultCheck(
     fault_info: *FaultInfo,
-    anonymous_page: *?*AnonymousPage,
+    anonymous_page: *?*AnonPage,
     fault_type: cascade.mem.PageFaultDetails.FaultType,
 ) FaultCheckError!void {
     _ = fault_type;
@@ -224,7 +224,7 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo) error{ Restart, OutOfMemory
 
     if (core.is_debug) std.debug.assert(object_page != .need_io);
 
-    var anonymous_page: *AnonymousPage = undefined;
+    var anonymous_page: *AnonPage = undefined;
     var physical_page: PhysicalPage.Index = undefined;
 
     if (fault_info.promote_to_anonymous_map) {
@@ -354,7 +354,7 @@ fn faultLookup(fault_info: *FaultInfo, lock_type: core.LockType) bool {
 fn promote(
     fault_info: *FaultInfo,
     object_page: ObjectPage,
-    anonymous_page: **AnonymousPage,
+    anonymous_page: **AnonPage,
     physical_page: *PhysicalPage.Index,
 ) error{ Restart, OutOfMemory }!void {
     log.verbose("promoting to an anonymous page", .{});
@@ -374,7 +374,7 @@ fn promote(
     };
     physical_page.* = allocated_physical_page;
 
-    anonymous_page.* = AnonymousPage.create(allocated_physical_page) catch {
+    anonymous_page.* = AnonPage.create(allocated_physical_page) catch {
         @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L520
         // MUST clean up `page` as well
     };
@@ -410,7 +410,7 @@ fn anonymousMapCopy(fault_info: *FaultInfo) error{ NotMapped, OutOfMemory }!void
 
     if (!fault_info.entry.needs_copy) return; // someone else already copied the anonymous map
 
-    try AnonymousMap.copy(
+    try AnonMap.copy(
         fault_info.address_space,
         fault_info.entry,
         fault_info.faulting_address,
@@ -426,7 +426,7 @@ fn anonymousMapCopy(fault_info: *FaultInfo) error{ NotMapped, OutOfMemory }!void
 /// Called `uvm_fault_upper_upgrade` in OpenBSD uvm.
 fn faultAnonymousMapLockUpgrade(
     fault_info: *FaultInfo,
-    anonymous_map: *AnonymousMap,
+    anonymous_map: *AnonMap,
 ) bool {
     if (core.is_debug) {
         std.debug.assert(switch (fault_info.anonymous_map_lock_type) {
@@ -463,7 +463,7 @@ fn faultAnonymousMapLockUpgrade(
 /// Called `uvmfault_unlockall` in OpenBSD uvm.
 fn unlockAll(
     fault_info: *FaultInfo,
-    opt_anonymous_map: ?*AnonymousMap,
+    opt_anonymous_map: ?*AnonMap,
     opt_object: ?*Object,
 ) void {
     if (opt_object) |object| {
