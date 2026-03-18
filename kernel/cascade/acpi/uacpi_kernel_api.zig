@@ -10,7 +10,7 @@ const core = @import("core");
 
 const uacpi = @import("uacpi.zig");
 
-const log = cascade.debug.log.scoped(.uacpi_kernel_api);
+const log = cascade.debug.log.scoped(.uacpi_api);
 
 /// Returns the PHYSICAL address of the RSDP structure via *out_rsdp_address.
 export fn uacpi_kernel_get_rsdp(out_rsdp_address: *cascade.PhysicalAddress) uacpi.Status {
