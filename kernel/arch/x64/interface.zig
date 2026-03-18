@@ -50,16 +50,7 @@ pub const functions: arch.Functions = .{
             }
         }.loadPageTable,
 
-        .copyTopLevelIntoPageTable = struct {
-            fn copyTopLevelIntoPageTable(
-                page_table: *x64.paging.PageTable,
-                target_page_table: *x64.paging.PageTable,
-            ) void {
-                if (core.is_debug) std.debug.assert(page_table != target_page_table);
-                @memcpy(&target_page_table.entries, &page_table.entries);
-            }
-        }.copyTopLevelIntoPageTable,
-
+        .copyTopLevelIntoPageTable = x64.paging.PageTable.copyTopLevelIntoPageTable,
         .mapSinglePage = x64.paging.PageTable.map4KiB,
         .unmap = x64.paging.PageTable.unmap,
         .changeProtection = x64.paging.PageTable.changeProtection,

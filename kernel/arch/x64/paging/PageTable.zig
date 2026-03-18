@@ -13,7 +13,7 @@ const x64 = @import("../x64.zig");
 
 /// A page table for x64.
 pub const PageTable = extern struct {
-    entries: [number_of_entries]Entry.Raw align(small_page_size.value),
+    _entries: [number_of_entries]Entry.Raw align(small_page_size.value),
 
     pub const number_of_entries = 512;
 
@@ -35,17 +35,25 @@ pub const PageTable = extern struct {
 
     pub const half_address_space_size: core.Size = .from(128, .tib);
 
+    pub inline fn entries(page_table: *PageTable) []volatile Entry.Raw {
+        return &page_table._entries;
+    }
+
+    pub inline fn entriesConst(page_table: *const PageTable) []const volatile Entry.Raw {
+        return &page_table._entries;
+    }
+
     pub fn sizeOfTopLevelEntry() core.Size {
         // TODO: Only correct for 4 level paging
         return level_4_address_space_size;
     }
 
     fn zero(page_table: *PageTable) void {
-        @memset(std.mem.asBytes(page_table), 0);
+        @memset(page_table.entries(), .{ .value = 0 });
     }
 
     fn isEmpty(page_table: *const PageTable) bool {
-        for (page_table.entries) |entry| {
+        for (page_table.entriesConst()) |entry| {
             if (!entry.isZero()) return false;
         }
         return true;
@@ -61,6 +69,15 @@ pub const PageTable = extern struct {
         return page_table;
     }
 
+    /// Copies the top level of `page_table` into `target_page_table`.
+    pub fn copyTopLevelIntoPageTable(
+        page_table: *x64.paging.PageTable,
+        target_page_table: *x64.paging.PageTable,
+    ) void {
+        if (core.is_debug) std.debug.assert(page_table != target_page_table);
+        @memcpy(target_page_table.entries(), page_table.entriesConst());
+    }
+
     /// Maps a 4 KiB page.
     pub fn map4KiB(
         level4_table: *PageTable,
@@ -74,53 +91,61 @@ pub const PageTable = extern struct {
         var deallocate_page_list: cascade.mem.PhysicalPage.List = .{};
         errdefer physical_page_allocator.deallocate(deallocate_page_list);
 
+        const level4_entries = level4_table.entries();
+
         const level4_index = p4Index(virtual_address);
 
         const level3_table, const created_level3_table = try ensureNextTable(
-            &level4_table.entries[level4_index],
+            &level4_entries[level4_index],
             physical_page_allocator,
         );
         errdefer {
             if (created_level3_table) {
-                var level4_entry = level4_table.entries[level4_index].load();
+                var level4_entry = level4_entries[level4_index].load();
                 const address = level4_entry.getAddress4kib();
-                level4_table.entries[level4_index].zero();
+                level4_entries[level4_index].zero();
                 deallocate_page_list.prepend(.fromAddress(address));
             }
         }
+
+        const level3_entries = level3_table.entries();
 
         const level3_index = p3Index(virtual_address);
 
         const level2_table, const created_level2_table = try ensureNextTable(
-            &level3_table.entries[level3_index],
+            &level3_entries[level3_index],
             physical_page_allocator,
         );
         errdefer {
             if (created_level2_table) {
-                var level3_entry = level3_table.entries[level3_index].load();
+                var level3_entry = level3_entries[level3_index].load();
                 const address = level3_entry.getAddress4kib();
-                level3_table.entries[level3_index].zero();
+                level3_entries[level3_index].zero();
                 deallocate_page_list.prepend(.fromAddress(address));
             }
         }
+
+        const level2_entries = level2_table.entries();
 
         const level2_index = p2Index(virtual_address);
 
         const level1_table, const created_level1_table = try ensureNextTable(
-            &level2_table.entries[level2_index],
+            &level2_entries[level2_index],
             physical_page_allocator,
         );
         errdefer {
             if (created_level1_table) {
-                var level2_entry = level2_table.entries[level2_index].load();
+                var level2_entry = level2_entries[level2_index].load();
                 const address = level2_entry.getAddress4kib();
-                level2_table.entries[level2_index].zero();
+                level2_entries[level2_index].zero();
                 deallocate_page_list.prepend(.fromAddress(address));
             }
         }
 
-        try level1_table.setEntry(
-            p1Index(virtual_address),
+        const level1_entries = level1_table.entries();
+
+        try setEntry(
+            &level1_entries[p1Index(virtual_address)],
             phys_page.baseAddress(),
             map_type,
             .small,
@@ -145,6 +170,8 @@ pub const PageTable = extern struct {
     ) void {
         if (core.is_debug) std.debug.assert(virtual_range.pageAligned());
 
+        const level4_entries = level4_table.entries();
+
         var current_virtual_address = virtual_range.address;
         const last_virtual_address = virtual_range.last();
 
@@ -158,7 +185,7 @@ pub const PageTable = extern struct {
         var opt_in_progress_range: ?cascade.VirtualRange = null;
 
         while (level4_index <= last_virtual_address_p4_index) : (level4_index += 1) {
-            const level4_entry = level4_table.entries[level4_index].load();
+            const level4_entry = level4_entries[level4_index].load();
 
             const level3_table = level4_entry.getNextLevel() catch |err| switch (err) {
                 error.NotPresent => {
@@ -175,9 +202,11 @@ pub const PageTable = extern struct {
             };
 
             defer if (top_level_decision == .free and level3_table.isEmpty()) {
-                level4_table.entries[level4_index].zero();
+                level4_entries[level4_index].zero();
                 deallocate_page_list.prepend(.fromAddress(level4_entry.getAddress4kib()));
             };
+
+            const level3_entries = level3_table.entries();
 
             var level3_index = p3Index(current_virtual_address);
             const last_level3_index = if (last_virtual_address_p4_index == level4_index)
@@ -186,7 +215,7 @@ pub const PageTable = extern struct {
                 number_of_entries - 1;
 
             while (level3_index <= last_level3_index) : (level3_index += 1) {
-                const level3_entry = level3_table.entries[level3_index].load();
+                const level3_entry = level3_entries[level3_index].load();
 
                 const level2_table = level3_entry.getNextLevel() catch |err| switch (err) {
                     error.NotPresent => {
@@ -203,9 +232,11 @@ pub const PageTable = extern struct {
                 };
 
                 defer if (level2_table.isEmpty()) {
-                    level3_table.entries[level3_index].zero();
+                    level3_entries[level3_index].zero();
                     deallocate_page_list.prepend(.fromAddress(level3_entry.getAddress4kib()));
                 };
+
+                const level2_entries = level2_table.entries();
 
                 var level2_index = p2Index(current_virtual_address);
                 const last_level2_index = if (last_virtual_address_p3_index == level3_index)
@@ -214,7 +245,7 @@ pub const PageTable = extern struct {
                     number_of_entries - 1;
 
                 while (level2_index <= last_level2_index) : (level2_index += 1) {
-                    const level2_entry = level2_table.entries[level2_index].load();
+                    const level2_entry = level2_entries[level2_index].load();
 
                     const level1_table = level2_entry.getNextLevel() catch |err| switch (err) {
                         error.NotPresent => {
@@ -231,9 +262,11 @@ pub const PageTable = extern struct {
                     };
 
                     defer if (level1_table.isEmpty()) {
-                        level2_table.entries[level2_index].zero();
+                        level2_entries[level2_index].zero();
                         deallocate_page_list.prepend(.fromAddress(level2_entry.getAddress4kib()));
                     };
+
+                    const level1_entries = level1_table.entries();
 
                     var level1_index = p1Index(current_virtual_address);
                     const last_level1_index = if (last_virtual_address_p2_index == level2_index)
@@ -244,7 +277,7 @@ pub const PageTable = extern struct {
                     while (level1_index <= last_level1_index) : (level1_index += 1) {
                         defer current_virtual_address.moveForwardPageInPlace();
 
-                        const level1_entry = level1_table.entries[level1_index].load();
+                        const level1_entry = level1_entries[level1_index].load();
 
                         if (!level1_entry.present.read()) {
                             if (opt_in_progress_range) |in_progress_range| {
@@ -255,7 +288,7 @@ pub const PageTable = extern struct {
                             continue;
                         }
 
-                        level1_table.entries[level1_index].zero();
+                        level1_entries[level1_index].zero();
 
                         if (backing_page_decision == .free) {
                             deallocate_page_list.prepend(.fromAddress(level1_entry.getAddress4kib()));
@@ -288,6 +321,8 @@ pub const PageTable = extern struct {
     ) void {
         if (core.is_debug) std.debug.assert(virtual_range.pageAligned());
 
+        const level4_entries = level4_table.entries();
+
         const need_to_flush = needToFlush(previous_map_type, new_map_type);
 
         var current_virtual_address = virtual_range.address;
@@ -304,7 +339,7 @@ pub const PageTable = extern struct {
         var opt_in_progress_range: ?cascade.VirtualRange = null;
 
         while (level4_index <= last_virtual_address_p4_index) : (level4_index += 1) {
-            const level4_entry = level4_table.entries[level4_index].load();
+            const level4_entry = level4_entries[level4_index].load();
 
             const level3_table = level4_entry.getNextLevel() catch |err| switch (err) {
                 error.NotPresent => {
@@ -320,6 +355,8 @@ pub const PageTable = extern struct {
                 error.HugePage => @panic("page table entry is huge"),
             };
 
+            const level3_entries = level3_table.entries();
+
             var level3_index = p3Index(current_virtual_address);
             const last_level3_index = if (last_virtual_address_p4_index == level4_index)
                 last_virtual_address_p3_index
@@ -327,7 +364,7 @@ pub const PageTable = extern struct {
                 number_of_entries - 1;
 
             while (level3_index <= last_level3_index) : (level3_index += 1) {
-                const level3_entry = level3_table.entries[level3_index].load();
+                const level3_entry = level3_entries[level3_index].load();
 
                 const level2_table = level3_entry.getNextLevel() catch |err| switch (err) {
                     error.NotPresent => {
@@ -343,6 +380,8 @@ pub const PageTable = extern struct {
                     error.HugePage => @panic("page table entry is huge"),
                 };
 
+                const level2_entries = level2_table.entries();
+
                 var level2_index = p2Index(current_virtual_address);
                 const last_level2_index = if (last_virtual_address_p3_index == level3_index)
                     last_virtual_address_p2_index
@@ -350,7 +389,7 @@ pub const PageTable = extern struct {
                     number_of_entries - 1;
 
                 while (level2_index <= last_level2_index) : (level2_index += 1) {
-                    const level2_entry = level2_table.entries[level2_index].load();
+                    const level2_entry = level2_entries[level2_index].load();
 
                     const level1_table = level2_entry.getNextLevel() catch |err| switch (err) {
                         error.NotPresent => {
@@ -366,6 +405,8 @@ pub const PageTable = extern struct {
                         error.HugePage => @panic("page table entry is huge"),
                     };
 
+                    const level1_entries = level1_table.entries();
+
                     var level1_index = p1Index(current_virtual_address);
                     const last_level1_index = if (last_virtual_address_p2_index == level2_index)
                         last_virtual_address_p1_index
@@ -375,7 +416,7 @@ pub const PageTable = extern struct {
                     while (level1_index <= last_level1_index) : (level1_index += 1) {
                         defer current_virtual_address.moveForwardPageInPlace();
 
-                        var level1_entry = level1_table.entries[level1_index].load();
+                        var level1_entry = level1_entries[level1_index].load();
 
                         if (!level1_entry.present.read()) {
                             if (opt_in_progress_range) |in_progress_range| {
@@ -387,7 +428,7 @@ pub const PageTable = extern struct {
                         }
 
                         level1_entry.applyMapType(new_map_type, .small);
-                        level1_table.entries[level1_index].store(level1_entry);
+                        level1_entries[level1_index].store(level1_entry);
 
                         if (opt_in_progress_range) |*in_progress_range| {
                             in_progress_range.size.addInPlace(small_page_size);
@@ -425,13 +466,12 @@ pub const PageTable = extern struct {
     }
 
     fn setEntry(
-        page_table: *PageTable,
-        index: usize,
+        raw_entry: *volatile Entry.Raw,
         physical_address: cascade.PhysicalAddress,
         map_type: MapType,
         page_type: PageType,
     ) error{AlreadyMapped}!void {
-        var entry = page_table.entries[index].load();
+        var entry = raw_entry.load();
 
         if (entry.present.read()) return error.AlreadyMapped;
 
@@ -451,7 +491,7 @@ pub const PageTable = extern struct {
 
         entry.applyMapType(map_type, page_type);
 
-        page_table.entries[index].store(entry);
+        raw_entry.store(entry);
     }
 
     const Entry = extern union {
@@ -606,19 +646,19 @@ pub const PageTable = extern struct {
         const Raw = extern struct {
             value: u64,
 
-            fn zero(raw: *Raw) void {
+            fn zero(raw: *volatile Raw) void {
                 raw.value = 0;
             }
 
-            fn isZero(raw: Raw) bool {
+            fn isZero(raw: *const volatile Raw) bool {
                 return raw.value == 0;
             }
 
-            fn load(raw: Raw) Entry {
-                return .{ ._raw = raw };
+            fn load(raw: *const volatile Raw) Entry {
+                return .{ ._raw = raw.* };
             }
 
-            fn store(raw: *Raw, entry: Entry) void {
+            fn store(raw: *volatile Raw, entry: Entry) void {
                 raw.* = entry._raw;
             }
 
@@ -1091,7 +1131,9 @@ pub const PageTable = extern struct {
                 std.debug.assert(range.address.aligned(size_of_top_level_entry.toAlignment()));
             }
 
-            const raw_entry = &page_table.entries[p4Index(range.address)];
+            const level4_entries = page_table.entries();
+
+            const raw_entry = &level4_entries[p4Index(range.address)];
 
             const entry = raw_entry.load();
             if (entry.present.read()) return error.AlreadyMapped;
@@ -1129,6 +1171,8 @@ pub const PageTable = extern struct {
                 .{ virtual_range, physical_range, map_type },
             );
 
+            const level4_entries = level4_table.entries();
+
             var large_pages_mapped: usize = 0;
             var medium_pages_mapped: usize = 0;
             var small_pages_mapped: usize = 0;
@@ -1148,9 +1192,11 @@ pub const PageTable = extern struct {
 
             while (level4_index <= last_virtual_address_p4_index) : (level4_index += 1) {
                 const level3_table, _ = try ensureNextTable(
-                    &level4_table.entries[level4_index],
+                    &level4_entries[level4_index],
                     physical_page_allocator,
                 );
+
+                const level3_entries = level3_table.entries();
 
                 var level3_index = p3Index(current_virtual_address);
                 const last_level3_index = if (last_virtual_address_p4_index == level4_index)
@@ -1164,9 +1210,10 @@ pub const PageTable = extern struct {
                         current_virtual_address.aligned(large_page_size_alignment) and
                         current_physical_address.aligned(large_page_size_alignment))
                     {
+
                         // large 1 GiB page
-                        try level3_table.setEntry(
-                            level3_index,
+                        try setEntry(
+                            &level3_entries[level3_index],
                             current_physical_address,
                             map_type,
                             .large,
@@ -1181,9 +1228,11 @@ pub const PageTable = extern struct {
                     }
 
                     const level2_table, _ = try ensureNextTable(
-                        &level3_table.entries[level3_index],
+                        &level3_entries[level3_index],
                         physical_page_allocator,
                     );
+
+                    const level2_entries = level2_table.entries();
 
                     var level2_index = p2Index(current_virtual_address);
                     const last_level2_index = if (last_virtual_address_p3_index == level3_index)
@@ -1197,8 +1246,8 @@ pub const PageTable = extern struct {
                             current_physical_address.aligned(medium_page_size_alignment))
                         {
                             // large 2 MiB page
-                            try level2_table.setEntry(
-                                level2_index,
+                            try setEntry(
+                                &level2_entries[level2_index],
                                 current_physical_address,
                                 map_type,
                                 .medium,
@@ -1213,9 +1262,11 @@ pub const PageTable = extern struct {
                         }
 
                         const level1_table, _ = try ensureNextTable(
-                            &level2_table.entries[level2_index],
+                            &level2_entries[level2_index],
                             physical_page_allocator,
                         );
+
+                        const level1_entries = level1_table.entries();
 
                         var level1_index = p1Index(current_virtual_address);
                         const last_level1_index = if (last_virtual_address_p2_index == level2_index)
@@ -1224,8 +1275,8 @@ pub const PageTable = extern struct {
                             number_of_entries - 1;
 
                         while (level1_index <= last_level1_index) : (level1_index += 1) {
-                            try level1_table.setEntry(
-                                level1_index,
+                            try setEntry(
+                                &level1_entries[level1_index],
                                 current_physical_address,
                                 map_type,
                                 .small,
@@ -1262,7 +1313,7 @@ pub const PageTable = extern struct {
 ///
 /// Returns the next table and whether it had to be created by this function or not.
 fn ensureNextTable(
-    raw_entry: *PageTable.Entry.Raw,
+    raw_entry: *volatile PageTable.Entry.Raw,
     physical_page_allocator: cascade.mem.PhysicalPage.Allocator,
 ) !struct { *PageTable, bool } {
     var created_table = false;
