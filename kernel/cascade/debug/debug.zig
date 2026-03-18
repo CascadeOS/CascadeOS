@@ -44,113 +44,102 @@ fn panicDispatch(
 ) noreturn {
     @branchHint(.cold);
 
+    const static = struct {
+        var nested_panic_count: usize = 0;
+    };
+
     arch.interrupts.disable();
 
-    switch (globals.panic_mode) {
-        .no_op => {},
-        .single_executor_init_panic => singleExecutorInitPanic(msg, panic_type),
-        .init_panic => initPanic(.panicked(), msg, panic_type),
+    no_op_panic: {
+        switch (globals.panic_mode) {
+            .no_op => break :no_op_panic,
+            .single_executor_init_panic => cascade.init.Output.lock.poison(),
+            .init_panic => {
+                const current_task: cascade.Task.Current = .panicked();
+                const executor = current_task.knownExecutor();
+
+                if (globals.panicking_executor.cmpxchgStrong(
+                    null,
+                    executor,
+                    .acq_rel,
+                    .acquire,
+                )) |panicking_executor| {
+                    if (panicking_executor != executor) break :no_op_panic; // another executor is panicking
+                }
+
+                cascade.init.Output.lock.poison();
+
+                arch.interrupts.sendPanicIPI();
+            },
+        }
+
+        const nested_panic_count = static.nested_panic_count;
+        static.nested_panic_count += 1;
+
+        printPanic(cascade.init.Output.terminal, msg, panic_type, nested_panic_count) catch {};
     }
 
     arch.interrupts.disableAndHalt();
-}
-
-fn singleExecutorInitPanic(
-    msg: []const u8,
-    panic_type: PanicType,
-) void {
-    const static = struct {
-        var nested_panic_count: usize = 0;
-    };
-
-    cascade.init.Output.lock.poison();
-    const t = cascade.init.Output.terminal;
-
-    const nested_panic_count = static.nested_panic_count;
-    static.nested_panic_count += 1;
-
-    switch (nested_panic_count) {
-        // on first panic attempt to print the full panic message
-        0 => printPanic(t, msg, panic_type) catch {},
-        // on second panic print a shorter message
-        1 => {
-            t.setColor(.red) catch {};
-            t.writer.writeAll("\nPANIC IN PANIC\n") catch {};
-            t.setColor(.reset) catch {};
-        },
-        // don't trigger any more panics
-        else => return,
-    }
-
-    t.writer.flush() catch {};
-}
-
-fn initPanic(
-    current_task: cascade.Task.Current,
-    msg: []const u8,
-    panic_type: PanicType,
-) void {
-    const static = struct {
-        var nested_panic_count: usize = 0;
-    };
-
-    const executor = current_task.knownExecutor();
-
-    if (globals.panicking_executor.cmpxchgStrong(
-        null,
-        executor,
-        .acq_rel,
-        .acquire,
-    )) |panicking_executor| {
-        if (panicking_executor != executor) return; // another executor is panicking
-    }
-
-    cascade.init.Output.lock.poison();
-    const t = cascade.init.Output.terminal;
-
-    arch.interrupts.sendPanicIPI();
-
-    const nested_panic_count = static.nested_panic_count;
-    static.nested_panic_count += 1;
-
-    switch (nested_panic_count) {
-        // on first panic attempt to print the full panic message
-        0 => printPanic(t, msg, panic_type) catch {},
-        // on second panic print a shorter message
-        1 => {
-            t.setColor(.red) catch {};
-            t.writer.writeAll("\nPANIC IN PANIC\n") catch {};
-            t.setColor(.reset) catch {};
-        },
-        // don't trigger any more panics
-        else => return,
-    }
-
-    t.writer.flush() catch {};
 }
 
 fn printPanic(
     t: std.Io.Terminal,
     msg: []const u8,
     panic_type: PanicType,
+    nested_panic_count: usize,
 ) !void {
-    try t.writer.writeByte('\n');
-    try t.setColor(.red);
-    try t.writer.writeAll("PANIC");
-    try t.setColor(.reset);
+    switch (nested_panic_count) {
+        // on first panic attempt to print the panic message and backtrace
+        0 => {
+            try t.setColor(.red);
+            try t.writer.writeAll("\nPANIC");
+            try t.setColor(.reset);
 
-    if (msg.len != 0) {
-        try t.writer.writeAll(" - ");
+            try printPanicMessage(t.writer, msg);
+            try printPanicBacktrace(t, panic_type);
+        },
+        // on first panic in panic print only the panic message
+        1 => {
+            try t.setColor(.red);
+            try t.writer.writeAll("\nPANIC IN PANIC");
+            try t.setColor(.reset);
 
-        try t.writer.writeAll(msg);
-
-        if (msg[msg.len - 1] != '\n') {
-            try t.writer.writeByte('\n');
-        }
-    } else {
-        try t.writer.writeByte('\n');
+            try printPanicMessage(t.writer, msg);
+        },
+        // on second panic in panic dont even try to print the panic message
+        2 => {
+            try t.setColor(.red);
+            try t.writer.writeAll("\nPANIC IN PANIC");
+            try t.setColor(.reset);
+        },
+        // don't trigger any more panics
+        else => return,
     }
 
+    try t.writer.flush();
+}
+
+fn printPanicMessage(
+    writer: *std.Io.Writer,
+    msg: []const u8,
+) !void {
+    if (msg.len != 0) {
+        try writer.writeAll(" - ");
+
+        try writer.writeAll(msg);
+
+        if (msg[msg.len - 1] != '\n') {
+            try writer.writeByte('\n');
+        }
+    } else {
+        try writer.writeByte('\n');
+    }
+}
+
+fn printPanicBacktrace(
+    t: std.Io.Terminal,
+    panic_type: PanicType,
+) !void {
     switch (panic_type) {
         .normal => |normal| {
             if (normal.error_return_trace) |trace| if (trace.index != 0) {
