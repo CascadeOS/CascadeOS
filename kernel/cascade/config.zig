@@ -8,6 +8,13 @@ const kernel_options = @import("kernel_options");
 
 pub const cascade_version = kernel_options.cascade_version;
 
+pub const debug = struct {
+    /// The maximum length a log scope can be.
+    ///
+    /// This is used to align the output of logs.
+    pub const max_log_scope_len = 14;
+};
+
 pub const executor = struct {
     pub const maximum_number_of_executors = 64;
 

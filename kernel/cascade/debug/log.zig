@@ -71,6 +71,10 @@ pub fn scoped(comptime scope: @EnumLiteral()) type {
             else
                 format ++ "\n";
         }
+
+        comptime {
+            if (scope_name.len > cascade.config.debug.max_log_scope_len) @compileError("log scope '" ++ scope_name ++ "' to too long");
+        }
     };
 }
 
