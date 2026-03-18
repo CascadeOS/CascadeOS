@@ -64,7 +64,7 @@ fn singleExecutorInitPanic(
     };
 
     cascade.init.Output.lock.poison();
-    const t: std.Io.Terminal = .{ .writer = cascade.init.Output.writer, .mode = .escape_codes };
+    const t = cascade.init.Output.terminal;
 
     const nested_panic_count = static.nested_panic_count;
     static.nested_panic_count += 1;
@@ -106,7 +106,7 @@ fn initPanic(
     }
 
     cascade.init.Output.lock.poison();
-    const t: std.Io.Terminal = .{ .writer = cascade.init.Output.writer, .mode = .escape_codes };
+    const t = cascade.init.Output.terminal;
 
     arch.interrupts.sendPanicIPI();
 

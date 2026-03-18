@@ -99,9 +99,20 @@ pub const init = struct {
         }
     }
 
-    pub fn printInitializationTime(writer: *std.Io.Writer) !void {
-        try writer.print(
-            "initialization complete - time since kernel start: {f} - time since system start: {f}\n",
+    pub fn printInitializationTime() !void {
+        cascade.init.Output.lock.lock();
+        defer cascade.init.Output.lock.unlock();
+
+        const t = cascade.init.Output.terminal;
+
+        try t.setColor(.green);
+
+        try t.writer.writeAll("initialization complete ");
+
+        try t.setColor(.reset);
+
+        try t.writer.print(
+            "- time since kernel start: {f} - time since system start: {f}\n",
             .{
                 wallclock.elapsed(
                     globals.kernel_start_time.getTick(),
@@ -113,6 +124,8 @@ pub const init = struct {
                 ),
             },
         );
+
+        try t.writer.flush();
     }
 
     pub const CandidateTimeSources = struct {

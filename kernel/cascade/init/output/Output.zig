@@ -25,7 +25,8 @@ state: *anyopaque,
 
 pub const Name = core.containers.BoundedArray(u8, 32);
 
-pub const writer = &globals.writer;
+// TODO: once we have kernel cmdline support changing the mode of this terminal
+pub const terminal: std.Io.Terminal = .{ .writer = &globals.writer, .mode = .escape_codes };
 pub const lock = &globals.lock;
 
 const cascade_starting_message: []const u8 = "starting CascadeOS " ++ cascade.config.cascade_version ++ "\n";

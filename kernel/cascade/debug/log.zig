@@ -11,12 +11,14 @@ const kernel_log_scopes = kernel_options.kernel_log_scopes;
 
 pub fn scoped(comptime scope: @EnumLiteral()) type {
     return struct {
+        const scope_name: []const u8 = @tagName(scope);
+
         pub inline fn err(
             comptime format: []const u8,
             args: anytype,
         ) void {
             if (comptime !levelEnabled(.err)) return;
-            logFn(prefix_err, comptime userFmt(format), args);
+            logFn(.err, scope_name, comptime userFmt(format), args);
         }
 
         pub inline fn warn(
@@ -24,7 +26,7 @@ pub fn scoped(comptime scope: @EnumLiteral()) type {
             args: anytype,
         ) void {
             if (comptime !levelEnabled(.warn)) return;
-            logFn(prefix_warn, comptime userFmt(format), args);
+            logFn(.warn, scope_name, comptime userFmt(format), args);
         }
 
         pub inline fn info(
@@ -32,7 +34,7 @@ pub fn scoped(comptime scope: @EnumLiteral()) type {
             args: anytype,
         ) void {
             if (comptime !levelEnabled(.info)) return;
-            logFn(prefix_info, comptime userFmt(format), args);
+            logFn(.info, scope_name, comptime userFmt(format), args);
         }
 
         pub inline fn debug(
@@ -40,7 +42,7 @@ pub fn scoped(comptime scope: @EnumLiteral()) type {
             args: anytype,
         ) void {
             if (comptime !levelEnabled(.debug)) return;
-            logFn(prefix_debug, comptime userFmt(format), args);
+            logFn(.debug, scope_name, comptime userFmt(format), args);
         }
 
         pub inline fn verbose(
@@ -48,21 +50,11 @@ pub fn scoped(comptime scope: @EnumLiteral()) type {
             args: anytype,
         ) void {
             if (comptime !levelEnabled(.verbose)) return;
-            logFn(prefix_verbose, comptime userFmt(format), args);
+            logFn(.verbose, scope_name, comptime userFmt(format), args);
         }
 
         pub inline fn levelEnabled(comptime message_level: Level) bool {
             comptime return loggingEnabledFor(scope, message_level);
-        }
-
-        const prefix_err = levelAndScope(.err);
-        const prefix_warn = levelAndScope(.warn);
-        const prefix_info = levelAndScope(.info);
-        const prefix_debug = levelAndScope(.debug);
-        const prefix_verbose = levelAndScope(.verbose);
-
-        inline fn levelAndScope(comptime message_level: Level) []const u8 {
-            comptime return message_level.asText() ++ " | " ++ @tagName(scope) ++ " | ";
         }
 
         inline fn userFmt(comptime format: []const u8) []const u8 {
@@ -85,16 +77,6 @@ pub const Level = enum {
     debug,
     verbose,
 
-    pub inline fn asText(comptime self: Level) []const u8 {
-        return switch (self) {
-            .err => "error",
-            .warn => "warning",
-            .info => "info",
-            .debug => "debug",
-            .verbose => "verbose",
-        };
-    }
-
     pub fn toStd(self: Level) std.log.Level {
         return switch (self) {
             .err => .err,
@@ -106,75 +88,58 @@ pub const Level = enum {
 };
 
 fn logFn(
-    prefix: []const u8,
+    level: Level,
+    scope: []const u8,
     comptime format: []const u8,
     args: anytype,
 ) void {
+    const t = cascade.init.Output.terminal;
+
     switch (globals.log_mode) {
-        .single_executor_init_log => {
-            @branchHint(.unlikely);
-
-            if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
-
-            const writer = cascade.init.Output.writer;
-
-            writer.writeAll(prefix) catch {
-                @branchHint(.cold);
-                _ = writer.consumeAll();
-                return;
-            };
-
-            writer.print("{f} | ", .{cascade.Task.Current.get().task}) catch {
-                @branchHint(.cold);
-                _ = writer.consumeAll();
-                return;
-            };
-
-            writer.print(format, args) catch {
-                @branchHint(.cold);
-                _ = writer.consumeAll();
-                return;
-            };
-
-            cascade.init.Output.writer.flush() catch {
-                @branchHint(.cold);
-                _ = writer.consumeAll();
-                return;
-            };
-        },
-        .init_log => {
-            @branchHint(.unlikely);
-
-            cascade.init.Output.lock.lock();
-            defer cascade.init.Output.lock.unlock();
-
-            const writer = cascade.init.Output.writer;
-
-            writer.writeAll(prefix) catch {
-                @branchHint(.cold);
-                _ = writer.consumeAll();
-                return;
-            };
-
-            writer.print("{f} | ", .{cascade.Task.Current.get().task}) catch {
-                @branchHint(.cold);
-                _ = writer.consumeAll();
-                return;
-            };
-
-            writer.print(format, args) catch {
-                @branchHint(.cold);
-                _ = writer.consumeAll();
-                return;
-            };
-
-            cascade.init.Output.writer.flush() catch {
-                @branchHint(.cold);
-                _ = writer.consumeAll();
-                return;
-            };
-        },
+        .single_executor_init_log => if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled()),
+        .init_log => cascade.init.Output.lock.lock(),
     }
+    defer switch (globals.log_mode) {
+        .single_executor_init_log => {},
+        .init_log => cascade.init.Output.lock.unlock(),
+    };
+
+    logFnInner(t, level, scope, format, args) catch {
+        @branchHint(.cold);
+        _ = t.writer.consumeAll();
+    };
+}
+
+fn logFnInner(
+    t: std.Io.Terminal,
+    level: Level,
+    scope: []const u8,
+    comptime format: []const u8,
+    args: anytype,
+) !void {
+    try switch (level) {
+        .err => t.setColor(.red),
+        .warn => t.setColor(.yellow),
+        .info => {},
+        .debug => t.setColor(.dim),
+        .verbose => t.setColor(.dim),
+    };
+
+    try t.writer.writeAll(scope);
+    try t.writer.splatByteAll(' ', cascade.config.debug.max_log_scope_len - scope.len);
+    try t.writer.writeByte('|');
+
+    const level_str = @tagName(level);
+    try t.writer.writeAll(level_str);
+    try t.writer.splatByteAll(' ', @tagName(Level.verbose).len - level_str.len);
+
+    try t.setColor(.reset);
+    try t.writer.writeByte('|');
+
+    try cascade.Task.Current.get().task.format(t.writer);
+    try t.writer.writeAll("| ");
+    try t.writer.print(format, args);
+    try t.writer.flush();
 }
 
 /// The mode the logging system is in.

@@ -188,10 +188,7 @@ fn initStage4() !void {
     defer scheduler_handle.unlock();
     scheduler_handle.queueTask(&hello_world_main_thread.task);
 
-    Output.lock.lock();
-    defer Output.lock.unlock();
-    try cascade.time.init.printInitializationTime(Output.writer);
-    try Output.writer.flush();
+    try cascade.time.init.printInitializationTime();
 }
 
 fn constructAndLoadBootstrapExecutorAndTask() !void {
