@@ -1344,9 +1344,8 @@ const globals = struct {
 };
 
 pub const init = struct {
-    const init_log = cascade.debug.log.scoped(.resource_arena_init);
     pub fn initializeCaches() !void {
-        init_log.debug("initializing boundary tag cache", .{});
+        log.debug("initializing boundary tag cache", .{});
         globals.tag_cache.init(.{
             .name = try .fromSlice("boundary tag"),
             .slab_source = .pmm,
