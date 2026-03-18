@@ -31,7 +31,7 @@ pub fn format(thread: *const Thread, writer: *std.Io.Writer) !void {
     // TODO: these are user controlled strings
 
     try writer.print(
-        "Thread<{s} - {s}>",
+        "U<{s} - {s}>",
         .{ thread.process.name.constSlice(), thread.task.name.constSlice() },
     );
 }

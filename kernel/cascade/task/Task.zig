@@ -129,7 +129,7 @@ pub fn format(
 ) !void {
     switch (task.type) {
         .kernel => try writer.print(
-            "Kernel<{s}>",
+            "K<{s}>",
             .{task.name.constSlice()},
         ),
         .user => return cascade.user.Thread.fromConst(task).format(writer),
