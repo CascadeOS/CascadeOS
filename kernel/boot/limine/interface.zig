@@ -25,29 +25,15 @@ pub fn kernelExecutableFile() ?[]align(arch.paging.standard_page_size_alignment.
 }
 
 pub fn memoryMap() error{NoMemoryMap}!boot.MemoryMap {
-    const resp = requests.memmap.response orelse
-        return error.NoMemoryMap;
-
-    var result: boot.MemoryMap = .{
-        .backing = undefined,
-    };
-
-    const limine_memory_map = std.mem.bytesAsValue(MemoryMapIterator, &result.backing);
-
-    const entries = resp.entries();
-
-    limine_memory_map.* = .{ .entries = entries };
-
-    return result;
+    const resp = requests.memmap.response orelse return error.NoMemoryMap;
+    return .{ .limine = .{ .entries = resp.entries() } };
 }
 
 pub const MemoryMapIterator = struct {
     index: usize = 0,
     entries: []const *const limine.Memmap.Entry,
 
-    pub fn next(memory_map: *boot.MemoryMap) ?boot.MemoryMap.Entry {
-        const memory_map_iterator: *MemoryMapIterator = @ptrCast(@alignCast(&memory_map.backing));
-
+    pub fn next(memory_map_iterator: *MemoryMapIterator) ?boot.MemoryMap.Entry {
         const limine_entry = blk: {
             if (memory_map_iterator.index >= memory_map_iterator.entries.len) return null;
             const entry = memory_map_iterator.entries[memory_map_iterator.index];
@@ -74,15 +60,13 @@ pub const MemoryMapIterator = struct {
 };
 
 pub fn directMapAddress() ?cascade.KernelVirtualAddress {
-    const resp = requests.hhdm.response orelse
-        return null;
+    const resp = requests.hhdm.response orelse return null;
 
     return resp.address;
 }
 
 pub fn rsdp() ?boot.Address {
-    const resp = requests.rsdp.response orelse
-        return null;
+    const resp = requests.rsdp.response orelse return null;
 
     return resp.address(limine_revison);
 }
@@ -90,15 +74,13 @@ pub fn rsdp() ?boot.Address {
 pub fn x2apicEnabled() bool {
     std.debug.assert(arch.current_arch == .x64);
 
-    const resp: *const limine.MP.x86_64 = requests.smp.response orelse
-        return false;
+    const resp: *const limine.MP.x86_64 = requests.smp.response orelse return false;
 
     return resp.flags.x2apic_enabled;
 }
 
 pub fn bootstrapArchitectureProcessorId() u64 {
-    const resp = requests.smp.response orelse
-        return 0;
+    const resp = requests.smp.response orelse return 0;
 
     return switch (arch.current_arch) {
         .arm => resp.bsp_mpidr,
@@ -111,108 +93,83 @@ pub fn cpuDescriptors() ?boot.CpuDescriptors {
     const resp = requests.smp.response orelse
         return null;
 
-    var result: boot.CpuDescriptors = .{
-        .backing = undefined,
+    return .{
+        .limine = .{ .index = 0, .entries = resp.cpus() },
     };
-
-    const descriptor_iterator = std.mem.bytesAsValue(CpuDescriptorIterator, &result.backing);
-
-    descriptor_iterator.* = .{
-        .index = 0,
-        .entries = resp.cpus(),
-    };
-
-    return result;
 }
 
 pub const CpuDescriptorIterator = struct {
     index: usize,
     entries: []*limine.MP.Response.MPInfo,
 
-    pub const Descriptor = struct {
-        smp_info: *limine.MP.Response.MPInfo,
-    };
-
-    pub fn count(cpu_descriptors: *const boot.CpuDescriptors) usize {
-        const descriptor_iterator = std.mem.bytesAsValue(CpuDescriptorIterator, &cpu_descriptors.backing);
+    pub fn count(descriptor_iterator: *const CpuDescriptorIterator) usize {
         return descriptor_iterator.entries.len;
     }
 
-    pub fn next(cpu_descriptors: *boot.CpuDescriptors) ?boot.CpuDescriptors.Descriptor {
-        const descriptor_iterator = std.mem.bytesAsValue(CpuDescriptorIterator, &cpu_descriptors.backing);
-
+    pub fn next(descriptor_iterator: *CpuDescriptorIterator) ?boot.CpuDescriptors.Descriptor {
         if (descriptor_iterator.index >= descriptor_iterator.entries.len) return null;
 
         const smp_info = descriptor_iterator.entries[descriptor_iterator.index];
 
         descriptor_iterator.index += 1;
 
-        var result: boot.CpuDescriptors.Descriptor = .{
-            .backing = undefined,
-        };
-
-        const descriptor = std.mem.bytesAsValue(Descriptor, &result.backing);
-
-        descriptor.* = .{ .smp_info = smp_info };
-
-        return result;
+        return .{ .limine = .{ .smp_info = smp_info } };
     }
 
-    pub fn bootFn(
-        generic_descriptor: *const boot.CpuDescriptors.Descriptor,
-        user_data: *anyopaque,
-        comptime targetFn: fn (user_data: *anyopaque) anyerror!noreturn,
-    ) void {
-        const trampolineFn = struct {
-            fn trampolineFn(smp_info: *const limine.MP.Response.MPInfo) callconv(.c) noreturn {
-                targetFn(@ptrFromInt(smp_info.extra_argument)) catch |err| {
-                    std.debug.panic("unhandled error: {t}", .{err});
-                };
-            }
-        }.trampolineFn;
+    pub const Descriptor = struct {
+        smp_info: *limine.MP.Response.MPInfo,
 
-        const descriptor = std.mem.bytesAsValue(Descriptor, &generic_descriptor.backing);
-        const smp_info = descriptor.smp_info;
+        pub fn bootFn(
+            descriptor: *const Descriptor,
+            user_data: *anyopaque,
+            comptime targetFn: fn (user_data: *anyopaque) anyerror!noreturn,
+        ) void {
+            const trampolineFn = struct {
+                fn trampolineFn(smp_info: *const limine.MP.Response.MPInfo) callconv(.c) noreturn {
+                    targetFn(@ptrFromInt(smp_info.extra_argument)) catch |err| {
+                        std.debug.panic("unhandled error: {t}", .{err});
+                    };
+                }
+            }.trampolineFn;
 
-        @atomicStore(
-            usize,
-            &smp_info.extra_argument,
-            @intFromPtr(user_data),
-            .release,
-        );
+            const smp_info = descriptor.smp_info;
 
-        @atomicStore(
-            ?*const fn (*const limine.MP.Response.MPInfo) callconv(.c) noreturn,
-            &smp_info.goto_address,
-            &trampolineFn,
-            .release,
-        );
-    }
+            @atomicStore(
+                usize,
+                &smp_info.extra_argument,
+                @intFromPtr(user_data),
+                .release,
+            );
 
-    pub fn acpiProcessorId(
-        generic_descriptor: *const boot.CpuDescriptors.Descriptor,
-    ) u32 {
-        const descriptor = std.mem.bytesAsValue(Descriptor, &generic_descriptor.backing);
-        return descriptor.smp_info.processor_id;
-    }
+            @atomicStore(
+                ?*const fn (*const limine.MP.Response.MPInfo) callconv(.c) noreturn,
+                &smp_info.goto_address,
+                &trampolineFn,
+                .release,
+            );
+        }
 
-    pub fn architectureProcessorId(
-        generic_descriptor: *const boot.CpuDescriptors.Descriptor,
-    ) u64 {
-        const descriptor = std.mem.bytesAsValue(Descriptor, &generic_descriptor.backing);
+        pub fn acpiProcessorId(
+            descriptor: *const Descriptor,
+        ) u32 {
+            return descriptor.smp_info.processor_id;
+        }
 
-        return switch (arch.current_arch) {
-            .arm => descriptor.smp_info.mpidr,
-            .riscv => descriptor.smp_info.hartid,
-            .x64 => descriptor.smp_info.lapic_id,
-        };
-    }
+        pub fn architectureProcessorId(
+            descriptor: *const Descriptor,
+        ) u64 {
+            return switch (arch.current_arch) {
+                .arm => descriptor.smp_info.mpidr,
+                .riscv => descriptor.smp_info.hartid,
+                .x64 => descriptor.smp_info.lapic_id,
+            };
+        }
+    };
 };
 
 pub fn framebuffer() ?boot.Framebuffer {
     const buffer = blk: {
-        const resp = requests.framebuffer.response orelse
-            return null;
+        const resp = requests.framebuffer.response orelse return null;
 
         const framebuffers = resp.framebuffers();
         if (framebuffers.len == 0) return null;
@@ -238,8 +195,7 @@ pub fn framebuffer() ?boot.Framebuffer {
 }
 
 pub fn deviceTreeBlob() ?cascade.KernelVirtualAddress {
-    const resp = requests.device_tree_blob.response orelse
-        return null;
+    const resp = requests.device_tree_blob.response orelse return null;
     return resp.address;
 }
 

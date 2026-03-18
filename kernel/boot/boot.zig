@@ -37,12 +37,13 @@ pub fn memoryMap() error{NoMemoryMap}!MemoryMap {
     };
 }
 
-pub const MemoryMap = struct {
-    backing: [backing_size]u8 align(backing_align),
+pub const MemoryMap = union {
+    unknown: void,
+    limine: limine_interface.MemoryMapIterator,
 
     pub fn next(memory_map: *MemoryMap) ?Entry {
         return switch (bootloader_api) {
-            .limine => limine_interface.MemoryMapIterator.next(memory_map),
+            .limine => memory_map.limine.next(),
             .unknown => null,
         };
     }
@@ -80,16 +81,6 @@ pub const MemoryMap = struct {
             try writer.print("{t} - {f}", .{ entry.type, entry.range });
         }
     };
-
-    const backing_size: usize = @max(
-        @sizeOf(limine_interface.MemoryMapIterator),
-        0,
-    );
-
-    const backing_align: usize = @max(
-        @alignOf(limine_interface.MemoryMapIterator),
-        0,
-    );
 };
 
 /// Iterate over the ranges of physical memory that are usable for allocation.
@@ -188,12 +179,13 @@ pub fn cpuDescriptors() ?CpuDescriptors {
     };
 }
 
-pub const CpuDescriptors = struct {
-    backing: [descriptors_backing_size]u8 align(descriptors_backing_align),
+pub const CpuDescriptors = union {
+    unknown: void,
+    limine: limine_interface.CpuDescriptorIterator,
 
     pub fn count(cpu_descriptors: *const CpuDescriptors) usize {
         return switch (bootloader_api) {
-            .limine => limine_interface.CpuDescriptorIterator.count(cpu_descriptors),
+            .limine => cpu_descriptors.limine.count(),
             .unknown => 0,
         };
     }
@@ -201,13 +193,14 @@ pub const CpuDescriptors = struct {
     /// Returns the next cpu descriptor from the iterator, if any remain.
     pub fn next(cpu_descriptors: *CpuDescriptors) ?Descriptor {
         return switch (bootloader_api) {
-            .limine => limine_interface.CpuDescriptorIterator.next(cpu_descriptors),
+            .limine => cpu_descriptors.limine.next(),
             .unknown => null,
         };
     }
 
-    pub const Descriptor = struct {
-        backing: [descriptor_backing_size]u8 align(descriptor_backing_align),
+    pub const Descriptor = union {
+        unknown: void,
+        limine: limine_interface.CpuDescriptorIterator.Descriptor,
 
         pub fn boot(
             descriptor: *const Descriptor,
@@ -215,45 +208,25 @@ pub const CpuDescriptors = struct {
             target_fn: fn (user_data: *anyopaque) anyerror!noreturn,
         ) void {
             switch (bootloader_api) {
-                .limine => limine_interface.CpuDescriptorIterator.bootFn(descriptor, user_data, target_fn),
+                .limine => descriptor.limine.bootFn(user_data, target_fn),
                 .unknown => unreachable,
             }
         }
 
         pub fn acpiProcessorId(descriptor: *const Descriptor) u32 {
             return switch (bootloader_api) {
-                .limine => limine_interface.CpuDescriptorIterator.acpiProcessorId(descriptor),
+                .limine => descriptor.limine.acpiProcessorId(),
                 .unknown => unreachable,
             };
         }
 
         pub fn architectureProcessorId(descriptor: *const Descriptor) u64 {
             return switch (bootloader_api) {
-                .limine => limine_interface.CpuDescriptorIterator.architectureProcessorId(descriptor),
+                .limine => descriptor.limine.architectureProcessorId(),
                 .unknown => unreachable,
             };
         }
-
-        const descriptor_backing_size: usize = @max(
-            @sizeOf(limine_interface.CpuDescriptorIterator.Descriptor),
-            0,
-        );
-
-        const descriptor_backing_align: usize = @max(
-            @alignOf(limine_interface.CpuDescriptorIterator.Descriptor),
-            0,
-        );
     };
-
-    const descriptors_backing_size: usize = @max(
-        @sizeOf(limine_interface.CpuDescriptorIterator),
-        0,
-    );
-
-    const descriptors_backing_align: usize = @max(
-        @alignOf(limine_interface.CpuDescriptorIterator),
-        0,
-    );
 };
 
 /// Each pixel of the framebuffer is a 32-bit RGB value.
