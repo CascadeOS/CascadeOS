@@ -189,15 +189,15 @@ test getBits {
     }
 }
 
-/// Sets the bit at the index `bit` to the value `value` (where true means a value of '1' and false means a value of '0').
+/// Sets the bit at the index `bit` to the value `value`.
 ///
 /// Note: that index 0 is the least significant bit, while index `length() - 1` is the most significant bit.
 ///
 /// ```zig
 /// var val: u8 = 0b00000000;
-/// try std.testing.expect(!getBit(val, 0));
-/// setBit( &val, 0, true);
-/// try std.testing.expect(getBit(val, 0));
+/// try std.testing.expect(getBit(val, 0) == 0);
+/// setBit(&val, 0, 1);
+/// try std.testing.expect(getBit(val, 0) == 1);
 /// ```
 pub inline fn setBit(target: anytype, comptime bit: comptime_int, value: u1) void {
     const ptr_type_info: std.builtin.Type = @typeInfo(@TypeOf(target));
