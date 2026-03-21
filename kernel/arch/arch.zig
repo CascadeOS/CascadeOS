@@ -669,7 +669,6 @@ pub const io = struct {
 
         pub const FromError = error{InvalidPort};
 
-        /// Creates a port.
         pub fn from(port: usize) FromError!Port {
             return .{
                 .arch_specific = @enumFromInt(std.math.cast(
@@ -681,15 +680,15 @@ pub const io = struct {
 
         pub fn read(port: Port, comptime T: type) callconv(core.inline_in_non_debug) T {
             return switch (T) {
-                u8 => return getFunction(
+                u8 => getFunction(
                     current_functions.io,
                     "readPortU8",
                 )(port.arch_specific),
-                u16 => return getFunction(
+                u16 => getFunction(
                     current_functions.io,
                     "readPortU16",
                 )(port.arch_specific),
-                u32 => return getFunction(
+                u32 => getFunction(
                     current_functions.io,
                     "readPortU32",
                 )(port.arch_specific),
