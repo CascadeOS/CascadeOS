@@ -72,16 +72,30 @@ pub const Function = extern struct {
     pub const enhanced_configuration_space_size: core.Size = .from(4096, .byte);
 
     pub inline fn read(function: *const Function, comptime T: type, offset: usize) T {
+        const size_offset: core.Size = .from(offset, .byte);
+
+        if (core.is_debug) {
+            std.debug.assert(size_offset.aligned(.of(T)));
+            std.debug.assert(enhanced_configuration_space_size.greaterThanOrEqual(size_offset.add(.of(T))));
+        }
+
         return arch.io.readPci(
             T,
-            cascade.KernelVirtualAddress.fromPtr(function).moveForward(.from(offset, .byte)),
+            cascade.KernelVirtualAddress.fromPtr(function).moveForward(size_offset),
         );
     }
 
     pub inline fn write(function: *Function, comptime T: type, offset: usize, value: T) void {
+        const size_offset: core.Size = .from(offset, .byte);
+
+        if (core.is_debug) {
+            std.debug.assert(size_offset.aligned(.of(T)));
+            std.debug.assert(enhanced_configuration_space_size.greaterThanOrEqual(size_offset.add(.of(T))));
+        }
+
         return arch.io.writePci(
             T,
-            cascade.KernelVirtualAddress.fromPtr(function).moveForward(.from(offset, .byte)),
+            cascade.KernelVirtualAddress.fromPtr(function).moveForward(size_offset),
             value,
         );
     }

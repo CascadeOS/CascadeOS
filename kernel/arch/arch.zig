@@ -665,12 +665,7 @@ pub const user = struct {
 
 pub const io = struct {
     /// Read a value from PCI enhanced configuration space.
-    ///
-    /// **REQUIREMENTS**:
-    ///  - `address` must be aligned to the alignment of `T`
     pub fn readPci(comptime T: type, address: cascade.KernelVirtualAddress) callconv(core.inline_in_non_debug) T {
-        if (core.is_debug) std.debug.assert(address.aligned(.of(T)));
-
         return switch (T) {
             u8 => getFunction(
                 current_functions.io,
@@ -689,12 +684,7 @@ pub const io = struct {
     }
 
     /// Write a value to PCI enhanced configuration space.
-    ///
-    /// **REQUIREMENTS**:
-    ///  - `address` must be aligned to the alignment of `T`
     pub fn writePci(comptime T: type, address: cascade.KernelVirtualAddress, value: T) callconv(core.inline_in_non_debug) void {
-        if (core.is_debug) std.debug.assert(address.aligned(.of(T)));
-
         switch (T) {
             u8 => getFunction(
                 current_functions.io,
