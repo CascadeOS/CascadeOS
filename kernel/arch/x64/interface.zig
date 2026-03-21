@@ -91,6 +91,38 @@ pub const functions: arch.Functions = .{
     },
 
     .io = .{
+        .readPciU8 = struct {
+            fn readPciU8(address: cascade.KernelVirtualAddress) u8 {
+                return x64.instructions.readPciU8(address);
+            }
+        }.readPciU8,
+        .readPciU16 = struct {
+            fn readPciU16(address: cascade.KernelVirtualAddress) u16 {
+                return x64.instructions.readPciU16(address);
+            }
+        }.readPciU16,
+        .readPciU32 = struct {
+            fn readPciU32(address: cascade.KernelVirtualAddress) u32 {
+                return x64.instructions.readPciU32(address);
+            }
+        }.readPciU32,
+
+        .writePciU8 = struct {
+            fn writePciU8(address: cascade.KernelVirtualAddress, value: u8) void {
+                x64.instructions.writePciU8(address, value);
+            }
+        }.writePciU8,
+        .writePciU16 = struct {
+            fn writePciU16(address: cascade.KernelVirtualAddress, value: u16) void {
+                x64.instructions.writePciU16(address, value);
+            }
+        }.writePciU16,
+        .writePciU32 = struct {
+            fn writePciU32(address: cascade.KernelVirtualAddress, value: u32) void {
+                x64.instructions.writePciU32(address, value);
+            }
+        }.writePciU32,
+
         .readPortU8 = struct {
             fn readPortU8(port: decls.io.Port) u8 {
                 return x64.instructions.portReadU8(@intFromEnum(port));
@@ -106,6 +138,7 @@ pub const functions: arch.Functions = .{
                 return x64.instructions.portReadU32(@intFromEnum(port));
             }
         }.readPortU32,
+
         .writePortU8 = struct {
             fn writePortU8(port: decls.io.Port, value: u8) void {
                 x64.instructions.portWriteU8(@intFromEnum(port), value);

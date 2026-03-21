@@ -122,6 +122,51 @@ pub inline fn halt() void {
     asm volatile ("hlt");
 }
 
+pub inline fn readPciU8(address: cascade.KernelVirtualAddress) u8 {
+    return asm volatile ("movb (%[address]), %[ret]"
+        : [ret] "={al}" (-> u8),
+        : [address] "r" (address.value),
+    );
+}
+
+pub inline fn readPciU16(address: cascade.KernelVirtualAddress) u16 {
+    return asm volatile ("movw (%[address]), %[ret]"
+        : [ret] "={ax}" (-> u16),
+        : [address] "r" (address.value),
+    );
+}
+
+pub inline fn readPciU32(address: cascade.KernelVirtualAddress) u32 {
+    return asm volatile ("movl (%[address]), %[ret]"
+        : [ret] "={eax}" (-> u32),
+        : [address] "r" (address.value),
+    );
+}
+
+pub inline fn writePciU8(address: cascade.KernelVirtualAddress, value: u8) void {
+    asm volatile ("movb %[value], (%[address])"
+        :
+        : [address] "r" (address.value),
+          [value] "{al}" (value),
+        : .{ .memory = true });
+}
+
+pub inline fn writePciU16(address: cascade.KernelVirtualAddress, value: u16) void {
+    asm volatile ("movw %[value], (%[address])"
+        :
+        : [address] "r" (address.value),
+          [value] "{ax}" (value),
+        : .{ .memory = true });
+}
+
+pub inline fn writePciU32(address: cascade.KernelVirtualAddress, value: u32) void {
+    asm volatile ("movl %[value], (%[address])"
+        :
+        : [address] "r" (address.value),
+          [value] "{eax}" (value),
+        : .{ .memory = true });
+}
+
 pub inline fn portReadU8(port: u16) u8 {
     return asm ("inb %[port], %[ret]"
         : [ret] "={al}" (-> u8),

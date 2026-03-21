@@ -664,6 +664,54 @@ pub const user = struct {
 };
 
 pub const io = struct {
+    /// Read a value from PCI enhanced configuration space.
+    ///
+    /// **REQUIREMENTS**:
+    ///  - `address` must be aligned to the alignment of `T`
+    pub fn readPci(comptime T: type, address: cascade.KernelVirtualAddress) callconv(core.inline_in_non_debug) T {
+        if (core.is_debug) std.debug.assert(address.aligned(.of(T)));
+
+        return switch (T) {
+            u8 => getFunction(
+                current_functions.io,
+                "readPciU8",
+            )(address),
+            u16 => getFunction(
+                current_functions.io,
+                "readPciU16",
+            )(address),
+            u32 => getFunction(
+                current_functions.io,
+                "readPciU32",
+            )(address),
+            else => @compileError("unsupported pci read size"),
+        };
+    }
+
+    /// Write a value to PCI enhanced configuration space.
+    ///
+    /// **REQUIREMENTS**:
+    ///  - `address` must be aligned to the alignment of `T`
+    pub fn writePci(comptime T: type, address: cascade.KernelVirtualAddress, value: T) callconv(core.inline_in_non_debug) void {
+        if (core.is_debug) std.debug.assert(address.aligned(.of(T)));
+
+        switch (T) {
+            u8 => getFunction(
+                current_functions.io,
+                "writePciU8",
+            )(address, value),
+            u16 => getFunction(
+                current_functions.io,
+                "writePciU16",
+            )(address, value),
+            u32 => getFunction(
+                current_functions.io,
+                "writePciU32",
+            )(address, value),
+            else => @compileError("unsupported pci write size"),
+        }
+    }
+
     pub const Port = struct {
         arch_specific: current_decls.io.Port,
 
@@ -1150,6 +1198,14 @@ pub const Functions = struct {
     },
 
     io: struct {
+        readPciU8: ?fn (address: cascade.KernelVirtualAddress) u8 = null,
+        readPciU16: ?fn (address: cascade.KernelVirtualAddress) u16 = null,
+        readPciU32: ?fn (address: cascade.KernelVirtualAddress) u32 = null,
+
+        writePciU8: ?fn (address: cascade.KernelVirtualAddress, value: u8) void = null,
+        writePciU16: ?fn (address: cascade.KernelVirtualAddress, value: u16) void = null,
+        writePciU32: ?fn (address: cascade.KernelVirtualAddress, value: u32) void = null,
+
         readPortU8: ?fn (port: current_decls.io.Port) u8 = null,
         readPortU16: ?fn (port: current_decls.io.Port) u16 = null,
         readPortU32: ?fn (port: current_decls.io.Port) u32 = null,
