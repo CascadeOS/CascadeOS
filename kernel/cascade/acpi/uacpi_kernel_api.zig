@@ -32,7 +32,7 @@ export fn uacpi_kernel_get_rsdp(out_rsdp_address: *cascade.PhysicalAddress) uacp
 /// The handle returned via 'out_handle' is used to perform IO on the configuration space of the device.
 export fn uacpi_kernel_pci_device_open(
     address: cascade.pci.Address,
-    out_handle: **volatile cascade.pci.Function,
+    out_handle: **cascade.pci.Function,
 ) uacpi.Status {
     log.verbose("uacpi_kernel_pci_device_open called with address {f}", .{address});
 
@@ -48,7 +48,7 @@ export fn uacpi_kernel_pci_device_close(handle: *anyopaque) void {
 
 /// Read the configuration space of a previously open PCI device.
 export fn uacpi_kernel_pci_read8(
-    function: *volatile cascade.pci.Function,
+    function: *cascade.pci.Function,
     offset: usize,
     value: *u8,
 ) uacpi.Status {
@@ -61,7 +61,7 @@ export fn uacpi_kernel_pci_read8(
 
 /// Read the configuration space of a previously open PCI device.
 export fn uacpi_kernel_pci_read16(
-    function: *volatile cascade.pci.Function,
+    function: *cascade.pci.Function,
     offset: usize,
     value: *u16,
 ) uacpi.Status {
@@ -74,7 +74,7 @@ export fn uacpi_kernel_pci_read16(
 
 /// Read the configuration space of a previously open PCI device.
 export fn uacpi_kernel_pci_read32(
-    function: *volatile cascade.pci.Function,
+    function: *cascade.pci.Function,
     offset: usize,
     value: *u32,
 ) uacpi.Status {
@@ -87,7 +87,7 @@ export fn uacpi_kernel_pci_read32(
 
 /// Write the configuration space of a previously open PCI device.
 export fn uacpi_kernel_pci_write8(
-    function: *volatile cascade.pci.Function,
+    function: *cascade.pci.Function,
     offset: usize,
     value: u8,
 ) uacpi.Status {
@@ -100,7 +100,7 @@ export fn uacpi_kernel_pci_write8(
 
 /// Write the configuration space of a previously open PCI device.
 export fn uacpi_kernel_pci_write16(
-    function: *volatile cascade.pci.Function,
+    function: *cascade.pci.Function,
     offset: usize,
     value: u16,
 ) uacpi.Status {
@@ -113,7 +113,7 @@ export fn uacpi_kernel_pci_write16(
 
 /// Write the configuration space of a previously open PCI device.
 export fn uacpi_kernel_pci_write32(
-    function: *volatile cascade.pci.Function,
+    function: *cascade.pci.Function,
     offset: usize,
     value: u32,
 ) uacpi.Status {
