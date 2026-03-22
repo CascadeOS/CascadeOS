@@ -273,9 +273,9 @@ pub const SyscallFrame = extern struct {
 
         try writer.splatByteAll(' ', new_indent);
         if (value.syscall()) |s|
-            try writer.print("syscall: {t},\n", .{s})
+            try writer.print("syscall:   {t},\n", .{s})
         else
-            try writer.print("invalid syscall: {d},\n", .{value.rdi});
+            try writer.print("invalid syscall:   {d},\n", .{value.rdi});
 
         try writer.splatByteAll(' ', new_indent);
         try writer.print("arg1/rsi:  0x{x:0>16}, arg2/rdx:  0x{x:0>16},\n", .{ value.arg(.one), value.arg(.two) });
