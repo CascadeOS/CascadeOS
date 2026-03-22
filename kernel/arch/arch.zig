@@ -127,11 +127,11 @@ pub const interrupts = struct {
             )(interrupt.arch_specific, external_interrupt);
         }
 
-        pub fn toUsize(interrupt: Interrupt) callconv(core.inline_in_non_debug) usize {
+        pub inline fn toUsize(interrupt: Interrupt) usize {
             return @intFromEnum(interrupt.arch_specific);
         }
 
-        pub fn fromUsize(interrupt: usize) callconv(core.inline_in_non_debug) Interrupt {
+        pub inline fn fromUsize(interrupt: usize) Interrupt {
             return .{ .arch_specific = @enumFromInt(interrupt) };
         }
     };

@@ -525,7 +525,7 @@ export fn uacpi_kernel_install_interrupt_handler(
     irq: u32,
     handler: uacpi.RawInterruptHandler,
     ctx: *anyopaque,
-    out_irq_handle: **anyopaque,
+    out_irq_handle: *usize,
 ) uacpi.Status {
     const HandlerWrapper = struct {
         fn HandlerWrapper(
@@ -556,7 +556,7 @@ export fn uacpi_kernel_install_interrupt_handler(
         return .internal_error;
     };
 
-    out_irq_handle.* = @ptrFromInt(interrupt.toUsize());
+    out_irq_handle.* = interrupt.toUsize();
 
     return .ok;
 }
@@ -566,11 +566,11 @@ export fn uacpi_kernel_install_interrupt_handler(
 /// 'irq_handle' is the value returned via 'out_irq_handle' during installation.
 export fn uacpi_kernel_uninstall_interrupt_handler(
     _: uacpi.RawInterruptHandler,
-    irq_handle: *anyopaque,
+    irq_handle: usize,
 ) uacpi.Status {
     log.verbose("uacpi_kernel_uninstall_interrupt_handler called", .{});
 
-    const interrupt: arch.interrupts.Interrupt = .fromUsize(@intFromPtr(irq_handle));
+    const interrupt: arch.interrupts.Interrupt = .fromUsize(irq_handle);
     interrupt.deallocate();
 
     return .ok;
