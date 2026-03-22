@@ -752,43 +752,25 @@ pub const PageTable = extern struct {
                 entry.no_execute.write(!map_type.protection.execute);
             }
 
-            switch (map_type.type) {
-                .user => {
-                    entry.user_accessible.write(true);
-                    entry.global.write(false);
-                },
-                .kernel => {
-                    entry.user_accessible.write(false);
-                    entry.global.write(true);
-                },
-            }
+            const user_accessible, const global = switch (map_type.type) {
+                .user => .{ true, false },
+                .kernel => .{ false, true },
+            };
 
-            switch (map_type.cache) {
-                .write_back => {
-                    entry.write_through.write(false);
-                    entry.no_cache.write(false);
+            entry.user_accessible.write(user_accessible);
+            entry.global.write(global);
 
-                    switch (page_type) {
-                        .small => entry.pat.write(false),
-                        .medium, .large => entry.pat_huge.write(false),
-                    }
-                },
-                .write_combining => {
-                    entry.write_through.write(true);
+            const write_through, const no_cache, const pat = switch (map_type.cache) {
+                .write_back => .{ false, false, false },
+                .write_combining => .{ true, false, true },
+                .uncached => .{ false, true, false },
+            };
 
-                    switch (page_type) {
-                        .small => entry.pat.write(true),
-                        .medium, .large => entry.pat_huge.write(true),
-                    }
-                },
-                .uncached => {
-                    entry.no_cache.write(true);
-
-                    switch (page_type) {
-                        .small => entry.pat.write(false),
-                        .medium, .large => entry.pat_huge.write(false),
-                    }
-                },
+            entry.write_through.write(write_through);
+            entry.no_cache.write(no_cache);
+            switch (page_type) {
+                .small => entry.pat.write(pat),
+                .medium, .large => entry.pat_huge.write(pat),
             }
         }
 
