@@ -73,7 +73,7 @@ pub const init = struct {
             const register_space_range = try cascade.mem.heap.allocateSpecial(
                 .from(.from(madt.local_interrupt_controller_address), LAPIC.Register.register_space_size),
                 .{
-                    .protection = .read_write,
+                    .protection = .{ .read = true, .write = true },
                     .cache = .uncached,
                 },
             );

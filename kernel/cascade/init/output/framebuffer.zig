@@ -31,7 +31,7 @@ fn tryGetFramebufferOutputInner(memory_system_available: bool) !?Output {
             .from(framebuffer.height * framebuffer.pitch, .byte),
         ),
         .{
-            .protection = .read_write,
+            .protection = .{ .read = true, .write = true },
             .cache = .write_combining,
         },
     );

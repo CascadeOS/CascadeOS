@@ -20,23 +20,47 @@ protection: Protection,
 
 cache: Cache = .write_back,
 
-// The ordering/values of these fields is important.
-pub const Protection = enum(u8) {
-    /// Disallow any access.
-    none = 0,
-
-    /// Read only.
-    read = 1,
-
-    /// Execute only.
+pub const Protection = struct {
+    /// Is read access allowed?
     ///
-    /// Reads may be possible if the architecture does not support execute only.
-    execute = 2,
+    /// Some architectures may not support disabling read access.
+    read: bool = false,
 
-    /// Read and write.
-    read_write = 3,
+    /// Is write access allowed?
+    write: bool = false,
 
-    // TODO: is there a way to support write only without it being the same as read_write when combined with mprotect?
+    /// Is execution allowed?
+    ///
+    /// Some architectures may not support disabling execution.
+    execute: bool = false,
+
+    pub const none: Protection = .{};
+    pub const all: Protection = .{ .read = true, .write = true, .execute = true };
+
+    pub fn equal(self: Protection, other: Protection) bool {
+        return self.read == other.read and
+            self.write == other.write and
+            self.execute == other.execute;
+    }
+
+    /// Returns `true` if `self` exceeds `other`.
+    ///
+    /// A `protection` exceeds another if it has any permission that the other does not.
+    pub fn exceeds(self: Protection, other: Protection) bool {
+        if (self.read and !other.read) return true;
+        if (self.write and !other.write) return true;
+        if (self.execute and !other.execute) return true;
+        return false;
+    }
+
+    pub fn format(self: Protection, writer: *std.Io.Writer) !void {
+        if (self.read) try writer.writeByte('R');
+        if (self.write) try writer.writeByte('W');
+        if (self.execute) try writer.writeByte('X');
+        // try writer.writeByte(if (self.read) 'R' else '_');
+        // try writer.writeByte(if (self.write) 'W' else '_');
+        // try writer.writeByte(if (self.execute) 'X' else '_');
+    }
 };
 
 pub const Cache = enum {
@@ -49,7 +73,7 @@ pub const Cache = enum {
 
 pub fn equal(map_type: MapType, other: MapType) bool {
     return map_type.type == other.type and
-        map_type.protection == other.protection and
+        map_type.protection.equal(other.protection) and
         map_type.cache == other.cache;
 }
 
@@ -59,17 +83,12 @@ pub fn format(
 ) !void {
     try writer.writeAll("MapType{ ");
 
-    try writer.writeAll(switch (map_type.type) {
-        .user => "U_",
-        .kernel => "K_",
+    try writer.writeByte(switch (map_type.type) {
+        .user => 'U',
+        .kernel => 'K',
     });
 
-    try writer.writeAll(switch (map_type.protection) {
-        .none => "NO",
-        .read => "RO",
-        .execute => "XO",
-        .read_write => "RW",
-    });
+    try map_type.protection.format(writer);
 
     try writer.writeAll(switch (map_type.cache) {
         .write_back => "_WB",

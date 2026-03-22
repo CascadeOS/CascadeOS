@@ -257,6 +257,7 @@ pub const paging = struct {
         /// Caller must ensure:
         ///  - the virtual address is aligned to the standard page size
         ///  - the virtual address is not already mapped
+        ///  - `map_type.protection` is not `.none`
         ///
         /// This function:
         ///  - only supports the standard page size for the architecture
@@ -312,6 +313,7 @@ pub const paging = struct {
         ///
         /// Caller must ensure:
         ///  - the virtual range address and size are aligned to the standard page size
+        ///  - `new_map_type` protection is not `.none`
         ///
         /// This function:
         ///  - does not flush the TLB
@@ -396,6 +398,7 @@ pub const paging = struct {
         ///  - the physical range address and size are aligned to the standard page size
         ///  - the virtual range size is equal to the physical range size
         ///  - the virtual range is not already mapped
+        ///  - `map_type.protection` is not `.none`
         ///
         /// This function:
         ///  - uses all page sizes available to the architecture
@@ -408,6 +411,7 @@ pub const paging = struct {
             map_type: cascade.mem.MapType,
             physical_page_allocator: cascade.mem.PhysicalPage.Allocator,
         ) callconv(core.inline_in_non_debug) anyerror!void {
+            if (core.is_debug) std.debug.assert(!map_type.protection.equal(.none));
             return getFunction(
                 current_functions.paging.init,
                 "mapToPhysicalRangeAllPageSizes",
@@ -984,6 +988,7 @@ pub const Functions = struct {
         /// Caller must ensure:
         ///  - the virtual address is aligned to the standard page size
         ///  - the virtual address is not already mapped
+        ///  - `map_type.protection` is not `.none`
         ///
         /// This function:
         ///  - only supports the standard page size for the architecture
@@ -1016,6 +1021,7 @@ pub const Functions = struct {
         ///
         /// Caller must ensure:
         ///  - the virtual range address and size are aligned to the standard page size
+        ///  - `new_map_type` protection is not `.none`
         ///
         /// This function:
         ///  - does not flush the TLB
@@ -1069,6 +1075,7 @@ pub const Functions = struct {
             ///  - the physical range address and size are aligned to the standard page size
             ///  - the virtual range size is equal to the physical range size
             ///  - the virtual range is not already mapped
+            ///  - `map_type.protection` is not `.none`
             ///
             /// This function:
             ///  - uses all page sizes available to the architecture

@@ -550,10 +550,10 @@ pub const LoadableRegion = struct {
                 }
 
                 const new_protection = blk: {
-                    var prot: cascade.mem.MapType.Protection = .none;
+                    var prot: cascade.mem.MapType.Protection = .{};
 
-                    if (program_header.flags.read) prot = .read;
-                    if (program_header.flags.execute) prot = .execute;
+                    if (program_header.flags.read) prot.read = true;
+                    if (program_header.flags.execute) prot.execute = true;
 
                     if (program_header.flags.write) {
                         if (program_header.flags.execute) {
@@ -561,10 +561,10 @@ pub const LoadableRegion = struct {
                             return error.ProgramHeaderInvalidProtection;
                         }
 
-                        prot = .read_write;
+                        prot.write = true;
                     }
 
-                    if (prot == .none) {
+                    if (prot.equal(.none)) {
                         log.warn("no protection flags set in program header", .{});
                         return error.ProgramHeaderInvalidProtection;
                     }

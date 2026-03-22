@@ -147,7 +147,7 @@ fn getSerialOutputFromNS16550a(dt: DeviceTree, node: DeviceTree.Node, memory_sys
             uart.Memory16550.register_region_size,
         ),
         .{
-            .protection = .read_write,
+            .protection = .{ .read = true, .write = true },
             .cache = .uncached,
         },
     );
@@ -229,7 +229,7 @@ fn getSerialOutputFromPL011(dt: DeviceTree, node: DeviceTree.Node, memory_system
             uart.PL011.register_region_size,
         ),
         .{
-            .protection = .read_write,
+            .protection = .{ .read = true, .write = true },
             .cache = .uncached,
         },
     );

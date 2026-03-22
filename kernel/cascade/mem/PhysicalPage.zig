@@ -333,7 +333,7 @@ pub const init = struct {
             try cascade.mem.mapRangeAndBackWithPhysicalPages(
                 kernel_page_table,
                 current_pages_range.toVirtualRange(),
-                .{ .protection = .read_write, .type = .kernel },
+                .{ .protection = .{ .read = true, .write = true }, .type = .kernel },
                 .kernel,
                 .keep,
                 bootstrap_allocator,
@@ -344,7 +344,7 @@ pub const init = struct {
             try cascade.mem.mapRangeAndBackWithPhysicalPages(
                 kernel_page_table,
                 range.toVirtualRange(),
-                .{ .protection = .read_write, .type = .kernel },
+                .{ .protection = .{ .read = true, .write = true }, .type = .kernel },
                 .kernel,
                 .keep,
                 bootstrap_allocator,

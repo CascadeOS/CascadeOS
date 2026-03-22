@@ -215,13 +215,13 @@ pub fn map(
     errdefer |err| log.debug("{s}: map failed {t}", .{ address_space.name(), err });
 
     if (log.levelEnabled(.verbose)) {
-        if (options.base) |base| log.verbose("{s}: map {f} @ {f} - {t} - {t}", .{
+        if (options.base) |base| log.verbose("{s}: map {f} @ {f} - protection: {f} - {t}", .{
             address_space.name(),
             options.size,
             base,
             options.protection,
             options.type,
-        }) else log.verbose("{s}: map {f} - {t} - {t}", .{
+        }) else log.verbose("{s}: map {f} - protection: {f} - {t}", .{
             address_space.name(),
             options.size,
             options.protection,
@@ -247,12 +247,12 @@ pub fn map(
     }
 
     if (options.max_protection) |max_protection| {
-        if (max_protection == .none) {
+        if (max_protection.equal(.none)) {
             @branchHint(.cold);
             return error.MaxProtectionNone;
         }
 
-        if (@intFromEnum(options.protection) > @intFromEnum(max_protection)) {
+        if (options.protection.exceeds(max_protection)) {
             @branchHint(.cold);
             return error.MaxProtectionExceeded;
         }
@@ -497,19 +497,12 @@ pub const ChangeProtection = union(enum) {
         protection: ?Protection,
         max_protection: ?Protection,
 
-        fn toInts(request: Request) struct { ?u8, ?u8 } {
-            return .{
-                if (request.protection) |protection| @intFromEnum(protection) else null,
-                if (request.max_protection) |max_protection| @intFromEnum(max_protection) else null,
-            };
-        }
-
         pub fn format(
             request: Request,
             writer: *std.Io.Writer,
         ) !void {
             try writer.print(
-                "protection: {?t} - max_protection: {?t}",
+                "protection: {?f} - max_protection: {?f}",
                 .{
                     request.protection,
                     request.max_protection,
@@ -553,7 +546,7 @@ pub fn changeProtection(
         return error.RangeNotPageAligned;
     }
 
-    if (request.max_protection) |max_protection| if (max_protection == .none) {
+    if (request.max_protection) |max_protection| if (max_protection.equal(.none)) {
         @branchHint(.cold);
         return error.MaxProtectionNone;
     };
@@ -670,38 +663,36 @@ fn validateChangeProtection(
     entry_range: EntryRange,
     request: ChangeProtection.Request,
 ) !ValidateChangeProtection {
-    const opt_new_protection, const opt_new_max_protection = request.toInts();
-
     var result: ValidateChangeProtection = .{ .no_op = true, .update_page_table = false };
 
     for (address_space.entries.items[entry_range.start..][0..entry_range.length]) |entry| {
-        const planned_max_protection = if (opt_new_max_protection) |new_max_protection| blk: {
-            const old_max_protection = @intFromEnum(entry.max_protection);
+        const planned_max_protection = if (request.max_protection) |new_max_protection| blk: {
+            const old_max_protection = entry.max_protection;
 
-            if (new_max_protection > old_max_protection) {
+            if (new_max_protection.exceeds(old_max_protection)) {
                 @branchHint(.cold);
                 return error.MaxProtectionIncreased;
             }
 
-            if (new_max_protection != old_max_protection) result.no_op = false;
+            if (!new_max_protection.equal(old_max_protection)) result.no_op = false;
 
             break :blk new_max_protection;
-        } else @intFromEnum(entry.max_protection);
+        } else entry.max_protection;
 
-        const old_protection = @intFromEnum(entry.protection);
+        const old_protection = entry.protection;
 
-        if (opt_new_protection) |new_protection| {
-            if (new_protection > planned_max_protection) {
+        if (request.protection) |new_protection| {
+            if (new_protection.exceeds(planned_max_protection)) {
                 @branchHint(.cold);
                 return error.MaxProtectionExceeded;
             }
 
-            if (new_protection != old_protection) {
+            if (!new_protection.equal(old_protection)) {
                 result.no_op = false;
                 result.update_page_table = true;
             }
         } else {
-            if (old_protection > planned_max_protection) {
+            if (old_protection.exceeds(planned_max_protection)) {
                 @branchHint(.cold);
                 return error.MaxProtectionExceeded;
             }
@@ -740,10 +731,10 @@ fn performChangeProtection(
 
         split_first_entry: {
             if (request.protection) |new_protection| {
-                if (first_entry.protection != new_protection) break :split_first_entry;
+                if (!first_entry.protection.equal(new_protection)) break :split_first_entry;
             }
             if (request.max_protection) |new_max_protection| {
-                if (first_entry.max_protection != new_max_protection) break :split_first_entry;
+                if (!first_entry.max_protection.equal(new_max_protection)) break :split_first_entry;
             }
 
             // the first entry is already the correct protection so no need to split it
@@ -777,10 +768,10 @@ fn performChangeProtection(
 
         split_last_entry: {
             if (request.protection) |new_protection| {
-                if (last_entry.protection != new_protection) break :split_last_entry;
+                if (!last_entry.protection.equal(new_protection)) break :split_last_entry;
             }
             if (request.max_protection) |new_max_protection| {
-                if (last_entry.max_protection != new_max_protection) break :split_last_entry;
+                if (!last_entry.max_protection.equal(new_max_protection)) break :split_last_entry;
             }
 
             // the last entry is already the correct protection so no need to split it
@@ -815,13 +806,13 @@ fn performChangeProtection(
 
         const entry = address_space.entries.items[index];
         if (request.protection) |new_protection| {
-            if (entry.protection != new_protection) {
+            if (!entry.protection.equal(new_protection)) {
                 entry.protection = new_protection;
                 modified = true;
             }
         }
         if (request.max_protection) |new_max_protection| {
-            if (entry.max_protection != new_max_protection) {
+            if (!entry.max_protection.equal(new_max_protection)) {
                 entry.max_protection = new_max_protection;
                 modified = true;
             }

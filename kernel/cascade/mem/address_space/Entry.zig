@@ -78,8 +78,8 @@ pub fn anyOverlap(entry: *const Entry, other: *const Entry) bool {
 ///
 /// Can only be `true` when `second_entry` immediately follows `first_entry` in the address space.
 pub fn canMerge(first_entry: *const Entry, second_entry: *const Entry) bool {
-    if (first_entry.protection != second_entry.protection) return false;
-    if (first_entry.max_protection != second_entry.max_protection) return false;
+    if (!first_entry.protection.equal(second_entry.protection)) return false;
+    if (!first_entry.max_protection.equal(second_entry.max_protection)) return false;
     if (first_entry.copy_on_write != second_entry.copy_on_write) return false;
     if (first_entry.wired_count != second_entry.wired_count) return false;
 

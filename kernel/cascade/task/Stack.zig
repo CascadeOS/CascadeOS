@@ -99,7 +99,7 @@ pub fn createStack() !Stack {
         cascade.mem.mapRangeAndBackWithPhysicalPages(
             cascade.mem.kernelPageTable(),
             usable_range.toVirtualRange(),
-            .{ .type = .kernel, .protection = .read_write },
+            .{ .type = .kernel, .protection = .{ .read = true, .write = true } },
             .kernel,
             .keep,
             cascade.mem.PhysicalPage.allocator,

@@ -163,7 +163,7 @@ pub const init = struct {
                 .config_space = try cascade.mem.heap.allocateSpecial(
                     ecam_config_space_physical_range,
                     .{
-                        .protection = .read_write,
+                        .protection = .{ .read = true, .write = true },
                         .cache = .uncached,
                     },
                 ),

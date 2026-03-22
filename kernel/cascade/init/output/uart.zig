@@ -61,7 +61,7 @@ pub fn tryGetSerialOutput16X50(
                     UartT.register_region_size,
                 ),
                 .{
-                    .protection = .read_write,
+                    .protection = .{ .read = true, .write = true },
                     .cache = .uncached,
                 },
             );
@@ -114,7 +114,7 @@ pub fn tryGetSerialOutputPL011(
             PL011.register_region_size,
         ),
         .{
-            .protection = .read_write,
+            .protection = .{ .read = true, .write = true },
             .cache = .uncached,
         },
     );

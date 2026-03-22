@@ -346,7 +346,8 @@ fn loadHelloWorld() !void {
         _ = try process.address_space.map(.{
             .base = loadable_region.virtual_range.address.toVirtualAddress(),
             .size = loadable_region.virtual_range.size,
-            .protection = .read_write,
+            .protection = .{ .read = true, .write = true },
+            .max_protection = .all,
             .type = .zero_fill,
         });
     }
@@ -374,8 +375,6 @@ fn loadHelloWorld() !void {
 
     // change each regions protections as per the elf
     while (try iter.next()) |loadable_region| {
-        if (loadable_region.protection == .read_write) continue;
-
         try process.address_space.changeProtection(
             loadable_region.virtual_range.toVirtualRange(),
             .{
@@ -389,7 +388,7 @@ fn loadHelloWorld() !void {
 
     const user_stack = try process.address_space.map(.{
         .size = .from(64, .kib),
-        .protection = .read_write,
+        .protection = .{ .read = true, .write = true },
         .type = .zero_fill,
     });
 

@@ -312,7 +312,7 @@ const allocator_impl = struct {
             cascade.mem.mapRangeAndBackWithPhysicalPages(
                 cascade.mem.kernelPageTable(),
                 virtual_range.toVirtualRange(),
-                .{ .type = .kernel, .protection = .read_write },
+                .{ .type = .kernel, .protection = .{ .read = true, .write = true } },
                 .kernel,
                 .keep,
                 cascade.mem.PhysicalPage.allocator,

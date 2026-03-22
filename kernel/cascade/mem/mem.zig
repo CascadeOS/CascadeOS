@@ -42,7 +42,7 @@ pub fn mapSinglePage(
     physical_page_allocator: PhysicalPage.Allocator,
 ) MapError!void {
     if (core.is_debug) {
-        std.debug.assert(map_type.protection != .none);
+        std.debug.assert(!map_type.protection.equal(.none));
         std.debug.assert(virtual_address.pageAligned());
     }
 
@@ -72,7 +72,7 @@ pub fn mapRangeAndBackWithPhysicalPages(
     physical_page_allocator: PhysicalPage.Allocator,
 ) MapError!void {
     if (core.is_debug) {
-        std.debug.assert(map_type.protection != .none);
+        std.debug.assert(!map_type.protection.equal(.none));
         std.debug.assert(virtual_range.pageAligned());
     }
 
@@ -141,7 +141,7 @@ pub fn mapRangeToPhysicalRange(
     physical_page_allocator: PhysicalPage.Allocator,
 ) MapError!void {
     if (core.is_debug) {
-        std.debug.assert(map_type.protection != .none);
+        std.debug.assert(!map_type.protection.equal(.none));
         std.debug.assert(virtual_range.pageAligned());
         std.debug.assert(physical_range.pageAligned());
         std.debug.assert(virtual_range.size.equal(physical_range.size));
@@ -238,12 +238,16 @@ pub fn unmap(
 /// Only modifies the pages that are actually mapped.
 ///
 /// Performs TLB shootdown if required.
+///
+/// Asserts that `new_map_type.protection` is not `.none`.
 pub fn changeProtection(
     page_table: arch.paging.PageTable,
     change_proection_batch: *const ChangeProtectionBatch,
     flush_target: cascade.Context,
     new_map_type: cascade.mem.MapType,
 ) void {
+    if (core.is_debug) std.debug.assert(!new_map_type.protection.equal(.none));
+
     var flush_batch: VirtualRangeBatch = .{};
 
     for (change_proection_batch.ranges.constSlice()) |range| {
@@ -951,7 +955,7 @@ pub const init = struct {
                             entry.range,
                             .{
                                 .type = .kernel,
-                                .protection = .read_write,
+                                .protection = .{ .read = true, .write = true },
                                 .cache = cache_type,
                             },
                             PhysicalPage.init.bootstrap_allocator,
@@ -970,9 +974,9 @@ pub const init = struct {
                         region.range.size,
                     ),
                     switch (region.type) {
-                        .executable_section => .{ .type = .kernel, .protection = .execute },
-                        .readonly_section => .{ .type = .kernel, .protection = .read },
-                        .writeable_section => .{ .type = .kernel, .protection = .read_write },
+                        .executable_section => .{ .type = .kernel, .protection = .{ .execute = true } },
+                        .readonly_section => .{ .type = .kernel, .protection = .{ .read = true } },
+                        .writeable_section => .{ .type = .kernel, .protection = .{ .read = true, .write = true } },
                         else => unreachable,
                     },
                     PhysicalPage.init.bootstrap_allocator,

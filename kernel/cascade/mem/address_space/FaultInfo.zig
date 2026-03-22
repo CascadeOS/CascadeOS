@@ -81,20 +81,21 @@ pub fn faultCheck(
         return error.NotMapped;
     }
 
-    log.verbose("fault_lookup found entry with range {f} and protection {t}", .{
+    log.verbose("fault_lookup found entry with range {f} and protection {f}", .{
         fault_info.entry.range,
         fault_info.entry.protection,
     });
 
     // check protection
-    {
-        errdefer fault_info.address_space.entries_lock.readUnlock();
-        switch (fault_info.entry.protection) {
-            .none => return error.Protection,
-            .read => if (fault_info.access_type != .read) return error.Protection,
-            .read_write => if (fault_info.access_type != .read and fault_info.access_type != .write) return error.Protection,
-            .execute => if (fault_info.access_type != .execute) return error.Protection, // TODO: x86 allows read on executable memory
+    blk: {
+        switch (fault_info.access_type) {
+            .read => if (fault_info.entry.protection.read) break :blk, // TODO: x86 allows read on executable memory
+            .write => if (fault_info.entry.protection.write) break :blk,
+            .execute => if (fault_info.entry.protection.execute) break :blk,
         }
+
+        fault_info.address_space.entries_lock.readUnlock();
+        return error.Protection;
     }
 
     // set the protection we want to enter the page in at
@@ -102,11 +103,10 @@ pub fn faultCheck(
     if (fault_info.entry.wired_count != 0) {
         fault_info.wired = true;
         // wired needs full access
-        switch (fault_info.enter_protection) {
-            .none => unreachable, // `error.Protection` is returned earlier if protection is `.none`
-            .read => fault_info.access_type = .read,
-            .read_write => fault_info.access_type = .write,
-            .execute => fault_info.access_type = .execute,
+        if (fault_info.enter_protection.write) {
+            fault_info.access_type = .write;
+        } else if (fault_info.enter_protection.execute) {
+            fault_info.access_type = .execute;
         }
         // wiring needs write lock
         fault_info.anonymous_map_lock_type = .write;
@@ -123,13 +123,13 @@ pub fn faultCheck(
             try fault_info.anonymousMapCopy();
 
             return error.Restart;
-        } else if (fault_info.enter_protection == .read_write and fault_info.access_type == .read) {
+        } else if (fault_info.enter_protection.read and fault_info.enter_protection.write and fault_info.access_type == .read) {
             // ensure the page is entered read only since `needs_copy` is still true
-            fault_info.enter_protection = .read;
+            fault_info.enter_protection = .{ .read = true };
         }
     }
 
-    log.verbose("page enter protection: {t}", .{fault_info.enter_protection});
+    log.verbose("page enter protection: {f}", .{fault_info.enter_protection});
 
     const anonymous_map_reference = fault_info.entry.anonymous_map_reference;
     const object_reference = fault_info.entry.object_reference;

@@ -79,6 +79,10 @@ pub const PageTable = extern struct {
     }
 
     /// Maps a 4 KiB page.
+    ///
+    /// Caller must ensure:
+    ///  - `virtual_address` is aligned to 4 KiB
+    ///  - `map_type.protection` is not `.none`
     pub fn map4KiB(
         level4_table: *PageTable,
         virtual_address: cascade.VirtualAddress,
@@ -312,6 +316,14 @@ pub const PageTable = extern struct {
         }
     }
 
+    /// Changes the protection of the given virtual range.
+    ///
+    /// Caller must ensure:
+    ///  - the virtual range address and size are aligned to the standard page size
+    ///  - `new_map_type` protection is not `.none`
+    ///
+    /// This function:
+    ///  - does not flush the TLB
     pub fn changeProtection(
         level4_table: *PageTable,
         virtual_range: cascade.VirtualRange,
@@ -459,12 +471,17 @@ pub const PageTable = extern struct {
             return true;
         }
 
-        return switch (previous_map_type.protection) {
-            .none => false,
-            else => |previous_protection| @intFromEnum(new_map_type.protection) < @intFromEnum(previous_protection),
-        };
+        if (new_map_type.protection.execute != new_map_type.protection.execute) return true;
+        if (new_map_type.protection.write != new_map_type.protection.write) return true;
+
+        return false;
     }
 
+    /// Sets given entries address and map type.
+    ///
+    /// Caller must ensure:
+    ///  - the entry is not present
+    ///  - the `map_type.protection` is not `.none`
     fn setEntry(
         raw_entry: *volatile Entry.Raw,
         physical_address: cascade.PhysicalAddress,
@@ -718,29 +735,21 @@ pub const PageTable = extern struct {
             return entry.getAddress4kib().toDirectMap().toPtr(*PageTable);
         }
 
+        /// Applies the given map type to the given entry.
+        ///
+        /// Caller must ensure:
+        ///  - `map_type.protection` is not `.none`
         fn applyMapType(
             entry: *PageTable.Entry,
             map_type: MapType,
             page_type: PageType,
         ) void {
-            switch (map_type.protection) {
-                .none => {
-                    entry.present.write(false);
-                    return; // entry is not present so no need to set other fields
-                },
-                .read, .execute => {
-                    entry.present.write(true);
-                    entry.writeable.write(false);
-                },
-                .read_write => {
-                    entry.present.write(true);
-                    entry.writeable.write(true);
-                },
-            }
+            entry.present.write(true);
+            entry.writeable.write(map_type.protection.write);
 
             if (x64.info.cpu_id.execute_disable) {
                 @branchHint(.likely); // modern CPUs support NX
-                entry.no_execute.write(map_type.protection != .execute);
+                entry.no_execute.write(!map_type.protection.execute);
             }
 
             switch (map_type.type) {
@@ -1148,6 +1157,7 @@ pub const PageTable = extern struct {
         ///  - the physical range address and size are aligned to the standard page size
         ///  - the virtual range size is equal to the physical range size
         ///  - the virtual range is not already mapped
+        ///  - `map_type.protection` is not `.none`
         ///
         /// This function:
         ///  - uses all page sizes available to the architecture

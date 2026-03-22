@@ -96,7 +96,7 @@ pub const init = struct {
         const register_region_range = try cascade.mem.heap.allocateSpecial(
             .from(.from(hpet.base_address.address), Hpet.register_region_size),
             .{
-                .protection = .read_write,
+                .protection = .{ .read = true, .write = true },
                 .cache = .uncached,
             },
         );
