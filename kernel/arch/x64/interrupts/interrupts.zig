@@ -140,10 +140,7 @@ pub const Interrupt = enum(u8) {
         const interrupt_number: u8 = @intCast(allocation.base);
 
         globals.handlers[interrupt_number] = interrupt_handler;
-
-        // TODO: maybe we should use `mfence` instead of this junk that probably doesn't work
-        const byte_slice: []u8 = std.mem.asBytes(&globals.handlers[interrupt_number]);
-        _ = @atomicStore(u8, &byte_slice.ptr[0], byte_slice.ptr[0], .release);
+        x64.instructions.mfence();
 
         const interrupt: Interrupt = @enumFromInt(interrupt_number);
         log.debug("allocated interrupt {}", .{interrupt});
@@ -158,9 +155,7 @@ pub const Interrupt = enum(u8) {
 
         globals.handlers[interrupt_number] = .prepare(interrupt_handlers.unhandledInterrupt, .{});
 
-        // TODO: maybe we should use `mfence` instead of this junk that probably doesn't work
-        const byte_slice: []u8 = std.mem.asBytes(&globals.handlers[interrupt_number]);
-        _ = @atomicStore(u8, &byte_slice.ptr[0], byte_slice.ptr[0], .release);
+        x64.instructions.mfence();
 
         globals.interrupt_arena.deallocate(.{ .base = interrupt_number, .len = 1 });
     }
@@ -329,7 +324,7 @@ const globals = struct {
 
         break :handlers temp_handlers;
     };
-    var interrupt_arena: cascade.mem.resource_arena.Arena(.none) = undefined; // initialized by `init.initializeInterrupts`
+    var interrupt_arena: cascade.mem.resource_arena.Arena(.none) = undefined; // initialized by `init.initializeInterruptRouting`
 };
 
 pub const init = struct {
