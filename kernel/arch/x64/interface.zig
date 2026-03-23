@@ -19,7 +19,6 @@ pub const functions: arch.Functions = .{
         .enable = x64.instructions.enableInterrupts,
         .disable = x64.instructions.disableInterrupts,
 
-        .eoi = x64.apic.eoi,
         .sendPanicIPI = x64.apic.sendPanicIPI,
         .sendFlushIPI = x64.apic.sendFlushIPI,
 

@@ -63,14 +63,6 @@ pub const interrupts = struct {
         )();
     }
 
-    /// Signal end of interrupt.
-    pub fn eoi() callconv(core.inline_in_non_debug) void {
-        getFunction(
-            current_functions.interrupts,
-            "eoi",
-        )();
-    }
-
     /// Send a panic IPI to all other executors.
     ///
     /// Asserts interrupts are disabled.
@@ -923,9 +915,6 @@ pub const Functions = struct {
         ///
         /// Non-optional because it is used during early initialization.
         disable: fn () callconv(.@"inline") void,
-
-        /// Signal end of interrupt.
-        eoi: ?fn () void = null,
 
         /// Send a panic IPI to all other executors.
         sendPanicIPI: ?fn () void = null,
