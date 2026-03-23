@@ -82,13 +82,35 @@ pub const interrupts = struct {
         )(executor);
     }
 
+    /// Get the EOI type for the given external interrupt if known.
+    pub fn eoiType(external_interrupt: u32) callconv(core.inline_in_non_debug) ?Interrupt.Handler.EOI {
+        return getFunction(
+            current_functions.interrupts,
+            "eoiType",
+        )(external_interrupt);
+    }
+
     pub const Interrupt = struct {
         arch_specific: current_decls.interrupts.Interrupt,
 
-        pub const Handler = core.TypeErasedCall.Templated(&.{
-            InterruptFrame,
-            cascade.Task.Current.StateBeforeInterrupt,
-        });
+        pub const Handler = struct {
+            eoi: EOI,
+            call: Call,
+
+            pub const EOI = enum {
+                none,
+                before,
+                after,
+
+                pub const edge: EOI = .before;
+                pub const level: EOI = .after;
+            };
+
+            pub const Call = core.TypeErasedCall.Templated(&.{
+                InterruptFrame,
+                cascade.Task.Current.StateBeforeInterrupt,
+            });
+        };
 
         pub const AllocateError = error{InterruptAllocationFailed};
 
@@ -921,6 +943,9 @@ pub const Functions = struct {
 
         /// Send a flush IPI to the given executor.
         sendFlushIPI: ?fn (executor: *cascade.Executor) void = null,
+
+        /// Get the EOI type for the given external interrupt if known.
+        eoiType: ?fn (external_interrupt: u32) ?interrupts.Interrupt.Handler.EOI = null,
 
         allocateInterrupt: ?fn (
             handler: interrupts.Interrupt.Handler,

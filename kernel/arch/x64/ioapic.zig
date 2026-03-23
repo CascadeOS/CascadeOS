@@ -9,6 +9,15 @@ const core = @import("core");
 
 const x64 = @import("x64.zig");
 
+/// Get the EOI type for the given external interrupt if known.
+pub fn eoiType(external_interrupt: u32) ?arch.interrupts.Interrupt.Handler.EOI {
+    const mapping = getMapping(@intCast(external_interrupt));
+    return switch (mapping.trigger_mode) {
+        .edge => .edge,
+        .level => .level,
+    };
+}
+
 pub fn routeInterrupt(
     interrupt: u8,
     vector: x64.interrupts.Interrupt,

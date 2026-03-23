@@ -79,17 +79,15 @@ pub fn flushRequestHandler(
     _: arch.interrupts.InterruptFrame,
     _: cascade.Task.Current.StateBeforeInterrupt,
 ) void {
+    // eoi is called after this handler returns
     cascade.mem.FlushRequest.processFlushRequests();
-    // eoi after all current flush requests have been handled
-    x64.apic.eoi();
 }
 
 pub fn perExecutorPeriodicHandler(
     _: arch.interrupts.InterruptFrame,
     _: cascade.Task.Current.StateBeforeInterrupt,
 ) void {
-    // eoi before calling `maybePreempt` as we may get scheduled out and need to re-enable timer interrupts
-    x64.apic.eoi();
+    // eoi is called before this handler
     cascade.Task.Current.get().maybePreempt();
 }
 

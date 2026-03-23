@@ -21,6 +21,7 @@ pub const functions: arch.Functions = .{
 
         .sendPanicIPI = x64.apic.sendPanicIPI,
         .sendFlushIPI = x64.apic.sendFlushIPI,
+        .eoiType = x64.ioapic.eoiType,
 
         .allocateInterrupt = x64.interrupts.Interrupt.allocate,
         .deallocateInterrupt = x64.interrupts.Interrupt.deallocate,

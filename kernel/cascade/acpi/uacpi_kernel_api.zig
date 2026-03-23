@@ -540,11 +540,10 @@ export fn uacpi_kernel_install_interrupt_handler(
 
     log.verbose("uacpi_kernel_install_interrupt_handler called", .{});
 
-    const interrupt_handler: arch.interrupts.Interrupt.Handler = .prepare(HandlerWrapper, .{ handler, ctx });
-
-    const interrupt = arch.interrupts.Interrupt.allocate(
-        interrupt_handler,
-    ) catch |err| {
+    const interrupt = arch.interrupts.Interrupt.allocate(.{
+        .eoi = arch.interrupts.eoiType(irq) orelse return .not_found,
+        .call = .prepare(HandlerWrapper, .{ handler, ctx }),
+    }) catch |err| {
         log.err("failed to allocate interrupt: {}", .{err});
         return .internal_error;
     };

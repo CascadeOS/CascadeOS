@@ -14,29 +14,38 @@ const interrupt_handlers = @import("handlers.zig");
 const log = cascade.debug.log.scoped(.interrupt);
 
 export fn interruptDispatch(interrupt_frame: *InterruptFrame) callconv(.c) void {
+    const state_before_interrupt = cascade.Task.Current.onInterruptEntry();
+    defer state_before_interrupt.onInterruptExit();
+
     switch (interrupt_frame.cs.selector) {
         .kernel_code => {},
         .user_code, .user_code_32bit => x64.instructions.disableSSEUsage(),
         else => unreachable,
     }
-    defer {
-        switch (interrupt_frame.cs.selector) {
-            .user_code, .user_code_32bit => {
-                const per_thread: *x64.user.PerThread = .from(.from(cascade.Task.Current.get().task));
-                x64.instructions.enableSSEUsage();
-                per_thread.extended_state.load();
-            },
-            .kernel_code => {},
-            else => unreachable,
-        }
-    }
-
-    const state_before_interrupt = cascade.Task.Current.onInterruptEntry();
-    defer state_before_interrupt.onInterruptExit();
+    defer switch (interrupt_frame.cs.selector) {
+        .user_code, .user_code_32bit => {
+            const per_thread: *x64.user.PerThread = .from(.from(cascade.Task.Current.get().task));
+            x64.instructions.enableSSEUsage();
+            per_thread.extended_state.load();
+        },
+        .kernel_code => {},
+        else => unreachable,
+    };
 
     var handler = globals.handlers[interrupt_frame.vector_number.full];
-    handler.setTemplatedArgs(.{ .{ .arch_specific = interrupt_frame }, state_before_interrupt });
-    handler.call();
+    handler.call.setTemplatedArgs(.{ .{ .arch_specific = interrupt_frame }, state_before_interrupt });
+
+    switch (handler.eoi) {
+        .none => handler.call.call(),
+        .after => {
+            handler.call.call();
+            x64.apic.eoi();
+        },
+        .before => {
+            x64.apic.eoi();
+            handler.call.call();
+        },
+    }
 
     x64.instructions.disableInterrupts();
 }
@@ -153,8 +162,10 @@ pub const Interrupt = enum(u8) {
 
         const interrupt_number = @intFromEnum(interrupt);
 
-        globals.handlers[interrupt_number] = .prepare(interrupt_handlers.unhandledInterrupt, .{});
-
+        globals.handlers[interrupt_number] = .{
+            .eoi = .after,
+            .call = .prepare(interrupt_handlers.unhandledInterrupt, .{}),
+        };
         x64.instructions.mfence();
 
         globals.interrupt_arena.deallocate(.{ .base = interrupt_number, .len = 1 });
@@ -312,14 +323,24 @@ const globals = struct {
             const interrupt: Interrupt = @enumFromInt(i);
 
             if (interrupt == .page_fault) {
-                temp_handlers[i] = .prepare(interrupt_handlers.earlyPageFaultHandler, .{});
+                temp_handlers[i] = .{
+                    .eoi = .none,
+                    .call = .prepare(interrupt_handlers.earlyPageFaultHandler, .{}),
+                };
                 continue;
             }
 
-            temp_handlers[i] = if (interrupt.isException())
-                .prepare(interrupt_handlers.unhandledException, .{})
-            else
-                .prepare(interrupt_handlers.unhandledInterrupt, .{});
+            if (interrupt.isException()) {
+                temp_handlers[i] = .{
+                    .eoi = .none,
+                    .call = .prepare(interrupt_handlers.unhandledException, .{}),
+                };
+            } else {
+                temp_handlers[i] = .{
+                    .eoi = .after,
+                    .call = .prepare(interrupt_handlers.unhandledInterrupt, .{}),
+                };
+            }
         }
 
         break :handlers temp_handlers;
@@ -369,10 +390,22 @@ pub const init = struct {
     /// Switch away from the initial interrupt handlers installed by `initInterrupts` to the standard
     /// system interrupt handlers.
     pub fn loadStandardInterruptHandlers() void {
-        globals.handlers[@intFromEnum(Interrupt.non_maskable_interrupt)] = .prepare(interrupt_handlers.nonMaskableInterruptHandler, .{});
-        globals.handlers[@intFromEnum(Interrupt.page_fault)] = .prepare(interrupt_handlers.pageFaultHandler, .{});
-        globals.handlers[@intFromEnum(Interrupt.flush_request)] = .prepare(interrupt_handlers.flushRequestHandler, .{});
-        globals.handlers[@intFromEnum(Interrupt.per_executor_periodic)] = .prepare(interrupt_handlers.perExecutorPeriodicHandler, .{});
+        globals.handlers[@intFromEnum(Interrupt.non_maskable_interrupt)] = .{
+            .eoi = .none,
+            .call = .prepare(interrupt_handlers.nonMaskableInterruptHandler, .{}),
+        };
+        globals.handlers[@intFromEnum(Interrupt.page_fault)] = .{
+            .eoi = .none,
+            .call = .prepare(interrupt_handlers.pageFaultHandler, .{}),
+        };
+        globals.handlers[@intFromEnum(Interrupt.flush_request)] = .{
+            .eoi = .after,
+            .call = .prepare(interrupt_handlers.flushRequestHandler, .{}),
+        };
+        globals.handlers[@intFromEnum(Interrupt.per_executor_periodic)] = .{
+            .eoi = .before,
+            .call = .prepare(interrupt_handlers.perExecutorPeriodicHandler, .{}),
+        };
     }
 
     pub fn loadIdt() void {
