@@ -21,8 +21,8 @@
         },
 
         .flanterm = .{
-            .url = "git+https://codeberg.org/Mintsuki/Flanterm.git#5d93c648bee81ce7d19f7a6671ec2bc3aaa834f2",
-            .hash = "N-V-__8AALZeAgBq-R7CB4XPNLV9QXt7BpX21GRanZD0FT7_",
+            .url = "git+https://codeberg.org/Mintsuki/Flanterm.git?ref=v3.0.2#112434532822dde252c84b25a6798a9c00515d66",
+            .hash = "N-V-__8AANhpAgCqVERv9sa-fOs0kLrpWT1o9AkID9GEKiMu",
         },
 
         .limine = .{
