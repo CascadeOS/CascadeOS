@@ -78,6 +78,10 @@ pub inline fn invlpg(address: cascade.VirtualAddress) void {
     );
 }
 
+pub inline fn mfence() void {
+    asm volatile ("mfence" ::: .{ .memory = true });
+}
+
 pub inline fn readTsc() u64 {
     var low: u32 = undefined;
     var high: u32 = undefined;
