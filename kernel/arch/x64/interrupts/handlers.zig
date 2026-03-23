@@ -91,6 +91,14 @@ pub fn perExecutorPeriodicHandler(
     cascade.Task.Current.get().maybePreempt();
 }
 
+pub fn spuriousInterruptHandler(
+    _: arch.interrupts.InterruptFrame,
+    _: cascade.Task.Current.StateBeforeInterrupt,
+) void {
+    // TODO: track occurrences of this, rather than panic
+    @panic("spurious interrupt");
+}
+
 pub fn unhandledException(
     interrupt_frame: arch.interrupts.InterruptFrame,
     _: cascade.Task.Current.StateBeforeInterrupt,

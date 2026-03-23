@@ -330,6 +330,14 @@ const globals = struct {
                 continue;
             }
 
+            if (interrupt == .spurious_interrupt) {
+                temp_handlers[i] = .{
+                    .eoi = .none,
+                    .call = .prepare(interrupt_handlers.spuriousInterruptHandler, .{}),
+                };
+                continue;
+            }
+
             if (interrupt.isException()) {
                 temp_handlers[i] = .{
                     .eoi = .none,
@@ -405,6 +413,10 @@ pub const init = struct {
         globals.handlers[@intFromEnum(Interrupt.per_executor_periodic)] = .{
             .eoi = .before,
             .call = .prepare(interrupt_handlers.perExecutorPeriodicHandler, .{}),
+        };
+        globals.handlers[@intFromEnum(Interrupt.spurious_interrupt)] = .{
+            .eoi = .none,
+            .call = .prepare(interrupt_handlers.spuriousInterruptHandler, .{}),
         };
     }
 
