@@ -215,7 +215,7 @@ fn limineEntryPoint() callconv(.c) noreturn {
     @panic("`initStage1` returned");
 }
 
-const target_limine_revison: limine.BaseRevison.Revison = .@"5";
+const target_limine_revison: limine.BaseRevison.Revison = .@"6";
 var limine_revison: limine.BaseRevison.Revison = .@"0";
 
 pub fn exportRequests() void {
@@ -243,7 +243,5 @@ const requests = struct {
     var framebuffer: limine.Framebuffer = .{};
     var device_tree_blob: limine.DeviceTreeBlob = .{};
     var executable_file: limine.ExecutableFile = .{};
-    var stack_size: limine.StackSize = .{
-        .stack_size = cascade.config.task.kernel_stack_size,
-    };
+    var stack_size: limine.StackSize = .{ .stack_size = cascade.config.task.kernel_stack_size };
 };

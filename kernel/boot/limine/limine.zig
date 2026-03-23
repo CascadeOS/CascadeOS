@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
 // SPDX-FileCopyrightText: 2022-2026 Mintsuki and contributors (https://codeberg.org/Limine/limine-protocol/src/branch/trunk/LICENSE)
 
-//! This module contains the definitions of the Limine protocol as of e42d010a761e4e9ac6bad1b578110ba72c61e1d9.
+//! This module contains the definitions of the Limine protocol as of 26519f1b598564db409e50d1d84eb30642d58ba3.
 //!
-//! [PROTOCOL DOC](https://codeberg.org/Limine/limine-protocol/src/commit/e42d010a761e4e9ac6bad1b578110ba72c61e1d9/PROTOCOL.md)
+//! [PROTOCOL DOC](https://codeberg.org/Limine/limine-protocol/src/commit/26519f1b598564db409e50d1d84eb30642d58ba3/PROTOCOL.md)
 
 const std = @import("std");
 
@@ -19,11 +19,12 @@ const UUID = @import("uuid").UUID;
 pub const BaseRevison = extern struct {
     id: [2]u64 = [_]u64{ 0xf9562b2d5c95a6c8, 0x6a7b384944536bdc },
 
-    /// The Limine boot protocol comes in several base revisions; so far, 6 base revisions are specified: 0 through 5.
+    /// The Limine boot protocol comes in several base revisions; so far, 7 base revisions are specified: 0 through 6.
     ///
-    /// Base revision 0 through 3 are considered deprecated.
-    /// Base revision 0 is the default base revision an executable is assumed to be requesting and complying to if no base
-    /// revision tag is provided by the executable, for backwards compatibility.
+    /// Base revision 0 through 5 are considered deprecated.
+    ///
+    /// Base revision 0 is the default base revision an executable is assumed to be requesting and complying to if no base revision tag is
+    /// provided by the executable, for backwards compatibility.
     ///
     /// A base revision tag is a set of 3 64-bit values placed somewhere in the loaded executable image on an 8-byte aligned boundary;
     /// the first 2 values are a magic number for the bootloader to be able to identify the tag, and the last value is the requested base
@@ -31,6 +32,7 @@ pub const BaseRevison = extern struct {
     ///
     /// If a bootloader drops support for an older base revision, the bootloader must fail to boot an executable requesting such base
     /// revision.
+    ///
     /// If a bootloader does not yet support a requested base revision (i.e. if the requested base revision is higher than the
     /// maximum base revision supported), it must boot the executable using any arbitrary revision it supports, and communicate failure to
     /// comply to the executable by *leaving the 3rd component of the base revision tag unchanged*.
@@ -51,6 +53,7 @@ pub const BaseRevison = extern struct {
         @"3" = 3,
         @"4" = 4,
         @"5" = 5,
+        @"6" = 6,
 
         _,
 
@@ -482,7 +485,7 @@ pub const MP = extern struct {
 
     pub const Response = switch (arch) {
         .aarch64 => aarch64,
-        .loongarch64 => @compileError("MP feature not available for loongarch64"),
+        .loongarch64 => loongarch64,
         .riscv64 => riscv64,
         .x86_64 => x86_64,
     };
@@ -491,7 +494,7 @@ pub const MP = extern struct {
         revision: u64,
 
         /// Always zero.
-        flags: u32,
+        flags: u64,
 
         /// MPIDR of the bootstrap processor (as read from MPIDR_EL1, with Res1 masked off).
         bsp_mpidr: u64,
@@ -547,9 +550,11 @@ pub const MP = extern struct {
             /// Other than that, the CPU state will be the same as described for the bootstrap processor.
             ///
             /// This field is unused for the structure describing the bootstrap processor.
+            ///
+            /// For all CPUs, this field is guaranteed to be `null` when control is first passed to the bootstrap processor.
             goto_address: ?*const fn (smp_info: *const MPInfo) callconv(.c) noreturn,
 
-            /// A free for use field
+            /// A free for use field.
             extra_argument: u64,
 
             pub fn print(mp_info: *const MPInfo, writer: *std.Io.Writer, indent: usize) !void {
@@ -573,11 +578,97 @@ pub const MP = extern struct {
         };
     };
 
+    pub const loongarch64 = extern struct {
+        revision: u64,
+
+        /// Always zero.
+        flags: u64,
+
+        /// Physical CPU ID of the bootstrap processor (as read from CSR.CPUID).
+        bsp_phys_id: u64,
+
+        _cpu_count: u64,
+        _cpus: [*]*MPInfo,
+
+        pub fn cpus(response: *const loongarch64) []*MPInfo {
+            return response._cpus[0..response._cpu_count];
+        }
+
+        pub fn print(response: *const loongarch64, writer: *std.Io.Writer, indent: usize) !void {
+            const new_indent = indent + 2;
+
+            try writer.writeAll("MP{\n");
+
+            try writer.splatByteAll(' ', new_indent);
+            try writer.print("bsp_phys_id: {}\n", .{response.bsp_phys_id});
+
+            try writer.splatByteAll(' ', new_indent);
+            try writer.writeAll("cpus:\n");
+
+            for (response.cpus()) |cpu| {
+                try writer.splatByteAll(' ', new_indent + 2);
+                try cpu.print(writer, new_indent + 2);
+                try writer.writeByte('\n');
+            }
+
+            try writer.splatByteAll(' ', indent);
+            try writer.writeByte('}');
+        }
+
+        pub inline fn format(response: *const loongarch64, writer: *std.Io.Writer) !void {
+            return response.print(writer.any(), 0);
+        }
+
+        pub const MPInfo = extern struct {
+            /// ACPI Processor UID as specified by the MADT (always 0 on non-ACPI systems).
+            processor_id: u64,
+
+            /// Physical CPU ID of the processor as specified by the MADT or device tree.
+            phys_id: u64,
+
+            _reserved: u64,
+
+            /// An atomic write to this field causes the parked CPU to jump to the written address, on a 64KiB (or Stack Size Request size)
+            /// stack.
+            ///
+            /// A pointer to the `MPInfo` structure of the CPU is passed in $a0.
+            ///
+            /// Other than that, the CPU state will be the same as described for the bootstrap processor.
+            ///
+            /// This field is unused for the structure describing the bootstrap processor.
+            ///
+            /// For all CPUs, this field is guaranteed to be `null` when control is first passed to the bootstrap processor.
+            goto_address: ?*const fn (smp_info: *const MPInfo) callconv(.c) noreturn,
+
+            /// A free for use field.
+            extra_argument: u64,
+
+            pub fn print(mp_info: *const MPInfo, writer: *std.Io.Writer, indent: usize) !void {
+                const new_indent = indent + 2;
+
+                try writer.writeAll("CPU{\n");
+
+                try writer.splatByteAll(' ', new_indent);
+                try writer.print("processor_id: {}\n", .{mp_info.processor_id});
+
+                try writer.splatByteAll(' ', new_indent);
+                try writer.print("phys_id: {}\n", .{mp_info.phys_id});
+
+                try writer.splatByteAll(' ', indent);
+                try writer.writeByte('}');
+            }
+
+            pub inline fn format(mp_info: *const MPInfo, writer: *std.Io.Writer) !void {
+                return mp_info.print(writer, 0);
+            }
+        };
+    };
+
     pub const riscv64 = extern struct {
         revision: u64,
 
         /// Always zero.
-        flags: u32,
+        flags: u64,
 
         /// Hart ID of the bootstrap processor as reported by the UEFI RISC-V Boot Protocol or the SBI.
         bsp_hartid: u64,
@@ -616,10 +707,10 @@ pub const MP = extern struct {
 
         pub const MPInfo = extern struct {
             /// ACPI Processor UID as specified by the MADT (always 0 on non-ACPI systems).
-            processor_id: u32,
+            processor_id: u64,
 
             /// Hart ID of the processor as specified by the MADT or Device Tree.
-            hartid: u32,
+            hartid: u64,
 
             _reserved: u64,
 
@@ -631,9 +722,11 @@ pub const MP = extern struct {
             /// Other than that, the CPU state will be the same as described for the bootstrap processor.
             ///
             /// This field is unused for the structure describing the bootstrap processor.
+            ///
+            /// For all CPUs, this field is guaranteed to be `null` when control is first passed to the bootstrap processor.
             goto_address: ?*const fn (smp_info: *const MPInfo) callconv(.c) noreturn,
 
-            /// A free for use field
+            /// A free for use field.
             extra_argument: u64,
 
             pub fn print(mp_info: *const MPInfo, writer: *std.Io.Writer, indent: usize) !void {
@@ -724,11 +817,10 @@ pub const MP = extern struct {
             ///
             /// This field is unused for the structure describing the bootstrap processor.
             ///
-            /// For all CPUs, this field is guaranteed to be `null` when control is first passed to the bootstrap
-            /// processor.
+            /// For all CPUs, this field is guaranteed to be `null` when control is first passed to the bootstrap processor.
             goto_address: ?*const fn (smp_info: *const MPInfo) callconv(.c) noreturn,
 
-            /// A free for use field
+            /// A free for use field.
             extra_argument: u64,
 
             pub fn print(mp_info: *const MPInfo, writer: *std.Io.Writer, indent: usize) !void {
@@ -1291,19 +1383,17 @@ pub const BootloaderPerformance = extern struct {
     };
 };
 
-/// If this feature is requested, the bootloader will not disable IOMMUs (Intel VT-d, AMD-Vi) that were left enabled by the firmware at
-/// hand-off.
+/// If this feature is requested, the bootloader will not disable IOMMUs (e.g. Intel VT-d, AMD-Vi, ARM SMMU, ...) that were left enabled by
+/// the firmware at bootloader hand-off, before executable handoff.
 ///
-/// This is intended for security-conscious kernels that wish to preserve DMA protection set up by firmware.
+/// This is intended for security-conscious executables that wish to preserve DMA protection and such set up by firmware.
 ///
 /// If this feature is not requested, the bootloader reserves the right to disable any active IOMMUs before handing control to the
-/// executable.
+/// executable, for compatibility with kernels that do not support these.
 ///
-/// This is especially of note for base revisions 5 and greater, where the bootloader is mandated to disable VT-d and AMD-Vi IOMMUs, unless
-/// this feature is requested.
-///
-/// On non-x86 platforms, no response will be provided.
-pub const x86_64_KeepIOMMU = extern struct {
+/// Not passing this request does not imply that the bootloader is mandated to disable the IOMMUs, though newly implemented bootloaders are
+/// strongly recommended to, and should, disable it.
+pub const KeepIOMMU = extern struct {
     id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x8ebaabe51f490179, 0x2aa86a59ffb4ab0f },
     revision: u64 = 0,
 
@@ -1311,6 +1401,97 @@ pub const x86_64_KeepIOMMU = extern struct {
 
     pub const Response = extern struct {
         revision: u64,
+    };
+};
+
+/// This feature provides the parameters used by the bootloader to initialise its [Flanterm](https://codeberg.org/Mintsuki/Flanterm)
+/// framebuffer terminal instances.
+///
+/// This allows the executable to initialise Flanterm in the same way as the bootloader, reproducing the same terminal appearance
+/// (wallpaper, colours, font, etc.).
+///
+/// Entries in this response correspond by index to framebuffers in the Framebuffer response.
+///
+/// If a framebuffer does not support a Flanterm terminal (e.g. non-32bpp), its entry will be zeroed.
+///
+/// This feature requires the Framebuffer Feature to also be requested. If no framebuffers are available, no response will be provided.
+pub const FlantermFBInitParams = extern struct {
+    id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x3259399fe7c5f126, 0xe01c1c8c5db9d1a9 },
+    revision: u64 = 0,
+
+    response: ?*const Response = null,
+
+    pub const Response = extern struct {
+        revision: u64,
+
+        _init_params_count: u64,
+        _init_params: [*]?*const FBInitParams,
+
+        pub fn initParams(response: *const Response) []?*const FBInitParams {
+            return response._init_params[0..response._init_params_count];
+        }
+
+        pub const FBInitParams = extern struct {
+            /// Pointer to a pre-rendered background canvas buffer, or `null` if no wallpaper is configured.
+            ///
+            /// The buffer is `canvas_size` bytes and contains 32-bit pixels in the same format as the associated framebuffer, laid out at
+            /// the framebuffer's width and height.
+            canvas: ?[*]const u32,
+
+            /// Size of the canvas buffer in bytes.
+            canvas_size: u64,
+
+            /// The 8 standard ANSI colours (black, red, green, brown, blue, magenta, cyan, grey).
+            ansi_colors: [8]u32,
+
+            /// The 8 bright ANSI colours.
+            ansi_bright_colors: [8]u32,
+
+            /// Default background colour.
+            default_bg: u32,
+
+            /// Default foreground colour.
+            default_fg: u32,
+
+            /// Default bright background colour.
+            default_bg_bright: u32,
+
+            /// Default bright foreground colour.
+            default_fg_bright: u32,
+
+            /// Pointer to font bitmap data, or `null` if the default built-in font is used.
+            ///
+            /// The font is a VGA-style bitmap font with 256 glyphs; its size in bytes is `font_width * font_height * 256 / 8`.
+            font: ?*const anyopaque,
+
+            /// Font character width in pixels (always 8 for VGA fonts).
+            font_width: u64,
+
+            /// Font character height in pixels.
+            font_height: u64,
+
+            /// Extra horizontal spacing between characters in pixels.
+            font_spacing: u64,
+
+            /// Horizontal font scale factor.
+            font_scale_x: u64,
+
+            /// Vertical font scale factor.
+            font_scale_y: u64,
+
+            /// Terminal margin in pixels from the screen edge.
+            margin: u64,
+
+            /// Display rotation.
+            rotation: Rotation,
+
+            pub const Rotation = enum(u64) {
+                @"0" = 0,
+                @"90" = 1,
+                @"180" = 2,
+                @"270" = 3,
+            };
+        };
     };
 };
 
