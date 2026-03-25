@@ -317,10 +317,10 @@ pub fn print(entry: *const Entry, writer: *std.Io.Writer, indent: usize) !void {
     try writer.print("range: {f},\n", .{entry.range});
 
     try writer.splatByteAll(' ', new_indent);
-    try writer.print("protection: {t},\n", .{entry.protection});
+    try writer.print("protection: {f},\n", .{entry.protection});
 
     try writer.splatByteAll(' ', new_indent);
-    try writer.print("max_protection: {t},\n", .{entry.max_protection});
+    try writer.print("max_protection: {f},\n", .{entry.max_protection});
 
     try writer.splatByteAll(' ', new_indent);
     try writer.print("copy_on_write: {},\n", .{entry.copy_on_write});
