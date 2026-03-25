@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-NON-AI-MIT
-// SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: CascadeOS Contributors
 
 //! A very simple debug console that uses the SBI debug console.
 //!

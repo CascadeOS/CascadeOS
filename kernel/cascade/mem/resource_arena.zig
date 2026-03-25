@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-NON-AI-MIT
-// SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: CascadeOS Contributors
 
 // TODO: use `core.Size`
 // TODO: return unused tags to the cache when they exceed a threshold

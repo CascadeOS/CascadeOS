@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-NON-AI-MIT
-// SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: CascadeOS Contributors
 
 pub inline fn readPhysicalCount() u64 {
     return asm ("mrs %[ret], cntpct_el0"

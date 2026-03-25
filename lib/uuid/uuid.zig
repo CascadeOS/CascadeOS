@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-NON-AI-MIT AND BSD-2-Clause AND 0BSD
-// SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: CascadeOS Contributors
 // SPDX-FileCopyrightText: 2015 Jiri Svoboda (https://github.com/HelenOS/helenos)
 // SPDX-FileCopyrightText: 2021 Dmitri Goutnik (https://github.com/dmgk/zig-uuid)
 

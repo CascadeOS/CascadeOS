@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-NON-AI-MIT
-// SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: CascadeOS Contributors
 
 const boot = @import("boot");
 const cascade = @import("cascade");

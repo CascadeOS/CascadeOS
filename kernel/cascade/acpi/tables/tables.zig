@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-NON-AI-MIT
-// SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: CascadeOS Contributors
 
 pub const DBG2 = @import("DBG2.zig").DBG2;
 pub const DSDT = @import("DSDT.zig").DSDT;

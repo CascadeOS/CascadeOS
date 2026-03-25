@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-NON-AI-MIT AND 0BSD
-// SPDX-FileCopyrightText: Lee Cannon <leecannon@leecannon.xyz>
+// SPDX-FileCopyrightText: CascadeOS Contributors
 // SPDX-FileCopyrightText: 2022-2026 Mintsuki and contributors (https://codeberg.org/Limine/limine-protocol/src/branch/trunk/LICENSE)
 
 //! This module contains the definitions of the Limine protocol as of 26519f1b598564db409e50d1d84eb30642d58ba3.
