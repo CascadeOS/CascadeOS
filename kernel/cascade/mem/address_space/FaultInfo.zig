@@ -89,7 +89,7 @@ pub fn faultCheck(
     // check protection
     blk: {
         switch (fault_info.access_type) {
-            .read => if (fault_info.entry.protection.read) break :blk, // TODO: x86 allows read on executable memory
+            .read => if (fault_info.entry.protection.read) break :blk,
             .write => if (fault_info.entry.protection.write) break :blk,
             .execute => if (fault_info.entry.protection.execute) break :blk,
         }
