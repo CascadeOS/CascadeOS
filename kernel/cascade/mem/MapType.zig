@@ -54,12 +54,9 @@ pub const Protection = struct {
     }
 
     pub fn format(self: Protection, writer: *std.Io.Writer) !void {
-        if (self.read) try writer.writeByte('R');
-        if (self.write) try writer.writeByte('W');
-        if (self.execute) try writer.writeByte('X');
-        // try writer.writeByte(if (self.read) 'R' else '_');
-        // try writer.writeByte(if (self.write) 'W' else '_');
-        // try writer.writeByte(if (self.execute) 'X' else '_');
+        try writer.writeByte(if (self.read) 'R' else '*');
+        try writer.writeByte(if (self.write) 'W' else '*');
+        try writer.writeByte(if (self.execute) 'X' else '*');
     }
 };
 
@@ -83,17 +80,17 @@ pub fn format(
 ) !void {
     try writer.writeAll("MapType{ ");
 
-    try writer.writeByte(switch (map_type.type) {
-        .user => 'U',
-        .kernel => 'K',
+    try writer.writeAll(switch (map_type.type) {
+        .user => "U-",
+        .kernel => "K-",
     });
 
     try map_type.protection.format(writer);
 
     try writer.writeAll(switch (map_type.cache) {
-        .write_back => "_WB",
-        .write_combining => "_WC",
-        .uncached => "_UC",
+        .write_back => "-WB",
+        .write_combining => "-WC",
+        .uncached => "-UC",
     });
 
     try writer.writeAll(" }");
