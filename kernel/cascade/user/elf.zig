@@ -554,15 +554,7 @@ pub const LoadableRegion = struct {
 
                     if (program_header.flags.read) prot.read = true;
                     if (program_header.flags.execute) prot.execute = true;
-
-                    if (program_header.flags.write) {
-                        if (program_header.flags.execute) {
-                            log.warn("both write and execute flags set in program header", .{});
-                            return error.ProgramHeaderInvalidProtection;
-                        }
-
-                        prot.write = true;
-                    }
+                    if (program_header.flags.write) prot.write = true;
 
                     if (prot.equal(.none)) {
                         log.warn("no protection flags set in program header", .{});
