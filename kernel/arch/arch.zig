@@ -12,6 +12,7 @@ const cascade = @import("cascade");
 const core = @import("core");
 const user_cascade = @import("user_cascade");
 
+pub const Arch = @TypeOf(current_arch);
 pub const current_arch = @import("cascade_architecture").arch;
 
 /// Architecture specific per-executor data.
