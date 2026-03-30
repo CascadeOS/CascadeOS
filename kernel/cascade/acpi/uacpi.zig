@@ -1103,7 +1103,7 @@ pub const Node = opaque {
             pin: u8,
 
             comptime {
-                core.testing.expectSize(Entry, @sizeOf(c_uacpi.uacpi_pci_routing_table_entry));
+                core.testing.expectSize(Entry, .of(c_uacpi.uacpi_pci_routing_table_entry));
             }
         };
     };
@@ -1137,7 +1137,7 @@ pub const Node = opaque {
         }
 
         comptime {
-            core.testing.expectSize(IdString, @sizeOf(c_uacpi.uacpi_id_string));
+            core.testing.expectSize(IdString, .of(c_uacpi.uacpi_id_string));
         }
     };
 
@@ -2283,7 +2283,7 @@ pub const Object = opaque {
         block_length: u8,
 
         comptime {
-            core.testing.expectSize(ProcessorInfo, @sizeOf(c_uacpi.uacpi_processor_info));
+            core.testing.expectSize(ProcessorInfo, .of(c_uacpi.uacpi_processor_info));
         }
     };
 
@@ -2303,7 +2303,7 @@ pub const Object = opaque {
         resource_order: u16,
 
         comptime {
-            core.testing.expectSize(PowerResourceInfo, @sizeOf(c_uacpi.uacpi_power_resource_info));
+            core.testing.expectSize(PowerResourceInfo, .of(c_uacpi.uacpi_power_resource_info));
         }
     };
 
@@ -2323,7 +2323,7 @@ pub const Object = opaque {
         id: u32,
 
         comptime {
-            core.testing.expectSize(Name, @sizeOf(c_uacpi.uacpi_object_name));
+            core.testing.expectSize(Name, .of(c_uacpi.uacpi_object_name));
         }
     };
 
@@ -2374,7 +2374,7 @@ pub const Object = opaque {
         pub const any: TypeBits = @bitCast(c_uacpi.UACPI_OBJECT_ANY_BIT);
 
         comptime {
-            core.testing.expectSize(TypeBits, @sizeOf(c_uacpi.uacpi_object_type_bits));
+            core.testing.expectSize(TypeBits, .of(c_uacpi.uacpi_object_type_bits));
         }
     };
 };
@@ -2586,7 +2586,7 @@ pub const Resources = extern struct {
     };
 
     comptime {
-        core.testing.expectSize(Resources, @sizeOf(c_uacpi.uacpi_resources));
+        core.testing.expectSize(Resources, .of(c_uacpi.uacpi_resources));
     }
 };
 
@@ -2717,7 +2717,7 @@ pub const Resource = extern struct {
         }
 
         comptime {
-            core.testing.expectSize(Irq, @sizeOf(c_uacpi.uacpi_resource_irq) + @sizeOf(u8));
+            core.testing.expectSize(Irq, core.Size.of(c_uacpi.uacpi_resource_irq).add(.of(u8)));
         }
     };
 
@@ -2738,7 +2738,7 @@ pub const Resource = extern struct {
 
         comptime {
             // `u64` due to the alignment forced by the `source` field
-            core.testing.expectSize(ExtendedIrq, @sizeOf(c_uacpi.uacpi_resource_extended_irq) + @sizeOf(u64));
+            core.testing.expectSize(ExtendedIrq, core.Size.of(c_uacpi.uacpi_resource_extended_irq).add(.of(u64)));
         }
     };
 
@@ -2774,7 +2774,7 @@ pub const Resource = extern struct {
         };
 
         comptime {
-            core.testing.expectSize(Dma, @sizeOf(c_uacpi.uacpi_resource_dma) + @sizeOf(u8));
+            core.testing.expectSize(Dma, core.Size.of(c_uacpi.uacpi_resource_dma).add(.of(u8)));
         }
     };
 
@@ -2793,7 +2793,7 @@ pub const Resource = extern struct {
         };
 
         comptime {
-            core.testing.expectSize(FixedDma, @sizeOf(c_uacpi.uacpi_resource_fixed_dma));
+            core.testing.expectSize(FixedDma, .of(c_uacpi.uacpi_resource_fixed_dma));
         }
     };
 
@@ -2810,7 +2810,7 @@ pub const Resource = extern struct {
         };
 
         comptime {
-            core.testing.expectSize(Io, @sizeOf(c_uacpi.uacpi_resource_io));
+            core.testing.expectSize(Io, .of(c_uacpi.uacpi_resource_io));
         }
     };
 
@@ -2819,7 +2819,7 @@ pub const Resource = extern struct {
         length: u8,
 
         comptime {
-            core.testing.expectSize(FixedIo, @sizeOf(c_uacpi.uacpi_resource_fixed_io));
+            core.testing.expectSize(FixedIo, .of(c_uacpi.uacpi_resource_fixed_io));
         }
     };
 
@@ -2833,7 +2833,7 @@ pub const Resource = extern struct {
         source: Source,
 
         comptime {
-            core.testing.expectSize(Address16, @sizeOf(c_uacpi.uacpi_resource_address16));
+            core.testing.expectSize(Address16, .of(c_uacpi.uacpi_resource_address16));
         }
     };
 
@@ -2847,7 +2847,7 @@ pub const Resource = extern struct {
         source: Source,
 
         comptime {
-            core.testing.expectSize(Address32, @sizeOf(c_uacpi.uacpi_resource_address32));
+            core.testing.expectSize(Address32, .of(c_uacpi.uacpi_resource_address32));
         }
     };
 
@@ -2861,7 +2861,7 @@ pub const Resource = extern struct {
         source: Source,
 
         comptime {
-            core.testing.expectSize(Address64, @sizeOf(c_uacpi.uacpi_resource_address64));
+            core.testing.expectSize(Address64, .of(c_uacpi.uacpi_resource_address64));
         }
     };
 
@@ -2876,7 +2876,7 @@ pub const Resource = extern struct {
         attributes: u64,
 
         comptime {
-            core.testing.expectSize(Address64Extended, @sizeOf(c_uacpi.uacpi_resource_address64_extended));
+            core.testing.expectSize(Address64Extended, .of(c_uacpi.uacpi_resource_address64_extended));
         }
     };
 
@@ -2888,7 +2888,7 @@ pub const Resource = extern struct {
         length: u16,
 
         comptime {
-            core.testing.expectSize(Memory24, @sizeOf(c_uacpi.uacpi_resource_memory24));
+            core.testing.expectSize(Memory24, .of(c_uacpi.uacpi_resource_memory24));
         }
     };
 
@@ -2900,7 +2900,7 @@ pub const Resource = extern struct {
         length: u32,
 
         comptime {
-            core.testing.expectSize(Memory32, @sizeOf(c_uacpi.uacpi_resource_memory32));
+            core.testing.expectSize(Memory32, .of(c_uacpi.uacpi_resource_memory32));
         }
     };
 
@@ -2910,7 +2910,7 @@ pub const Resource = extern struct {
         length: u32,
 
         comptime {
-            core.testing.expectSize(FixedMemory32, @sizeOf(c_uacpi.uacpi_resource_fixed_memory32));
+            core.testing.expectSize(FixedMemory32, .of(c_uacpi.uacpi_resource_fixed_memory32));
         }
     };
 
@@ -2920,7 +2920,7 @@ pub const Resource = extern struct {
         performance: CompatibilityPerformance,
 
         comptime {
-            core.testing.expectSize(StartDependent, @sizeOf(c_uacpi.uacpi_resource_start_dependent));
+            core.testing.expectSize(StartDependent, .of(c_uacpi.uacpi_resource_start_dependent));
         }
     };
 
@@ -2934,7 +2934,7 @@ pub const Resource = extern struct {
         }
 
         comptime {
-            core.testing.expectSize(Vendor, @sizeOf(c_uacpi.uacpi_resource_vendor) + @sizeOf(u8));
+            core.testing.expectSize(Vendor, core.Size.of(c_uacpi.uacpi_resource_vendor).add(.of(u8)));
         }
     };
 
@@ -2950,7 +2950,7 @@ pub const Resource = extern struct {
         }
 
         comptime {
-            core.testing.expectSize(VendorTyped, @sizeOf(c_uacpi.uacpi_resource_vendor_typed));
+            core.testing.expectSize(VendorTyped, .of(c_uacpi.uacpi_resource_vendor_typed));
         }
     };
 
@@ -2962,7 +2962,7 @@ pub const Resource = extern struct {
         address: u64,
 
         comptime {
-            core.testing.expectSize(GenericRegister, @sizeOf(c_uacpi.uacpi_resource_generic_register));
+            core.testing.expectSize(GenericRegister, .of(c_uacpi.uacpi_resource_generic_register));
         }
     };
 
@@ -2998,7 +2998,7 @@ pub const Resource = extern struct {
             wake_capability: WakeCapability,
 
             comptime {
-                core.testing.expectSize(InterruptConnectionFlags, @sizeOf(c_uacpi.uacpi_interrupt_connection_flags));
+                core.testing.expectSize(InterruptConnectionFlags, .of(c_uacpi.uacpi_interrupt_connection_flags));
             }
         };
 
@@ -3014,12 +3014,12 @@ pub const Resource = extern struct {
             };
 
             comptime {
-                core.testing.expectSize(IoConnectionFlags, @sizeOf(c_uacpi.uacpi_io_connection_flags));
+                core.testing.expectSize(IoConnectionFlags, .of(c_uacpi.uacpi_io_connection_flags));
             }
         };
 
         comptime {
-            core.testing.expectSize(GpioConnection, @sizeOf(c_uacpi.uacpi_resource_gpio_connection));
+            core.testing.expectSize(GpioConnection, .of(c_uacpi.uacpi_resource_gpio_connection));
         }
     };
 
@@ -3035,7 +3035,7 @@ pub const Resource = extern struct {
         };
 
         comptime {
-            core.testing.expectSize(I2cConnection, @sizeOf(c_uacpi.uacpi_resource_i2c_connection));
+            core.testing.expectSize(I2cConnection, .of(c_uacpi.uacpi_resource_i2c_connection));
         }
     };
 
@@ -3070,7 +3070,7 @@ pub const Resource = extern struct {
         };
 
         comptime {
-            core.testing.expectSize(SpiConnection, @sizeOf(c_uacpi.uacpi_resource_spi_connection));
+            core.testing.expectSize(SpiConnection, .of(c_uacpi.uacpi_resource_spi_connection));
         }
     };
 
@@ -3131,7 +3131,7 @@ pub const Resource = extern struct {
         };
 
         comptime {
-            core.testing.expectSize(UartConnection, @sizeOf(c_uacpi.uacpi_resource_uart_connection));
+            core.testing.expectSize(UartConnection, .of(c_uacpi.uacpi_resource_uart_connection));
         }
     };
 
@@ -3146,7 +3146,7 @@ pub const Resource = extern struct {
         };
 
         comptime {
-            core.testing.expectSize(Csi2Connection, @sizeOf(c_uacpi.uacpi_resource_csi2_connection));
+            core.testing.expectSize(Csi2Connection, .of(c_uacpi.uacpi_resource_csi2_connection));
         }
     };
 
@@ -3162,7 +3162,7 @@ pub const Resource = extern struct {
         vendor_data: [*]const u8,
 
         comptime {
-            core.testing.expectSize(PinFunction, @sizeOf(c_uacpi.uacpi_resource_pin_function));
+            core.testing.expectSize(PinFunction, .of(c_uacpi.uacpi_resource_pin_function));
         }
     };
 
@@ -3179,7 +3179,7 @@ pub const Resource = extern struct {
         vendor_data: [*]const u8,
 
         comptime {
-            core.testing.expectSize(PinConfiguration, @sizeOf(c_uacpi.uacpi_resource_pin_configuration));
+            core.testing.expectSize(PinConfiguration, .of(c_uacpi.uacpi_resource_pin_configuration));
         }
     };
 
@@ -3200,7 +3200,7 @@ pub const Resource = extern struct {
         vendor_data: [*]const u8,
 
         comptime {
-            core.testing.expectSize(PinGroup, @sizeOf(c_uacpi.uacpi_resource_pin_group));
+            core.testing.expectSize(PinGroup, .of(c_uacpi.uacpi_resource_pin_group));
         }
     };
 
@@ -3215,7 +3215,7 @@ pub const Resource = extern struct {
         vendor_data: [*]const u8,
 
         comptime {
-            core.testing.expectSize(PinGroupFunction, @sizeOf(c_uacpi.uacpi_resource_pin_group_function));
+            core.testing.expectSize(PinGroupFunction, .of(c_uacpi.uacpi_resource_pin_group_function));
         }
     };
 
@@ -3231,7 +3231,7 @@ pub const Resource = extern struct {
         vendor_data: [*]const u8,
 
         comptime {
-            core.testing.expectSize(PinConfiguration, @sizeOf(c_uacpi.uacpi_resource_pin_group_configuration));
+            core.testing.expectSize(PinConfiguration, .of(c_uacpi.uacpi_resource_pin_group_configuration));
         }
     };
 
@@ -3272,7 +3272,7 @@ pub const Resource = extern struct {
         };
 
         comptime {
-            core.testing.expectSize(ClockInput, @sizeOf(c_uacpi.uacpi_resource_clock_input));
+            core.testing.expectSize(ClockInput, .of(c_uacpi.uacpi_resource_clock_input));
         }
     };
 
@@ -3294,7 +3294,7 @@ pub const Resource = extern struct {
         };
 
         comptime {
-            core.testing.expectSize(SerialBusCommon, @sizeOf(c_uacpi.uacpi_resource_serial_bus_common));
+            core.testing.expectSize(SerialBusCommon, .of(c_uacpi.uacpi_resource_serial_bus_common));
         }
     };
 
@@ -3347,7 +3347,7 @@ pub const Resource = extern struct {
                 };
 
                 comptime {
-                    core.testing.expectSize(MemoryAttribute, @sizeOf(c_uacpi.uacpi_memory_attribute));
+                    core.testing.expectSize(MemoryAttribute, .of(c_uacpi.uacpi_memory_attribute));
                 }
             };
 
@@ -3362,17 +3362,17 @@ pub const Resource = extern struct {
                 };
 
                 comptime {
-                    core.testing.expectSize(IoAttribute, @sizeOf(c_uacpi.uacpi_io_attribute));
+                    core.testing.expectSize(IoAttribute, .of(c_uacpi.uacpi_io_attribute));
                 }
             };
 
             comptime {
-                core.testing.expectSize(AddressAttribute, @sizeOf(c_uacpi.uacpi_address_attribute));
+                core.testing.expectSize(AddressAttribute, .of(c_uacpi.uacpi_address_attribute));
             }
         };
 
         comptime {
-            core.testing.expectSize(AddressCommon, @sizeOf(c_uacpi.uacpi_resource_address_common));
+            core.testing.expectSize(AddressCommon, .of(c_uacpi.uacpi_resource_address_common));
         }
     };
 
@@ -3414,7 +3414,7 @@ pub const Resource = extern struct {
         }
 
         comptime {
-            core.testing.expectSize(Source, @sizeOf(c_uacpi.uacpi_resource_source));
+            core.testing.expectSize(Source, .of(c_uacpi.uacpi_resource_source));
         }
     };
 
@@ -3444,12 +3444,12 @@ pub const Resource = extern struct {
         }
 
         comptime {
-            core.testing.expectSize(Label, @sizeOf(c_uacpi.uacpi_resource_label));
+            core.testing.expectSize(Label, .of(c_uacpi.uacpi_resource_label));
         }
     };
 
     comptime {
-        core.testing.expectSize(Resource, @sizeOf(c_uacpi.uacpi_resource));
+        core.testing.expectSize(Resource, .of(c_uacpi.uacpi_resource));
     }
 };
 
@@ -3691,7 +3691,7 @@ pub const DataView = extern struct {
     }
 
     comptime {
-        core.testing.expectSize(DataView, @sizeOf(c_uacpi.uacpi_data_view));
+        core.testing.expectSize(DataView, .of(c_uacpi.uacpi_data_view));
     }
 };
 
@@ -3866,7 +3866,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
                     length: u64,
 
                     comptime {
-                        core.testing.expectSize(Generic, @sizeOf(c_uacpi.uacpi_generic_region_info));
+                        core.testing.expectSize(Generic, .of(c_uacpi.uacpi_generic_region_info));
                     }
                 };
 
@@ -3875,7 +3875,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
                     subspace_id: u8,
 
                     comptime {
-                        core.testing.expectSize(Pcc, @sizeOf(c_uacpi.uacpi_pcc_region_info));
+                        core.testing.expectSize(Pcc, .of(c_uacpi.uacpi_pcc_region_info));
                     }
                 };
 
@@ -3883,13 +3883,13 @@ pub fn RegionOperation(comptime UserContextT: type) type {
                     num_pins: u64,
 
                     comptime {
-                        core.testing.expectSize(Gpio, @sizeOf(c_uacpi.uacpi_gpio_region_info));
+                        core.testing.expectSize(Gpio, .of(c_uacpi.uacpi_gpio_region_info));
                     }
                 };
             };
 
             comptime {
-                core.testing.expectSize(Attach, @sizeOf(c_uacpi.uacpi_region_attach_data));
+                core.testing.expectSize(Attach, .of(c_uacpi.uacpi_region_attach_data));
             }
         };
 
@@ -3899,7 +3899,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             region_node: *Node,
 
             comptime {
-                core.testing.expectSize(Detach, @sizeOf(c_uacpi.uacpi_region_detach_data));
+                core.testing.expectSize(Detach, .of(c_uacpi.uacpi_region_detach_data));
             }
         };
 
@@ -3914,7 +3914,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             byte_width: ByteWidth,
 
             comptime {
-                core.testing.expectSize(ReadWrite, @sizeOf(c_uacpi.uacpi_region_rw_data));
+                core.testing.expectSize(ReadWrite, .of(c_uacpi.uacpi_region_rw_data));
             }
         };
 
@@ -3924,7 +3924,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             buffer: DataView,
 
             comptime {
-                core.testing.expectSize(PccSend, @sizeOf(c_uacpi.uacpi_region_pcc_send_data));
+                core.testing.expectSize(PccSend, .of(c_uacpi.uacpi_region_pcc_send_data));
             }
         };
 
@@ -3937,7 +3937,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             value: u64,
 
             comptime {
-                core.testing.expectSize(GpioReadWrite, @sizeOf(c_uacpi.uacpi_region_gpio_rw_data));
+                core.testing.expectSize(GpioReadWrite, .of(c_uacpi.uacpi_region_gpio_rw_data));
             }
         };
 
@@ -3948,7 +3948,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             command: u64,
 
             comptime {
-                core.testing.expectSize(IpmiCommand, @sizeOf(c_uacpi.uacpi_region_ipmi_rw_data));
+                core.testing.expectSize(IpmiCommand, .of(c_uacpi.uacpi_region_ipmi_rw_data));
             }
         };
 
@@ -3959,7 +3959,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             command: u64,
 
             comptime {
-                core.testing.expectSize(FixedHardwareCommand, @sizeOf(c_uacpi.uacpi_region_ffixedhw_rw_data));
+                core.testing.expectSize(FixedHardwareCommand, .of(c_uacpi.uacpi_region_ffixedhw_rw_data));
             }
         };
 
@@ -3969,7 +3969,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             in_out_message: DataView,
 
             comptime {
-                core.testing.expectSize(PrmReadWrite, @sizeOf(c_uacpi.uacpi_region_prm_rw_data));
+                core.testing.expectSize(PrmReadWrite, .of(c_uacpi.uacpi_region_prm_rw_data));
             }
         };
 
@@ -4001,7 +4001,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             };
 
             comptime {
-                core.testing.expectSize(SerialReadWrite, @sizeOf(c_uacpi.uacpi_region_serial_rw_data));
+                core.testing.expectSize(SerialReadWrite, .of(c_uacpi.uacpi_region_serial_rw_data));
             }
         };
     };
