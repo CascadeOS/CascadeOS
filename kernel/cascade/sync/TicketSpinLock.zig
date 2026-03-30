@@ -66,8 +66,6 @@ pub fn tryLock(ticket_spin_lock: *TicketSpinLock) bool {
         .acquire,
         .monotonic,
     )) |_| {
-        @branchHint(.unlikely);
-
         current_task.decrementInterruptDisable();
         return false;
     }
