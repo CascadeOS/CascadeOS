@@ -703,10 +703,6 @@ pub const RawCache = struct {
         ///
         /// Only set for large item slabs.
         large_item_allocation: cascade.mem.resource_arena.Allocation,
-
-        fn constructor(slab: *Slab) void {
-            slab.* = .{};
-        }
     };
 
     const LargeItem = struct {
