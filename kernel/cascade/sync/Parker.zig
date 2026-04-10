@@ -38,7 +38,7 @@ pub fn park(parker: *Parker) void {
         return; // there were some wakeups, they might be spurious
     }
 
-    const scheduler_handle: cascade.Task.SchedulerHandle = .get();
+    var scheduler_handle: cascade.Task.Scheduler.Handle = .get();
     defer scheduler_handle.unlock();
 
     // recheck for unpark attempts that happened while we were locking the scheduler
@@ -57,7 +57,7 @@ pub fn park(parker: *Parker) void {
         return;
     }
 
-    scheduler_handle.dropWithDeferredAction(
+    scheduler_handle = scheduler_handle.block(
         .{
             .action = struct {
                 fn action(old_task: *cascade.Task, arg: usize) void {
@@ -65,7 +65,7 @@ pub fn park(parker: *Parker) void {
 
                     old_task.state = .blocked;
                     old_task.spinlocks_held -= 1;
-                    old_task.interrupt_disable_count -= 1;
+                    _ = old_task.interrupt_disable_count.fetchSub(1, .acq_rel);
 
                     inner_parker.parked_task = old_task;
                     inner_parker.lock.unsafeUnlock();
@@ -73,7 +73,6 @@ pub fn park(parker: *Parker) void {
             }.action,
             .arg = @intFromPtr(parker),
         },
-        false,
     );
 
     parker.unpark_attempts.store(0, .release);
@@ -94,12 +93,6 @@ pub fn unpark(parker: *Parker) void {
         parker.parked_task = null;
         break :blk parked_task;
     };
-    if (core.is_debug) std.debug.assert(parked_task.state == .blocked);
 
-    parked_task.state = .ready;
-
-    const maybe_locked: cascade.Task.SchedulerHandle.MaybeLocked = .get();
-    defer maybe_locked.unlock();
-
-    maybe_locked.scheduler_handle.queueTask(parked_task);
+    parked_task.wakeFromBlocked();
 }

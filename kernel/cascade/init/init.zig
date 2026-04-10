@@ -152,7 +152,7 @@ fn initStage3() !noreturn {
                 },
             );
 
-            const scheduler_handle: cascade.Task.SchedulerHandle = .get();
+            const scheduler_handle: cascade.Task.Scheduler.Handle = .get();
             defer scheduler_handle.unlock();
 
             scheduler_handle.queueTask(init_stage4_task);
@@ -161,8 +161,8 @@ fn initStage3() !noreturn {
         static.stage3_barrier.complete();
     }
 
-    const scheduler_handle: cascade.Task.SchedulerHandle = .get();
-    scheduler_handle.drop();
+    const scheduler_handle: cascade.Task.Scheduler.Handle = .get();
+    scheduler_handle.terminate();
     unreachable;
 }
 
@@ -188,7 +188,7 @@ fn initStage4() !void {
         .{ .entry = .prepare(loadHelloWorld, .{}) },
     );
 
-    const scheduler_handle: cascade.Task.SchedulerHandle = .get();
+    const scheduler_handle: cascade.Task.Scheduler.Handle = .get();
     defer scheduler_handle.unlock();
     scheduler_handle.queueTask(&hello_world_main_thread.task);
 }
@@ -200,7 +200,7 @@ fn constructAndLoadBootstrapExecutorAndTask() !void {
             .id = .bootstrap,
             ._current_task = undefined, // set by `setCurrentTask`
             .arch_specific = undefined, // set by `arch.init.prepareBootstrapExecutor`
-            .scheduler_task = undefined, // not used
+            .scheduler = undefined, // not used
         };
     };
 
@@ -248,11 +248,13 @@ fn createExecutors() !struct { []cascade.Executor, *cascade.Executor } {
             .id = @enumFromInt(i),
             .arch_specific = undefined, // set by `arch.init.prepareExecutor`
             ._current_task = undefined, // set below by `Task.init.createAndAssignInitTask`
-            .scheduler_task = undefined, // set below by `Task.init.initializeSchedulerTask`
+            .scheduler = .{
+                .task = undefined, // set below by `Task.init.initializeSchedulerTask`
+            },
         };
 
         try cascade.Task.init.createAndAssignInitTask(executor);
-        try cascade.Task.init.initializeSchedulerTask(&executor.scheduler_task, executor);
+        try cascade.Task.init.initializeSchedulerTask(&executor.scheduler.task, executor);
 
         arch.init.prepareExecutor(
             executor,

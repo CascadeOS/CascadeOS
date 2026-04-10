@@ -437,13 +437,13 @@ export fn uacpi_kernel_get_thread_id() usize {
 export fn uacpi_kernel_disable_interrupts() uacpi.InterruptState {
     const current: cascade.Task.Current = .get();
     current.incrementInterruptDisable();
-    return current.task.interrupt_disable_count - 1;
+    return current.task.interrupt_disable_count.load(.acquire) - 1;
 }
 
 /// Restore the state of the interrupt flags to the kernel-defined value provided in 'state'.
 export fn uacpi_kernel_restore_interrupts(state: uacpi.InterruptState) void {
     const current: cascade.Task.Current = .get();
-    std.debug.assert(current.task.interrupt_disable_count == state + 1);
+    std.debug.assert(current.task.interrupt_disable_count.load(.acquire) == state + 1);
     current.decrementInterruptDisable();
 }
 

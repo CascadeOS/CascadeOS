@@ -23,8 +23,8 @@ pub fn submitAndWait(flush_request: *FlushRequest) void {
     const current_task: cascade.Task.Current = .get();
 
     {
-        current_task.incrementInterruptDisable();
-        defer current_task.decrementInterruptDisable();
+        current_task.incrementMigrationDisable();
+        defer current_task.decrementMigrationDisable();
 
         const current_executor = current_task.knownExecutor();
 
@@ -38,7 +38,7 @@ pub fn submitAndWait(flush_request: *FlushRequest) void {
         flush_request.flush();
     }
 
-    if (current_task.task.interrupt_disable_count == 0) {
+    if (current_task.task.interrupt_disable_count.load(.acquire) == 0) {
         // interrupts are enabled so flush requests from other cores will be serviced
         while (flush_request.count.load(.monotonic) != 0) {
             arch.spinLoopHint();
@@ -53,8 +53,6 @@ pub fn submitAndWait(flush_request: *FlushRequest) void {
 
 pub fn processFlushRequests() void {
     const current_task: cascade.Task.Current = .get();
-    if (core.is_debug) std.debug.assert(current_task.task.interrupt_disable_count != 0);
-
     const executor = current_task.knownExecutor();
 
     while (executor.flush_requests.popFirst()) |node| {
@@ -65,8 +63,6 @@ pub fn processFlushRequests() void {
 
 fn flush(flush_request: *FlushRequest) void {
     const current_task: cascade.Task.Current = .get();
-    if (core.is_debug) std.debug.assert(current_task.task.interrupt_disable_count != 0);
-
     defer _ = flush_request.count.fetchSub(1, .monotonic);
 
     switch (flush_request.flush_target) {

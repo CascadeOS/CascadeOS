@@ -25,22 +25,19 @@ pub inline fn get() Current {
 }
 
 pub fn incrementInterruptDisable(current_task: Current) void {
-    const previous = current_task.task.interrupt_disable_count;
+    arch.interrupts.disable();
 
-    if (previous == 0) {
-        if (core.is_debug) std.debug.assert(arch.interrupts.areEnabled());
-        arch.interrupts.disable();
-        current_task.task.known_executor = current_task.task.state.running;
-    } else if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
+    const previous = current_task.task.interrupt_disable_count.fetchAdd(1, .acq_rel);
+    if (core.is_debug) std.debug.assert(previous < std.math.maxInt(u32));
 
-    current_task.task.interrupt_disable_count = previous + 1;
+    current_task.task.known_executor = current_task.task.state.running;
 }
 
 pub fn decrementInterruptDisable(current_task: Current) void {
     if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
 
-    const previous = current_task.task.interrupt_disable_count;
-    current_task.task.interrupt_disable_count = previous - 1;
+    const previous = current_task.task.interrupt_disable_count.fetchSub(1, .acq_rel);
+    if (core.is_debug) std.debug.assert(previous > 0);
 
     if (previous == 1) {
         current_task.setKnownExecutor();
@@ -48,26 +45,36 @@ pub fn decrementInterruptDisable(current_task: Current) void {
     }
 }
 
+pub fn incrementMigrationDisable(current_task: Current) void {
+    const previous = current_task.task.migration_disable_count.fetchAdd(1, .acq_rel);
+    if (core.is_debug) std.debug.assert(previous < std.math.maxInt(u32));
+
+    current_task.task.known_executor = current_task.task.state.running;
+}
+
+pub fn decrementMigrationDisable(current_task: Current) void {
+    const previous = current_task.task.migration_disable_count.fetchSub(1, .acq_rel);
+    if (core.is_debug) std.debug.assert(previous > 0);
+
+    if (previous == 1) current_task.setKnownExecutor();
+}
+
 pub fn incrementEnableAccessToUserMemory(current_task: Current) void {
     if (core.is_debug) std.debug.assert(current_task.task.type == .user);
 
-    const previous = current_task.task.enable_access_to_user_memory_count;
-    current_task.task.enable_access_to_user_memory_count = previous + 1;
+    const previous = current_task.task.enable_access_to_user_memory_count.fetchAdd(1, .acq_rel);
+    if (core.is_debug) std.debug.assert(previous < std.math.maxInt(u32));
 
-    if (previous == 0) {
-        arch.paging.enableAccessToUserMemory();
-    }
+    if (previous == 0) arch.paging.enableAccessToUserMemory();
 }
 
 pub fn decrementEnableAccessToUserMemory(current_task: Current) void {
     if (core.is_debug) std.debug.assert(current_task.task.type == .user);
 
-    const previous = current_task.task.enable_access_to_user_memory_count;
-    current_task.task.enable_access_to_user_memory_count = previous - 1;
+    const previous = current_task.task.enable_access_to_user_memory_count.fetchSub(1, .acq_rel);
+    if (core.is_debug) std.debug.assert(previous > 0);
 
-    if (previous == 1) {
-        arch.paging.disableAccessToUserMemory();
-    }
+    if (previous == 1) arch.paging.disableAccessToUserMemory();
 }
 
 /// Maybe preempt the current task.
@@ -81,7 +88,7 @@ pub fn maybePreempt(current_task: Current) void {
         std.debug.assert(current_task.task.state == .running);
     }
 
-    const scheduler_handle: cascade.Task.SchedulerHandle = .get();
+    const scheduler_handle: cascade.Task.Scheduler.Handle = .get();
     defer scheduler_handle.unlock();
 
     if (scheduler_handle.isEmpty()) return;
@@ -96,11 +103,9 @@ pub fn onInterruptEntry() StateBeforeInterrupt {
 
     const task = arch.scheduling.getCurrentTask();
 
-    const before_interrupt_interrupt_disable_count = task.interrupt_disable_count;
-    task.interrupt_disable_count = before_interrupt_interrupt_disable_count + 1;
+    const before_interrupt_interrupt_disable_count = task.interrupt_disable_count.fetchAdd(1, .acq_rel);
 
-    const before_interrupt_enable_access_to_user_memory_count = task.enable_access_to_user_memory_count;
-    task.enable_access_to_user_memory_count = 0;
+    const before_interrupt_enable_access_to_user_memory_count = task.enable_access_to_user_memory_count.swap(0, .acq_rel);
 
     if (before_interrupt_enable_access_to_user_memory_count != 0) {
         @branchHint(.unlikely);
@@ -125,12 +130,13 @@ pub const StateBeforeInterrupt = struct {
     pub fn onInterruptExit(state_before_interrupt: StateBeforeInterrupt) void {
         const current_task: Current = .get();
 
-        current_task.task.interrupt_disable_count = state_before_interrupt.interrupt_disable_count;
+        current_task.task.interrupt_disable_count.store(state_before_interrupt.interrupt_disable_count, .release);
 
         const before_interrupt_enable_access_to_user_memory_count = state_before_interrupt.enable_access_to_user_memory_count;
-        const current_enable_access_to_user_memory_count = current_task.task.enable_access_to_user_memory_count;
-
-        current_task.task.enable_access_to_user_memory_count = before_interrupt_enable_access_to_user_memory_count;
+        const current_enable_access_to_user_memory_count = current_task.task.enable_access_to_user_memory_count.swap(
+            before_interrupt_enable_access_to_user_memory_count,
+            .release,
+        );
 
         if (current_enable_access_to_user_memory_count != before_interrupt_enable_access_to_user_memory_count) {
             @branchHint(.unlikely);
@@ -154,7 +160,7 @@ pub fn panicked() Current {
 
     const task = arch.scheduling.getCurrentTask();
 
-    task.interrupt_disable_count += 1;
+    _ = task.interrupt_disable_count.fetchAdd(1, .acq_rel);
     task.known_executor = task.state.running;
 
     return .{ .task = task };
@@ -165,10 +171,13 @@ pub inline fn format(current_task: Current, writer: *std.Io.Writer) !void {
 }
 
 /// Set the `known_executor` field of the task based on the state of the task.
-inline fn setKnownExecutor(current_task: Current) void {
-    if (current_task.task.interrupt_disable_count != 0) {
+fn setKnownExecutor(current_task: Current) void {
+    if (current_task.task.interrupt_disable_count.load(.acquire) != 0 or
+        current_task.task.migration_disable_count.load(.acquire) != 0)
+    {
         current_task.task.known_executor = current_task.task.state.running;
-    } else {
-        current_task.task.known_executor = null;
+        return;
     }
+
+    current_task.task.known_executor = null;
 }

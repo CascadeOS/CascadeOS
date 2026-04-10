@@ -16,8 +16,7 @@ id: Id,
 
 _current_task: *cascade.Task,
 
-/// Used as the current task during idle and also during the transition between tasks when executing a deferred action.
-scheduler_task: cascade.Task,
+scheduler: cascade.Task.Scheduler,
 
 arch_specific: arch.PerExecutor,
 

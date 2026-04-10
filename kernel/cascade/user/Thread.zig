@@ -60,7 +60,7 @@ pub const internal = struct {
         if (core.is_debug) {
             const task = &thread.task;
             std.debug.assert(task.type == .user);
-            std.debug.assert(task.state == .dropped);
+            std.debug.assert(task.state == .terminated);
             std.debug.assert(task.reference_count.load(.monotonic) == 0);
         }
         globals.cache.deallocate(thread);

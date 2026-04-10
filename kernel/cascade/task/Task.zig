@@ -12,7 +12,7 @@ const cascade = @import("cascade");
 const core = @import("core");
 
 pub const Current = @import("Current.zig");
-pub const SchedulerHandle = @import("SchedulerHandle.zig");
+pub const Scheduler = @import("Scheduler.zig");
 pub const Stack = @import("Stack.zig");
 
 const log = cascade.debug.log.scoped(.task);
@@ -34,7 +34,7 @@ state: State,
 
 /// The number of references to this task.
 ///
-/// Each task has a reference to itself which is dropped when the scheduler drops the task.
+/// Each task has a reference to itself which is dropped when the scheduler terminates the task.
 reference_count: std.atomic.Value(usize) = .init(1), // tasks start with a reference to themselves
 
 /// The stack used by this task in kernelspace.
@@ -55,10 +55,13 @@ next_task_node: std.SinglyLinkedList.Node = .{},
 known_executor: ?*cascade.Executor,
 
 /// Tracks the depth of nested interrupt disables.
-interrupt_disable_count: u32 = 1, // tasks always start with interrupts disabled
+interrupt_disable_count: std.atomic.Value(u32) = .init(1), // tasks always start with interrupts disabled
+
+/// Tracks the depth of nested migration disables.
+migration_disable_count: std.atomic.Value(u32),
 
 /// Tracks nested enables of access to user memory.
-enable_access_to_user_memory_count: u32 = 0,
+enable_access_to_user_memory_count: std.atomic.Value(u32) = .init(0),
 
 spinlocks_held: u32,
 scheduler_locked: bool,
@@ -70,9 +73,9 @@ pub const State = union(enum) {
     /// Do not access the executor directly, use `known_executor` instead.
     running: *cascade.Executor,
     blocked,
-    dropped: Dropped,
+    terminated: Terminated,
 
-    pub const Dropped = struct {
+    pub const Terminated = struct {
         queued_for_cleanup: std.atomic.Value(bool) = .init(false),
     };
 };
@@ -85,7 +88,7 @@ pub fn incrementReferenceCount(task: *Task) void {
 ///
 /// If it reaches zero the task is submitted to the task cleanup service.
 ///
-/// This must **not** be called when the task is the current task, see `Task.drop` instead.
+/// This must **not** be called when the task is the current task, see `Scheduler.Handle.terminate` instead.
 pub fn decrementReferenceCount(task: *Task) void {
     if (core.is_debug) std.debug.assert(task != Task.Current.get().task);
 
@@ -94,6 +97,46 @@ pub fn decrementReferenceCount(task: *Task) void {
         return;
     }
     globals.task_cleanup.queueTaskForCleanup(task);
+}
+
+pub fn wakeFromBlocked(task_to_wake: *cascade.Task) void {
+    if (core.is_debug) std.debug.assert(task_to_wake.state == .blocked);
+    task_to_wake.state = .ready;
+
+    if (task_to_wake.migration_disable_count.load(.acquire) != 0) {
+        const current_task: cascade.Task.Current = .get();
+        current_task.incrementMigrationDisable();
+        defer current_task.decrementMigrationDisable();
+
+        if (current_task.task.known_executor == task_to_wake.known_executor) {
+            // queue on the current executors scheduler
+            // can't be merged with the identical code at the end of the function as we need to keep migration disabled
+            const maybe_locked: cascade.Task.Scheduler.Handle.MaybeLocked = .get();
+            defer maybe_locked.unlock();
+
+            maybe_locked.scheduler_handle.queueTask(task_to_wake);
+
+            return;
+        }
+
+        // queue on the parked tasks known executor
+        const executor = task_to_wake.known_executor orelse std.debug.panic(
+            "{f} has non-zero migration disable but no known executor",
+            .{task_to_wake},
+        );
+
+        executor.scheduler.lock();
+        defer executor.scheduler.unlock();
+
+        executor.scheduler.queueTask(task_to_wake);
+        return;
+    }
+
+    // queue on the current executors scheduler
+    const maybe_locked: cascade.Task.Scheduler.Handle.MaybeLocked = .get();
+    defer maybe_locked.unlock();
+
+    maybe_locked.scheduler_handle.queueTask(task_to_wake);
 }
 
 pub const CreateKernelTaskOptions = struct {
@@ -214,10 +257,10 @@ const TaskCleanup = struct {
     ) void {
         if (core.is_debug) {
             std.debug.assert(task != Task.Current.get().task);
-            std.debug.assert(task.state == .dropped);
+            std.debug.assert(task.state == .terminated);
         }
 
-        if (task.state.dropped.queued_for_cleanup.cmpxchgStrong(
+        if (task.state.terminated.queued_for_cleanup.cmpxchgStrong(
             false,
             true,
             .acq_rel,
@@ -244,11 +287,11 @@ const TaskCleanup = struct {
 
     fn cleanupTask(task: *Task) void {
         if (core.is_debug) {
-            std.debug.assert(task.state == .dropped);
-            std.debug.assert(task.state.dropped.queued_for_cleanup.load(.monotonic));
+            std.debug.assert(task.state == .terminated);
+            std.debug.assert(task.state.terminated.queued_for_cleanup.load(.monotonic));
         }
 
-        task.state.dropped.queued_for_cleanup.store(false, .release);
+        task.state.terminated.queued_for_cleanup.store(false, .release);
 
         switch (task.type) {
             .kernel => {
@@ -263,7 +306,7 @@ const TaskCleanup = struct {
                         return;
                     }
 
-                    if (task.state.dropped.queued_for_cleanup.load(.acquire)) {
+                    if (task.state.terminated.queued_for_cleanup.load(.acquire)) {
                         @branchHint(.unlikely);
                         // someone has requeued this task for cleanup
                         log.verbose("{f} has been requeued for cleanup", .{task});
@@ -292,7 +335,7 @@ const TaskCleanup = struct {
                         return;
                     }
 
-                    if (task.state.dropped.queued_for_cleanup.load(.acquire)) {
+                    if (task.state.terminated.queued_for_cleanup.load(.acquire)) {
                         @branchHint(.unlikely);
                         // someone has requeued this task for cleanup
                         log.verbose("{f} has been requeued for cleanup", .{task});
@@ -328,6 +371,7 @@ pub const internal = struct {
             .stack = preconstructed_stack,
             .type = options.type,
             .known_executor = null,
+            .migration_disable_count = .init(0),
             .spinlocks_held = 1, // fresh tasks start with the scheduler locked
             .scheduler_locked = true, // fresh tasks start with the scheduler locked
 
@@ -351,11 +395,11 @@ pub const internal = struct {
     ) callconv(.c) noreturn {
         asm volatile (arch.scheduling.cfi_prevent_unwinding);
 
-        SchedulerHandle.internal.unsafeUnlock();
+        cascade.Task.Current.get().knownExecutor().scheduler.unlock();
         target_function(arg0, arg1, arg2, arg3, arg4);
 
-        const scheduler_handle: Task.SchedulerHandle = .get();
-        scheduler_handle.drop();
+        const scheduler_handle: Scheduler.Handle = .get();
+        scheduler_handle.terminate();
         unreachable;
     }
 };
@@ -418,6 +462,7 @@ pub const init = struct {
 
             .type = .kernel,
 
+            .migration_disable_count = .init(1), // always on the bootstrap executor
             .known_executor = bootstrap_executor,
             .spinlocks_held = 0, // init tasks don't start with the scheduler locked
             .scheduler_locked = false, // init tasks don't start with the scheduler locked
@@ -444,6 +489,7 @@ pub const init = struct {
 
         task.state = .{ .running = executor };
         task.known_executor = executor;
+        task.migration_disable_count = .init(1); // init tasks are always on their executor
         task.spinlocks_held = 0; // init tasks don't start with the scheduler locked
         task.scheduler_locked = false; // init tasks don't start with the scheduler locked
 
@@ -462,9 +508,10 @@ pub const init = struct {
             .state = .ready,
             .stack = try .createStack(),
             .type = .kernel,
-            .known_executor = null,
-            .spinlocks_held = 1, // fresh tasks start with the scheduler locked
-            .scheduler_locked = true, // fresh tasks start with the scheduler locked
+            .known_executor = executor,
+            .migration_disable_count = .init(1), // scheduler tasks are always on their executor
+            .spinlocks_held = 1, // scheduler tasks start with the scheduler locked
+            .scheduler_locked = true, // scheduler tasks start with the scheduler locked
             .is_scheduler_task = true,
 
             .arch_specific = undefined, // initialized by `initializeTaskArchSpecific` below

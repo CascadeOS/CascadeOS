@@ -36,20 +36,14 @@ pub fn wakeOne(
     spinlock: *const cascade.sync.TicketSpinLock,
 ) void {
     if (core.is_debug) {
-        std.debug.assert(cascade.Task.Current.get().task.interrupt_disable_count != 0);
+        std.debug.assert(cascade.Task.Current.get().task.interrupt_disable_count.load(.acquire) != 0);
         std.debug.assert(spinlock.isLockedByCurrent());
     }
 
     const task_to_wake_node = wait_queue.waiting_tasks.pop() orelse return;
     const task_to_wake: *cascade.Task = .fromNode(task_to_wake_node);
 
-    if (core.is_debug) std.debug.assert(task_to_wake.state == .blocked);
-    task_to_wake.state = .ready;
-
-    const maybe_locked: cascade.Task.SchedulerHandle.MaybeLocked = .get();
-    defer maybe_locked.unlock();
-
-    maybe_locked.scheduler_handle.queueTask(task_to_wake);
+    task_to_wake.wakeFromBlocked();
 }
 
 /// Add the current task to the wait queue.
@@ -64,16 +58,16 @@ pub fn wait(
     const current_task: cascade.Task.Current = .get();
 
     if (core.is_debug) {
-        std.debug.assert(current_task.task.interrupt_disable_count != 0);
+        std.debug.assert(current_task.task.interrupt_disable_count.load(.acquire) != 0);
         std.debug.assert(spinlock.isLockedByCurrent());
     }
 
     wait_queue.waiting_tasks.append(&current_task.task.next_task_node);
 
-    const scheduler_handle: cascade.Task.SchedulerHandle = .get();
+    var scheduler_handle: cascade.Task.Scheduler.Handle = .get();
     defer scheduler_handle.unlock();
 
-    scheduler_handle.dropWithDeferredAction(
+    scheduler_handle = scheduler_handle.block(
         .{
             .action = struct {
                 fn action(old_task: *cascade.Task, arg: usize) void {
@@ -81,13 +75,12 @@ pub fn wait(
 
                     old_task.state = .blocked;
                     old_task.spinlocks_held -= 1;
-                    old_task.interrupt_disable_count -= 1;
+                    _ = old_task.interrupt_disable_count.fetchSub(1, .acq_rel);
 
                     inner_spinlock.unsafeUnlock();
                 }
             }.action,
             .arg = @intFromPtr(spinlock),
         },
-        false,
     );
 }

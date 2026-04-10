@@ -93,7 +93,7 @@ pub fn createThread(
             },
         );
         errdefer {
-            thread.task.state = .{ .dropped = .{} }; // `destroy` will assert this
+            thread.task.state = .{ .terminated = .{} }; // `destroy` will assert this
             thread.task.reference_count.store(0, .monotonic); // `destroy` will assert this
             cascade.user.Thread.internal.destroy(thread);
         }
