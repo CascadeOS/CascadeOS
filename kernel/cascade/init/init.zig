@@ -317,7 +317,7 @@ const StageBarrier = struct {
     ///
     /// Called by the stage executor only.
     fn complete(barrier: *StageBarrier) void {
-        _ = barrier.stage_complete.store(true, .release);
+        barrier.stage_complete.store(true, .release);
     }
 };
 
