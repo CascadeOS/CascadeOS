@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: LicenseRef-NON-AI-MIT AND 0BSD
 // SPDX-FileCopyrightText: CascadeOS Contributors
-// SPDX-FileCopyrightText: 2022-2026 Mintsuki and contributors (https://codeberg.org/Limine/limine-protocol/src/branch/trunk/LICENSE)
+// SPDX-FileCopyrightText: 2022-2026 Mintsuki and contributors (https://github.com/Limine-Bootloader/limine-protocol/blob/trunk/LICENSE)
 
-//! This module contains the definitions of the Limine protocol as of 26519f1b598564db409e50d1d84eb30642d58ba3.
+//! This module contains the definitions of the Limine protocol as of 6f3fafe337c30f94e7c2f5c4a21498346c5604bf.
 //!
-//! [PROTOCOL DOC](https://codeberg.org/Limine/limine-protocol/src/commit/26519f1b598564db409e50d1d84eb30642d58ba3/PROTOCOL.md)
+//! [PROTOCOL DOC](https://github.com/Limine-Bootloader/limine-protocol/blob/6f3fafe337c30f94e7c2f5c4a21498346c5604bf/PROTOCOL.md)
 
 const std = @import("std");
 
@@ -15,6 +15,7 @@ const cascade = @import("cascade");
 const UUID = @import("uuid").UUID;
 
 /// Base protocol revisions change certain behaviours of the Limine boot protocol outside any specific feature.
+///
 /// The specifics are going to be described as needed throughout this specification.
 pub const BaseRevison = extern struct {
     id: [2]u64 = [_]u64{ 0xf9562b2d5c95a6c8, 0x6a7b384944536bdc },
@@ -34,14 +35,24 @@ pub const BaseRevison = extern struct {
     /// revision.
     ///
     /// If a bootloader does not yet support a requested base revision (i.e. if the requested base revision is higher than the
-    /// maximum base revision supported), it must boot the executable using any arbitrary revision it supports, and communicate failure to
+    /// maximum base revision supported), it may boot the executable using any arbitrary revision it supports, and communicate failure to
     /// comply to the executable by *leaving the 3rd component of the base revision tag unchanged*.
+    ///
+    /// The bootloader may also refuse to boot executables requesting a base revision that it does not yet support, and this is the expected
+    /// and strongly recommended behaviour for bootloaders moving forward, but it is not guaranteed since older bootloaders may not support
+    /// base revisions at all.
+    ///
     /// On the other hand, if the executable's requested base revision is supported, *the 3rd component of the base revision tag must be
     /// set to 0 by the bootloader*.
     ///
     /// Note: this means that unlike when the bootloader drops support for an older base revision and *it* is responsible for failing to
-    /// boot the executable, in case the bootloader does not yet support the executable's requested base revision, it is up to the
-    /// executable itself to fail (or handle the condition otherwise).
+    /// boot the executable, in case the bootloader does not yet support the executable's requested base revision, it is up to the executable
+    /// itself to fail (or handle the condition otherwise), in order to deal with older bootloader implementations.
+    ///
+    /// For any Limine-compliant bootloader supporting base revision 3 or greater, if choosing to boot an executable expecting a base
+    /// revision the bootloader does not yet support (which is discouraged for new bootloader implementations), it is *mandatory* to load
+    /// such executables using at least base revision 3, and it is mandatory for it to always set the 2nd component of the base revision tag
+    /// to the base revision actually used to load the executable, regardless of whether it was the requested one or not.
     ///
     /// **WARNING**: if the requested revision is supported this is set to 0
     revison: Revison,
@@ -1383,17 +1394,17 @@ pub const BootloaderPerformance = extern struct {
     };
 };
 
-/// If this feature is requested, the bootloader will not disable IOMMUs (e.g. Intel VT-d, AMD-Vi, ARM SMMU, ...) that were left enabled by
-/// the firmware at bootloader hand-off, before executable handoff.
-///
-/// This is intended for security-conscious executables that wish to preserve DMA protection and such set up by firmware.
+/// If this feature is requested, the bootloader will not disable IOMMUs (Intel VT-d, AMD-Vi) that were left enabled by the firmware at
+/// hand-off. This is intended for security-conscious executables that wish to preserve DMA protection set up by firmware.
 ///
 /// If this feature is not requested, the bootloader reserves the right to disable any active IOMMUs before handing control to the
-/// executable, for compatibility with kernels that do not support these.
+/// executable, for compatibility with executables that do not support these.
 ///
-/// Not passing this request does not imply that the bootloader is mandated to disable the IOMMUs, though newly implemented bootloaders are
-/// strongly recommended to, and should, disable it.
-pub const KeepIOMMU = extern struct {
+/// Note: Not passing this request does not imply that the bootloader is mandated to disable the IOMMUs, though newly implemented
+/// bootloaders are strongly recommended to, and should, disable them.
+///
+/// Note: On non-x86 platforms, no response will be provided.
+pub const x86_64_KeepIOMMU = extern struct {
     id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x8ebaabe51f490179, 0x2aa86a59ffb4ab0f },
     revision: u64 = 0,
 
@@ -1401,6 +1412,30 @@ pub const KeepIOMMU = extern struct {
 
     pub const Response = extern struct {
         revision: u64,
+    };
+};
+
+/// This feature provides the frequency of the primary timestamp counter.
+///
+/// The primary timestamp counter is the counter read by the `RDTSC` instruction on x86-64, `CNTPCT_EL0` on aarch64, `RDTIME` on riscv64,
+/// and `RDTIME.D` on loongarch64.
+///
+/// Note: The frequency value provided by this feature is best-effort, and may not be fully precise depending on the platform and the method
+/// used by the bootloader to determine it.
+///
+/// Note: If the bootloader is unable to determine the timestamp counter frequency, no response will be provided.
+pub const TSCFrequency = extern struct {
+    id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x10f2ee1d87d195e4, 0xf747a2b78f6ddb31 },
+    revision: u64 = 0,
+
+    response: ?*const Response = null,
+
+    pub const Response = extern struct {
+        revision: u64,
+
+        /// The frequency of the primary timestamp counter, in Hz.
+        ///
+        frequency: u64,
     };
 };
 

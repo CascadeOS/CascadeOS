@@ -26,8 +26,8 @@
         },
 
         .limine = .{
-            .url = "git+https://codeberg.org/Limine/Limine.git?ref=v11.0.0-binary#f7696a0c7367e03301a541a436e4a0bec3dd635d",
-            .hash = "N-V-__8AANKPTAAPwWY44dyMLr3u-l6yIYfdWKnJ111LcTmu",
+            .url = "git+https://github.com/Limine-Bootloader/Limine.git?ref=v11.3.1-binary#3c16d4c3bb2bb54ecc8b37b71760fdb20a193caa",
+            .hash = "N-V-__8AAEgRTQD5aYigsigI4K1eUsxm1QWk9c_i0FGjMEr2",
         },
 
         .sbi = .{
