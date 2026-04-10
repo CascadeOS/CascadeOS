@@ -195,7 +195,7 @@ fn constructAndLoadBootstrapExecutorAndTask() !void {
     const static = struct {
         var bootstrap_init_task: cascade.Task = undefined;
         var bootstrap_executor: cascade.Executor = .{
-            .id = @enumFromInt(0),
+            .id = .bootstrap,
             ._current_task = undefined, // set by `setCurrentTask`
             .arch_specific = undefined, // set by `arch.init.prepareBootstrapExecutor`
             .scheduler_task = undefined, // not used

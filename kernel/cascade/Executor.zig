@@ -74,6 +74,8 @@ pub inline fn format(
 pub const Id = enum(u32) {
     _,
 
+    pub const bootstrap: Id = @enumFromInt(0);
+
     pub inline fn format(
         id: Id,
         writer: *std.Io.Writer,
