@@ -152,7 +152,7 @@ fn createQemuStep(
 
     // set the cpu
     switch (architecture) {
-        .arm => run_qemu.addArgs(&.{ "-cpu", "max" }),
+        .arm => run_qemu.addArgs(&.{ "-cpu", "cortex-a76" }), // TODO: using max here causes exception loop in EDK2 firmware
         .riscv => run_qemu.addArgs(&.{ "-cpu", "max" }),
         .x64 => run_qemu.addArgs(&.{ "-cpu", "max,migratable=no" }),
     }
