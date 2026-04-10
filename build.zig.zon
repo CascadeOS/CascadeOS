@@ -35,6 +35,11 @@
             .hash = "sbi-7.0.0-Muvb-m3vAQAHchgYBHIuYnXH_RWiwbiYqSJ_LLInQmpu",
         },
 
+        .translate_c = .{
+            .url = "git+https://codeberg.org/ziglang/translate-c?ref=main#46b5609b5ac4c0a896217d1d984f3ae50e4810b5",
+            .hash = "translate_c-0.0.0-Q_BUWpf0BgAwrh5AM-acJcslN_YPEhcoCVKbbNjwuUTJ",
+        },
+
         .uacpi = .{
             .url = "git+https://github.com/uACPI/uACPI.git?ref=4.0.0#e05715b2e6a3ae913aecdb86f4fd2dba30304e45",
             .hash = "N-V-__8AACf_EwAqU0c833d6mIfScf7rsW0lDps-JYnPWiqY",

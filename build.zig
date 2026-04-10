@@ -20,6 +20,8 @@ pub fn build(b: *std.Build) !void {
 
     b.enable_qemu = true;
 
+    c.init(b);
+
     const all_architectures: []const CascadeTarget.Architecture = std.meta.tags(CascadeTarget.Architecture);
 
     const step_collection = try StepCollection.create(b, all_architectures);
@@ -73,6 +75,20 @@ pub fn build(b: *std.Build) !void {
         all_architectures,
     );
 }
+
+pub const c = struct {
+    pub const Translator = @import("translate_c").Translator;
+
+    pub fn createTranslator(options: Translator.Options) Translator {
+        return .init(translate_c_dep, options);
+    }
+
+    fn init(b: *std.Build) void {
+        translate_c_dep = b.dependency("translate_c", .{ .optimize = .ReleaseSafe });
+    }
+
+    var translate_c_dep: *std.Build.Dependency = undefined;
+};
 
 fn disableUnsupportedSteps(b: *std.Build) !void {
     const installMakeFn = struct {

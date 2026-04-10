@@ -8,7 +8,7 @@ const Options = @import("../../build/Options.zig");
 
 pub fn customConfiguration(
     b: *std.Build,
-    _: CascadeTarget.Architecture,
+    architecture: CascadeTarget.Architecture,
     module: *std.Build.Module,
     options: Options,
     is_check: bool,
@@ -68,6 +68,30 @@ pub fn customConfiguration(
             },
         });
         module.addIncludePath(uacpi_dep.path("include"));
+
+        const translator = @import("../../build.zig").c.createTranslator(.{
+            .c_source_file = b.addWriteFiles().add("uacpi_api.h",
+                \\#include <uacpi/event.h>
+                \\#include <uacpi/io.h>
+                \\#include <uacpi/namespace.h>
+                \\#include <uacpi/notify.h>
+                \\#include <uacpi/opregion.h>
+                \\#include <uacpi/osi.h>
+                \\#include <uacpi/registers.h>
+                \\#include <uacpi/resources.h>
+                \\#include <uacpi/sleep.h>
+                \\#include <uacpi/status.h>
+                \\#include <uacpi/tables.h>
+                \\#include <uacpi/types.h>
+                \\#include <uacpi/uacpi.h>
+                \\#include <uacpi/utilities.h>
+            ),
+            .target = architecture.kernelTarget(b),
+            .optimize = options.optimize,
+            .link_libc = false,
+        });
+        translator.addIncludePath(uacpi_dep.path("include"));
+        module.addImport("uacpi", translator.mod);
     }
 
     // devicetree
@@ -76,6 +100,7 @@ pub fn customConfiguration(
     // flanterm
     {
         const flanterm_src = b.dependency("flanterm", .{}).path("src");
+
         module.addIncludePath(flanterm_src);
         module.addCSourceFiles(.{
             .root = flanterm_src,
@@ -86,5 +111,17 @@ pub fn customConfiguration(
             // we use the kernel heap instead of the bump allocator
             .flags = &.{"-DFLANTERM_FB_DISABLE_BUMP_ALLOC=1"},
         });
+
+        const translator = @import("../../build.zig").c.createTranslator(.{
+            .c_source_file = b.addWriteFiles().add("flanterm_api.h",
+                \\#include <flanterm.h>
+                \\#include <flanterm_backends/fb.h>
+            ),
+            .target = architecture.kernelTarget(b),
+            .optimize = options.optimize,
+            .link_libc = false,
+        });
+        translator.addIncludePath(flanterm_src);
+        module.addImport("flanterm", translator.mod);
     }
 }

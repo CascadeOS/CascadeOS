@@ -11,6 +11,7 @@
 
 const std = @import("std");
 
+const c = @import("uacpi");
 const cascade = @import("cascade");
 const acpi = cascade.acpi;
 const core = @import("core");
@@ -35,7 +36,7 @@ const core = @import("core");
 /// static buffer for tables, "UACPI_STATIC_TABLE_ARRAY_LEN", which is configured
 /// as 16 descriptors in length by default.
 pub fn setupEarlyTableAccess(temporary_buffer: []align(@sizeOf(usize)) u8) !void {
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_setup_early_table_access(
+    const ret: Status = @enumFromInt(c.uacpi_setup_early_table_access(
         temporary_buffer.ptr,
         temporary_buffer.len,
     ));
@@ -46,7 +47,7 @@ pub fn setupEarlyTableAccess(temporary_buffer: []align(@sizeOf(usize)) u8) !void
 ///
 /// This happens after a successful call to either `setupEarlyTableAccess` or `initialize`.
 pub fn tableSubsystemAvailable() bool {
-    return c_uacpi.uacpi_table_subsystem_available();
+    return c.uacpi_table_subsystem_available();
 }
 
 /// Returns true if the current platform is reduced ACPI hardware.
@@ -54,7 +55,7 @@ pub fn tableSubsystemAvailable() bool {
 /// This getter becomes available along with the table subsystem, use `tableSubsystemAvailable` to check.
 pub fn isPlatformReducedHardware() !bool {
     var value: bool = undefined;
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_is_platform_reduced_hardware(&value));
+    const ret: Status = @enumFromInt(c.uacpi_is_platform_reduced_hardware(&value));
     try ret.toError();
     return value;
 }
@@ -91,7 +92,7 @@ pub const InitalizeOptions = packed struct(u64) {
 ///
 /// Enters ACPI mode.
 pub fn initialize(options: InitalizeOptions) !void {
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_initialize(
+    const ret: Status = @enumFromInt(c.uacpi_initialize(
         @bitCast(options),
     ));
     try ret.toError();
@@ -101,39 +102,39 @@ pub fn initialize(options: InitalizeOptions) !void {
 ///
 /// Initializes the event subsystem.
 pub fn namespaceLoad() !void {
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_load());
+    const ret: Status = @enumFromInt(c.uacpi_namespace_load());
     try ret.toError();
 }
 
 /// Initializes all the necessary objects in the namespaces by calling _STA/_INI etc.
 pub fn namespaceInitialize() !void {
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_initialize());
+    const ret: Status = @enumFromInt(c.uacpi_namespace_initialize());
     try ret.toError();
 }
 
-pub const InitLevel = enum(c_uacpi.uacpi_init_level) {
+pub const InitLevel = enum(c.uacpi_init_level) {
     /// Reboot state, nothing is available
-    early = c_uacpi.UACPI_INIT_LEVEL_EARLY,
+    early = c.UACPI_INIT_LEVEL_EARLY,
 
     /// State after a successfull call to `initialize`.
     ///
     /// Table API and other helpers that don't depend on the ACPI namespace may be used.
-    subsystem_initialized = c_uacpi.UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED,
+    subsystem_initialized = c.UACPI_INIT_LEVEL_SUBSYSTEM_INITIALIZED,
 
     /// State after a successfull call to `namespaceLoad`.
     ///
     /// Most API may be used, namespace can be iterated, etc.
-    namespace_loaded = c_uacpi.UACPI_INIT_LEVEL_NAMESPACE_LOADED,
+    namespace_loaded = c.UACPI_INIT_LEVEL_NAMESPACE_LOADED,
 
     /// The final initialization stage, this is entered after the call to `namespaceInitialize`.
     ///
     /// All API is available to use.
-    namespace_initialized = c_uacpi.UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED,
+    namespace_initialized = c.UACPI_INIT_LEVEL_NAMESPACE_INITIALIZED,
 };
 
 /// Returns the current subsystem initialization level
 pub fn currentInitLevel() InitLevel {
-    return @enumFromInt(c_uacpi.uacpi_get_current_init_level());
+    return @enumFromInt(c.uacpi_get_current_init_level());
 }
 
 pub const Bitness = enum(u8) {
@@ -144,7 +145,7 @@ pub const Bitness = enum(u8) {
 /// Get the bitness of the currently loaded AML code according to the DSDT.
 pub fn getAmlBitness() !Bitness {
     var value: Bitness = undefined;
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_get_aml_bitness(
+    const ret: Status = @enumFromInt(c.uacpi_get_aml_bitness(
         @ptrCast(&value),
     ));
     try ret.toError();
@@ -155,13 +156,13 @@ pub fn getAmlBitness() !Bitness {
 ///
 /// Note that ACPI mode is entered automatically during the call to `initialize`.
 pub fn enterAcpiMode() !void {
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_enter_acpi_mode());
+    const ret: Status = @enumFromInt(c.uacpi_enter_acpi_mode());
     try ret.toError();
 }
 
 /// Helper for leaving ACPI mode.
 pub fn leaveAcpiMode() !void {
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_leave_acpi_mode());
+    const ret: Status = @enumFromInt(c.uacpi_leave_acpi_mode());
     try ret.toError();
 }
 
@@ -172,7 +173,7 @@ pub fn leaveAcpiMode() !void {
 /// This number is used for validation during release.
 pub fn acquireGlobalLock(timeout: Timeout) !u32 {
     var seq: u32 = undefined;
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_acquire_global_lock(
+    const ret: Status = @enumFromInt(c.uacpi_acquire_global_lock(
         @intFromEnum(timeout),
         &seq,
     ));
@@ -181,7 +182,7 @@ pub fn acquireGlobalLock(timeout: Timeout) !u32 {
 }
 
 pub fn releaseGlobalLock(seq: u32) !void {
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_release_global_lock(seq));
+    const ret: Status = @enumFromInt(c.uacpi_release_global_lock(seq));
     try ret.toError();
 }
 
@@ -192,21 +193,21 @@ pub fn releaseGlobalLock(seq: u32) !void {
 /// This is called by uACPI automatically if a fatal error occurs during a call to `initialize`/`namespaceLoad` etc.
 /// in order to prevent accidental use of partially uninitialized subsystems.
 pub fn acpiStateReset() void {
-    c_uacpi.uacpi_state_reset();
+    c.uacpi_state_reset();
 }
 
-pub const InterruptModel = enum(c_uacpi.uacpi_interrupt_model) {
-    pic = c_uacpi.UACPI_INTERRUPT_MODEL_PIC,
-    ioapic = c_uacpi.UACPI_INTERRUPT_MODEL_IOAPIC,
-    iosapic = c_uacpi.UACPI_INTERRUPT_MODEL_IOSAPIC,
-    platform_specific = c_uacpi.UACPI_INTERRUPT_MODEL_PLATFORM_SPECIFIC,
-    gic = c_uacpi.UACPI_INTERRUPT_MODEL_GIC,
-    lpic = c_uacpi.UACPI_INTERRUPT_MODEL_LPIC,
-    rintc = c_uacpi.UACPI_INTERRUPT_MODEL_RINTC,
+pub const InterruptModel = enum(c.uacpi_interrupt_model) {
+    pic = c.UACPI_INTERRUPT_MODEL_PIC,
+    ioapic = c.UACPI_INTERRUPT_MODEL_IOAPIC,
+    iosapic = c.UACPI_INTERRUPT_MODEL_IOSAPIC,
+    platform_specific = c.UACPI_INTERRUPT_MODEL_PLATFORM_SPECIFIC,
+    gic = c.UACPI_INTERRUPT_MODEL_GIC,
+    lpic = c.UACPI_INTERRUPT_MODEL_LPIC,
+    rintc = c.UACPI_INTERRUPT_MODEL_RINTC,
 };
 
 pub fn setInterruptModel(model: InterruptModel) !void {
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_set_interrupt_model(@intFromEnum(model)));
+    const ret: Status = @enumFromInt(c.uacpi_set_interrupt_model(@intFromEnum(model)));
     try ret.toError();
 }
 
@@ -216,13 +217,13 @@ pub fn setInterruptModel(model: InterruptModel) !void {
 /// _PRW methods etc., and marking those it wishes to use for wake by calling `Node.setupGPEForWake` and
 /// `Node.enableGPEForWake`
 pub fn finializeGpeInitialization() !void {
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_finalize_gpe_initialization());
+    const ret: Status = @enumFromInt(c.uacpi_finalize_gpe_initialization());
     try ret.toError();
 }
 
 /// Disable all GPEs currently set up on the system.
 pub fn disableAllGPEs() !void {
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_disable_all_gpes());
+    const ret: Status = @enumFromInt(c.uacpi_disable_all_gpes());
     try ret.toError();
 }
 
@@ -230,7 +231,7 @@ pub fn disableAllGPEs() !void {
 ///
 /// This is only needed after the system wakes from a shallow sleep state and is called automatically by wake code.
 pub fn enableAllRuntimeGPEs() !void {
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_enable_all_runtime_gpes());
+    const ret: Status = @enumFromInt(c.uacpi_enable_all_runtime_gpes());
     try ret.toError();
 }
 
@@ -238,14 +239,14 @@ pub fn enableAllRuntimeGPEs() !void {
 ///
 /// This is only needed before the system goes to sleep is called automatically by sleep code.
 pub fn enableAllWakeGPEs() !void {
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_enable_all_wake_gpes());
+    const ret: Status = @enumFromInt(c.uacpi_enable_all_wake_gpes());
     try ret.toError();
 }
 
-pub const InterfaceKind = enum(c_uacpi.uacpi_interface_kind) {
-    vendor = c_uacpi.UACPI_INTERFACE_KIND_VENDOR,
-    feature = c_uacpi.UACPI_INTERFACE_KIND_FEATURE,
-    all = c_uacpi.UACPI_INTERFACE_KIND_ALL,
+pub const InterfaceKind = enum(c.uacpi_interface_kind) {
+    vendor = c.UACPI_INTERFACE_KIND_VENDOR,
+    feature = c.UACPI_INTERFACE_KIND_FEATURE,
+    all = c.UACPI_INTERFACE_KIND_ALL,
 };
 
 /// Install or uninstall an interface.
@@ -254,7 +255,7 @@ pub const InterfaceKind = enum(c_uacpi.uacpi_interface_kind) {
 ///
 /// After installing an interface, all _OSI queries report it as supported.
 pub fn installInterface(name: [:0]const u8, kind: InterfaceKind) !void {
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_install_interface(
+    const ret: Status = @enumFromInt(c.uacpi_install_interface(
         name.ptr,
         @intFromEnum(kind),
     ));
@@ -262,7 +263,7 @@ pub fn installInterface(name: [:0]const u8, kind: InterfaceKind) !void {
 }
 
 pub fn uninstallInterface(name: [:0]const u8) !void {
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_uninstall_interface(
+    const ret: Status = @enumFromInt(c.uacpi_uninstall_interface(
         name.ptr,
     ));
     try ret.toError();
@@ -276,7 +277,7 @@ pub fn uninstallInterface(name: [:0]const u8) !void {
 /// The callback is able to override the return value dynamically or leave it untouched if desired (e.g. if it
 /// simply wants to log something or do internal bookkeeping of some kind).
 pub fn setInterfaceQueryHandler(handler: InterfaceHandler) !void {
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_set_interface_query_handler(
+    const ret: Status = @enumFromInt(c.uacpi_set_interface_query_handler(
         makeInterfaceHandlerWrapper(handler),
     ));
     try ret.toError();
@@ -287,25 +288,25 @@ pub fn setInterfaceQueryHandler(handler: InterfaceHandler) !void {
 /// - 'addr32' is the real mode entry-point address
 /// - 'addr64' is the protected mode entry-point address
 pub fn setWakingVector(addr32: cascade.PhysicalAddress, addr64: cascade.PhysicalAddress) !void {
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_set_waking_vector(
+    const ret: Status = @enumFromInt(c.uacpi_set_waking_vector(
         @bitCast(addr32),
         @bitCast(addr64),
     ));
     try ret.toError();
 }
 
-pub const SleepState = enum(c_uacpi.uacpi_sleep_state) {
-    S0 = c_uacpi.UACPI_SLEEP_STATE_S0,
-    S1 = c_uacpi.UACPI_SLEEP_STATE_S1,
-    S2 = c_uacpi.UACPI_SLEEP_STATE_S2,
-    S3 = c_uacpi.UACPI_SLEEP_STATE_S3,
-    S4 = c_uacpi.UACPI_SLEEP_STATE_S4,
-    S5 = c_uacpi.UACPI_SLEEP_STATE_S5,
+pub const SleepState = enum(c.uacpi_sleep_state) {
+    S0 = c.UACPI_SLEEP_STATE_S0,
+    S1 = c.UACPI_SLEEP_STATE_S1,
+    S2 = c.UACPI_SLEEP_STATE_S2,
+    S3 = c.UACPI_SLEEP_STATE_S3,
+    S4 = c.UACPI_SLEEP_STATE_S4,
+    S5 = c.UACPI_SLEEP_STATE_S5,
 };
 
 /// Prepare for a given sleep state.
 pub fn prepareForSleep(state: SleepState) !void {
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_prepare_for_sleep_state(
+    const ret: Status = @enumFromInt(c.uacpi_prepare_for_sleep_state(
         @intFromEnum(state),
     ));
     try ret.toError();
@@ -313,7 +314,7 @@ pub fn prepareForSleep(state: SleepState) !void {
 
 /// Enter the given sleep state after preparation.
 pub fn sleep(state: SleepState) !void {
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_enter_sleep_state(
+    const ret: Status = @enumFromInt(c.uacpi_enter_sleep_state(
         @intFromEnum(state),
     ));
     try ret.toError();
@@ -321,7 +322,7 @@ pub fn sleep(state: SleepState) !void {
 
 /// Prepare to leave the given sleep state.
 pub fn prepareForWake(state: SleepState) !void {
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_prepare_for_wake_from_sleep_state(
+    const ret: Status = @enumFromInt(c.uacpi_prepare_for_wake_from_sleep_state(
         @intFromEnum(state),
     ));
     try ret.toError();
@@ -329,7 +330,7 @@ pub fn prepareForWake(state: SleepState) !void {
 
 /// Wake from the given sleep state.
 pub fn wake(state: SleepState) !void {
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_wake_from_sleep_state(
+    const ret: Status = @enumFromInt(c.uacpi_wake_from_sleep_state(
         @intFromEnum(state),
     ));
     try ret.toError();
@@ -337,7 +338,7 @@ pub fn wake(state: SleepState) !void {
 
 /// Attempt reset via the FADT reset register.
 pub fn reboot() !void {
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_reboot());
+    const ret: Status = @enumFromInt(c.uacpi_reboot());
     try ret.toError();
 }
 
@@ -347,7 +348,7 @@ pub fn reboot() !void {
 pub fn readGas(gas: *const acpi.Address) !u64 {
     var value: u64 = undefined;
 
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_gas_read(
+    const ret: Status = @enumFromInt(c.uacpi_gas_read(
         @ptrCast(gas),
         @ptrCast(&value),
     ));
@@ -360,7 +361,7 @@ pub fn readGas(gas: *const acpi.Address) !u64 {
 ///
 /// Prefer `mapGas` + `MappedGas.write`.
 pub fn writeGas(gas: *const acpi.Address, value: u64) !void {
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_gas_write(
+    const ret: Status = @enumFromInt(c.uacpi_gas_write(
         @ptrCast(gas),
         value,
     ));
@@ -373,7 +374,7 @@ pub const MappedGas = opaque {
     pub fn read(mapped_gas: *const MappedGas) !u64 {
         var value: u64 = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_gas_read(
+        const ret: Status = @enumFromInt(c.uacpi_gas_read(
             @ptrCast(mapped_gas),
             @ptrCast(&value),
         ));
@@ -385,7 +386,7 @@ pub const MappedGas = opaque {
     /// Same as `writeGas` but operates on a pre-mapped handle for faster access and/or ability to use in critical
     /// sections/irq contexts.
     pub fn write(mapped_gas: *const MappedGas, value: u64) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_gas_write(
+        const ret: Status = @enumFromInt(c.uacpi_gas_write(
             @ptrCast(mapped_gas),
             value,
         ));
@@ -393,7 +394,7 @@ pub const MappedGas = opaque {
     }
 
     pub fn unmap(mapped_gas: *MappedGas) void {
-        c_uacpi.uacpi_unmap_gas(@ptrCast(mapped_gas));
+        c.uacpi_unmap_gas(@ptrCast(mapped_gas));
     }
 };
 
@@ -403,7 +404,7 @@ pub const MappedGas = opaque {
 pub fn mapGas(gas: *const acpi.Address) !*MappedGas {
     var mapped_gas: *MappedGas = undefined;
 
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_map_gas(
+    const ret: Status = @enumFromInt(c.uacpi_map_gas(
         @ptrCast(gas),
         @ptrCast(&mapped_gas),
     ));
@@ -412,9 +413,9 @@ pub fn mapGas(gas: *const acpi.Address) !*MappedGas {
     return mapped_gas;
 }
 
-pub const InterfaceAction = enum(c_uacpi.uacpi_interface_action) {
-    disable = c_uacpi.UACPI_INTERFACE_ACTION_DISABLE,
-    enable = c_uacpi.UACPI_INTERFACE_ACTION_ENABLE,
+pub const InterfaceAction = enum(c.uacpi_interface_action) {
+    disable = c.UACPI_INTERFACE_ACTION_DISABLE,
+    enable = c.UACPI_INTERFACE_ACTION_ENABLE,
 };
 
 /// Bulk interface configuration, used to disable or enable all interfaces that match 'kind'.
@@ -425,38 +426,38 @@ pub const InterfaceAction = enum(c_uacpi.uacpi_interface_action) {
 /// By default, all vendor strings (like "Windows 2000") are enabled, and all host features
 /// (like "3.0 Thermal Model") are disabled.
 pub fn bulkConfigureInterfaces(kind: InterfaceKind, action: InterfaceAction) !void {
-    const ret: Status = @enumFromInt(c_uacpi.uacpi_bulk_configure_interfaces(
+    const ret: Status = @enumFromInt(c.uacpi_bulk_configure_interfaces(
         @intFromEnum(action),
         @intFromEnum(kind),
     ));
     try ret.toError();
 }
 
-pub const VendorInterface = enum(c_uacpi.uacpi_vendor_interface) {
-    none = c_uacpi.UACPI_VENDOR_INTERFACE_NONE,
-    windows_2000 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_2000,
-    windows_xp = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_XP,
-    windows_xp_sp1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_XP_SP1,
-    windows_server_2003 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_SERVER_2003,
-    windows_xp_sp2 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_XP_SP2,
-    windows_server_2003_sp1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_SERVER_2003_SP1,
-    windows_vista = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_VISTA,
-    windows_server_2008 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_SERVER_2008,
-    windows_vista_sp1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_VISTA_SP1,
-    windows_vista_sp2 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_VISTA_SP2,
-    windows_7 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_7,
-    windows_8 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_8,
-    windows_8_1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_8_1,
-    windows_10 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10,
-    windows_10_rs1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS1,
-    windows_10_rs2 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS2,
-    windows_10_rs3 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS3,
-    windows_10_rs4 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS4,
-    windows_10_rs5 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS5,
-    windows_10_19h1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_19H1,
-    windows_10_20h1 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_10_20H1,
-    windows_11 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_11,
-    windows_11_22h2 = c_uacpi.UACPI_VENDOR_INTERFACE_WINDOWS_11_22H2,
+pub const VendorInterface = enum(c.uacpi_vendor_interface) {
+    none = c.UACPI_VENDOR_INTERFACE_NONE,
+    windows_2000 = c.UACPI_VENDOR_INTERFACE_WINDOWS_2000,
+    windows_xp = c.UACPI_VENDOR_INTERFACE_WINDOWS_XP,
+    windows_xp_sp1 = c.UACPI_VENDOR_INTERFACE_WINDOWS_XP_SP1,
+    windows_server_2003 = c.UACPI_VENDOR_INTERFACE_WINDOWS_SERVER_2003,
+    windows_xp_sp2 = c.UACPI_VENDOR_INTERFACE_WINDOWS_XP_SP2,
+    windows_server_2003_sp1 = c.UACPI_VENDOR_INTERFACE_WINDOWS_SERVER_2003_SP1,
+    windows_vista = c.UACPI_VENDOR_INTERFACE_WINDOWS_VISTA,
+    windows_server_2008 = c.UACPI_VENDOR_INTERFACE_WINDOWS_SERVER_2008,
+    windows_vista_sp1 = c.UACPI_VENDOR_INTERFACE_WINDOWS_VISTA_SP1,
+    windows_vista_sp2 = c.UACPI_VENDOR_INTERFACE_WINDOWS_VISTA_SP2,
+    windows_7 = c.UACPI_VENDOR_INTERFACE_WINDOWS_7,
+    windows_8 = c.UACPI_VENDOR_INTERFACE_WINDOWS_8,
+    windows_8_1 = c.UACPI_VENDOR_INTERFACE_WINDOWS_8_1,
+    windows_10 = c.UACPI_VENDOR_INTERFACE_WINDOWS_10,
+    windows_10_rs1 = c.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS1,
+    windows_10_rs2 = c.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS2,
+    windows_10_rs3 = c.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS3,
+    windows_10_rs4 = c.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS4,
+    windows_10_rs5 = c.UACPI_VENDOR_INTERFACE_WINDOWS_10_RS5,
+    windows_10_19h1 = c.UACPI_VENDOR_INTERFACE_WINDOWS_10_19H1,
+    windows_10_20h1 = c.UACPI_VENDOR_INTERFACE_WINDOWS_10_20H1,
+    windows_11 = c.UACPI_VENDOR_INTERFACE_WINDOWS_11,
+    windows_11_22h2 = c.UACPI_VENDOR_INTERFACE_WINDOWS_11_22H2,
 };
 
 /// Returns the "latest" AML-queried _OSI vendor interface.
@@ -470,26 +471,26 @@ pub const VendorInterface = enum(c_uacpi.uacpi_vendor_interface) {
 /// This function will return `VendorInterface.windows_11`, since this is the latest version of the interface the
 /// code queried, even though the "Windows 2000" query came after "Windows 2021".
 pub fn latestQueriedVendorInterface() VendorInterface {
-    return @enumFromInt(c_uacpi.uacpi_latest_queried_vendor_interface());
+    return @enumFromInt(c.uacpi_latest_queried_vendor_interface());
 }
 
-pub const Register = enum(c_uacpi.uacpi_register) {
-    pm1_sts = c_uacpi.UACPI_REGISTER_PM1_STS,
-    pm1_en = c_uacpi.UACPI_REGISTER_PM1_EN,
-    pm1_cnt = c_uacpi.UACPI_REGISTER_PM1_CNT,
-    pm_tmr = c_uacpi.UACPI_REGISTER_PM_TMR,
-    pm2_cnt = c_uacpi.UACPI_REGISTER_PM2_CNT,
-    slp_cnt = c_uacpi.UACPI_REGISTER_SLP_CNT,
-    spl_sts = c_uacpi.UACPI_REGISTER_SLP_STS,
-    reset = c_uacpi.UACPI_REGISTER_RESET,
-    smi_cmd = c_uacpi.UACPI_REGISTER_SMI_CMD,
+pub const Register = enum(c.uacpi_register) {
+    pm1_sts = c.UACPI_REGISTER_PM1_STS,
+    pm1_en = c.UACPI_REGISTER_PM1_EN,
+    pm1_cnt = c.UACPI_REGISTER_PM1_CNT,
+    pm_tmr = c.UACPI_REGISTER_PM_TMR,
+    pm2_cnt = c.UACPI_REGISTER_PM2_CNT,
+    slp_cnt = c.UACPI_REGISTER_SLP_CNT,
+    spl_sts = c.UACPI_REGISTER_SLP_STS,
+    reset = c.UACPI_REGISTER_RESET,
+    smi_cmd = c.UACPI_REGISTER_SMI_CMD,
 
     /// Read a register from FADT
     ///
     /// NOTE: write-only bits (if any) are cleared automatically
     pub fn read(register: Register) !u64 {
         var value: u64 = undefined;
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_read_register(
+        const ret: Status = @enumFromInt(c.uacpi_read_register(
             @intFromEnum(register),
             @ptrCast(&value),
         ));
@@ -503,7 +504,7 @@ pub const Register = enum(c_uacpi.uacpi_register) {
     /// - Preserved bits (if any) are preserved automatically
     /// - If a register is made up of two (e.g. PM1a and PM1b) parts, the input is written to both at the same time
     pub fn write(register: Register, value: u64) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_write_register(
+        const ret: Status = @enumFromInt(c.uacpi_write_register(
             @intFromEnum(register),
             value,
         ));
@@ -516,7 +517,7 @@ pub const Register = enum(c_uacpi.uacpi_register) {
     /// - Preserved bits (if any) are preserved automatically
     /// - If a register is made up of two (e.g. PM1a and PM1b) parts, the input is written to both at the same time
     pub fn writeRegisters(register: Register, value1: u64, value2: u64) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_write_registers(
+        const ret: Status = @enumFromInt(c.uacpi_write_registers(
             @intFromEnum(register),
             value1,
             value2,
@@ -525,30 +526,30 @@ pub const Register = enum(c_uacpi.uacpi_register) {
     }
 };
 
-pub const RegisterField = enum(c_uacpi.uacpi_register_field) {
-    tmr_sts = c_uacpi.UACPI_REGISTER_FIELD_TMR_STS,
-    bm_sts = c_uacpi.UACPI_REGISTER_FIELD_BM_STS,
-    gbl_sts = c_uacpi.UACPI_REGISTER_FIELD_GBL_STS,
-    pwrbtn_sts = c_uacpi.UACPI_REGISTER_FIELD_PWRBTN_STS,
-    slpbtn_sts = c_uacpi.UACPI_REGISTER_FIELD_SLPBTN_STS,
-    rtc_sts = c_uacpi.UACPI_REGISTER_FIELD_RTC_STS,
-    pciex_wake_sts = c_uacpi.UACPI_REGISTER_FIELD_PCIEX_WAKE_STS,
-    hwr_wak_sts = c_uacpi.UACPI_REGISTER_FIELD_HWR_WAK_STS,
-    wak_sts = c_uacpi.UACPI_REGISTER_FIELD_WAK_STS,
-    tmr_en = c_uacpi.UACPI_REGISTER_FIELD_TMR_EN,
-    gbl_en = c_uacpi.UACPI_REGISTER_FIELD_GBL_EN,
-    pwrbtn_en = c_uacpi.UACPI_REGISTER_FIELD_PWRBTN_EN,
-    slpbtn_en = c_uacpi.UACPI_REGISTER_FIELD_SLPBTN_EN,
-    rtc_en = c_uacpi.UACPI_REGISTER_FIELD_RTC_EN,
-    pciexp_wake_dis = c_uacpi.UACPI_REGISTER_FIELD_PCIEXP_WAKE_DIS,
-    sci_en = c_uacpi.UACPI_REGISTER_FIELD_SCI_EN,
-    bm_rld = c_uacpi.UACPI_REGISTER_FIELD_BM_RLD,
-    gbl_rls = c_uacpi.UACPI_REGISTER_FIELD_GBL_RLS,
-    slp_typ = c_uacpi.UACPI_REGISTER_FIELD_SLP_TYP,
-    hwr_slp_typ = c_uacpi.UACPI_REGISTER_FIELD_HWR_SLP_TYP,
-    slp_en = c_uacpi.UACPI_REGISTER_FIELD_SLP_EN,
-    hwr_slp_en = c_uacpi.UACPI_REGISTER_FIELD_HWR_SLP_EN,
-    arb_dis = c_uacpi.UACPI_REGISTER_FIELD_ARB_DIS,
+pub const RegisterField = enum(c.uacpi_register_field) {
+    tmr_sts = c.UACPI_REGISTER_FIELD_TMR_STS,
+    bm_sts = c.UACPI_REGISTER_FIELD_BM_STS,
+    gbl_sts = c.UACPI_REGISTER_FIELD_GBL_STS,
+    pwrbtn_sts = c.UACPI_REGISTER_FIELD_PWRBTN_STS,
+    slpbtn_sts = c.UACPI_REGISTER_FIELD_SLPBTN_STS,
+    rtc_sts = c.UACPI_REGISTER_FIELD_RTC_STS,
+    pciex_wake_sts = c.UACPI_REGISTER_FIELD_PCIEX_WAKE_STS,
+    hwr_wak_sts = c.UACPI_REGISTER_FIELD_HWR_WAK_STS,
+    wak_sts = c.UACPI_REGISTER_FIELD_WAK_STS,
+    tmr_en = c.UACPI_REGISTER_FIELD_TMR_EN,
+    gbl_en = c.UACPI_REGISTER_FIELD_GBL_EN,
+    pwrbtn_en = c.UACPI_REGISTER_FIELD_PWRBTN_EN,
+    slpbtn_en = c.UACPI_REGISTER_FIELD_SLPBTN_EN,
+    rtc_en = c.UACPI_REGISTER_FIELD_RTC_EN,
+    pciexp_wake_dis = c.UACPI_REGISTER_FIELD_PCIEXP_WAKE_DIS,
+    sci_en = c.UACPI_REGISTER_FIELD_SCI_EN,
+    bm_rld = c.UACPI_REGISTER_FIELD_BM_RLD,
+    gbl_rls = c.UACPI_REGISTER_FIELD_GBL_RLS,
+    slp_typ = c.UACPI_REGISTER_FIELD_SLP_TYP,
+    hwr_slp_typ = c.UACPI_REGISTER_FIELD_HWR_SLP_TYP,
+    slp_en = c.UACPI_REGISTER_FIELD_SLP_EN,
+    hwr_slp_en = c.UACPI_REGISTER_FIELD_HWR_SLP_EN,
+    arb_dis = c.UACPI_REGISTER_FIELD_ARB_DIS,
 
     /// Read a field from a FADT register
     ///
@@ -556,7 +557,7 @@ pub const RegisterField = enum(c_uacpi.uacpi_register_field) {
     /// bit manipulation. E.g. for a field at 0b???XX??? the returned value will contain just the 0bXX
     pub fn read(register_field: RegisterField) !u64 {
         var value: u64 = undefined;
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_read_register_field(
+        const ret: Status = @enumFromInt(c.uacpi_read_register_field(
             @intFromEnum(register_field),
             @ptrCast(&value),
         ));
@@ -569,7 +570,7 @@ pub const RegisterField = enum(c_uacpi.uacpi_register_field) {
     /// NOTE: The value is automatically masked and shifted up as appropriate, the client code doesn't have to do any
     /// bit manipulation. E.g. for a field at 0b???XX??? the passed value should be just 0bXX
     pub fn write(register_field: RegisterField, value: u64) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_write_register_field(
+        const ret: Status = @enumFromInt(c.uacpi_write_register_field(
             @intFromEnum(register_field),
             value,
         ));
@@ -577,37 +578,37 @@ pub const RegisterField = enum(c_uacpi.uacpi_register_field) {
     }
 };
 
-pub const HostInterface = enum(c_uacpi.uacpi_host_interface) {
-    module_device = c_uacpi.UACPI_HOST_INTERFACE_MODULE_DEVICE,
-    processor_device = c_uacpi.UACPI_HOST_INTERFACE_PROCESSOR_DEVICE,
-    @"3_0_thermal_model" = c_uacpi.UACPI_HOST_INTERFACE_3_0_THERMAL_MODEL,
-    @"3_0_scp_extensions" = c_uacpi.UACPI_HOST_INTERFACE_3_0_SCP_EXTENSIONS,
-    processor_aggregator_device = c_uacpi.UACPI_HOST_INTERFACE_PROCESSOR_AGGREGATOR_DEVICE,
+pub const HostInterface = enum(c.uacpi_host_interface) {
+    module_device = c.UACPI_HOST_INTERFACE_MODULE_DEVICE,
+    processor_device = c.UACPI_HOST_INTERFACE_PROCESSOR_DEVICE,
+    @"3_0_thermal_model" = c.UACPI_HOST_INTERFACE_3_0_THERMAL_MODEL,
+    @"3_0_scp_extensions" = c.UACPI_HOST_INTERFACE_3_0_SCP_EXTENSIONS,
+    processor_aggregator_device = c.UACPI_HOST_INTERFACE_PROCESSOR_AGGREGATOR_DEVICE,
 
     /// Same as install/uninstall interface, but comes with an enum of known interfaces defined by the ACPI
     /// specification.
     ///
     /// These are disabled by default as they depend on the host kernel support.
     pub fn enable(interface: HostInterface) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_enable_host_interface(
+        const ret: Status = @enumFromInt(c.uacpi_enable_host_interface(
             @intFromEnum(interface),
         ));
         try ret.toError();
     }
 
     pub fn disable(interface: HostInterface) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_disable_host_interface(
+        const ret: Status = @enumFromInt(c.uacpi_disable_host_interface(
             @intFromEnum(interface),
         ));
         try ret.toError();
     }
 };
 
-pub const FixedEvent = enum(c_uacpi.uacpi_fixed_event) {
-    timer_status = c_uacpi.UACPI_FIXED_EVENT_TIMER_STATUS,
-    power_button = c_uacpi.UACPI_FIXED_EVENT_POWER_BUTTON,
-    sleep_button = c_uacpi.UACPI_FIXED_EVENT_SLEEP_BUTTON,
-    rtc = c_uacpi.UACPI_FIXED_EVENT_RTC,
+pub const FixedEvent = enum(c.uacpi_fixed_event) {
+    timer_status = c.UACPI_FIXED_EVENT_TIMER_STATUS,
+    power_button = c.UACPI_FIXED_EVENT_POWER_BUTTON,
+    sleep_button = c.UACPI_FIXED_EVENT_SLEEP_BUTTON,
+    rtc = c.UACPI_FIXED_EVENT_RTC,
 
     pub fn installHandler(
         event: FixedEvent,
@@ -615,7 +616,7 @@ pub const FixedEvent = enum(c_uacpi.uacpi_fixed_event) {
         handler: InterruptHandler(UserContextT),
         user_context: ?*UserContextT,
     ) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_install_fixed_event_handler(
+        const ret: Status = @enumFromInt(c.uacpi_install_fixed_event_handler(
             @intFromEnum(event),
             makeInterruptHandlerWrapper(UserContextT, handler),
             @ptrCast(user_context),
@@ -624,28 +625,28 @@ pub const FixedEvent = enum(c_uacpi.uacpi_fixed_event) {
     }
 
     pub fn uninstallHandler(event: FixedEvent) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_uninstall_fixed_event_handler(
+        const ret: Status = @enumFromInt(c.uacpi_uninstall_fixed_event_handler(
             @intFromEnum(event),
         ));
         try ret.toError();
     }
 
     pub fn enable(event: FixedEvent) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_enable_fixed_event(
+        const ret: Status = @enumFromInt(c.uacpi_enable_fixed_event(
             @intFromEnum(event),
         ));
         try ret.toError();
     }
 
     pub fn disable(event: FixedEvent) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_disable_fixed_event(
+        const ret: Status = @enumFromInt(c.uacpi_disable_fixed_event(
             @intFromEnum(event),
         ));
         try ret.toError();
     }
 
     pub fn clear(event: FixedEvent) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_clear_fixed_event(
+        const ret: Status = @enumFromInt(c.uacpi_clear_fixed_event(
             @intFromEnum(event),
         ));
         try ret.toError();
@@ -653,7 +654,7 @@ pub const FixedEvent = enum(c_uacpi.uacpi_fixed_event) {
 
     pub fn info(event: FixedEvent) !EventInfo {
         var info_data: EventInfo = undefined;
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_fixed_event_info(
+        const ret: Status = @enumFromInt(c.uacpi_fixed_event_info(
             @intFromEnum(event),
             @ptrCast(&info_data),
         ));
@@ -664,35 +665,35 @@ pub const FixedEvent = enum(c_uacpi.uacpi_fixed_event) {
 
 pub const Node = opaque {
     pub fn root() *Node {
-        return @ptrCast(c_uacpi.uacpi_namespace_root());
+        return @ptrCast(c.uacpi_namespace_root());
     }
 
-    pub const PredefinedNamespace = enum(c_uacpi.uacpi_predefined_namespace) {
-        root = c_uacpi.UACPI_PREDEFINED_NAMESPACE_ROOT,
-        gpe = c_uacpi.UACPI_PREDEFINED_NAMESPACE_GPE,
-        pr = c_uacpi.UACPI_PREDEFINED_NAMESPACE_PR,
-        sb = c_uacpi.UACPI_PREDEFINED_NAMESPACE_SB,
-        si = c_uacpi.UACPI_PREDEFINED_NAMESPACE_SI,
-        tz = c_uacpi.UACPI_PREDEFINED_NAMESPACE_TZ,
-        gl = c_uacpi.UACPI_PREDEFINED_NAMESPACE_GL,
-        os = c_uacpi.UACPI_PREDEFINED_NAMESPACE_OS,
-        osi = c_uacpi.UACPI_PREDEFINED_NAMESPACE_OSI,
-        rev = c_uacpi.UACPI_PREDEFINED_NAMESPACE_REV,
+    pub const PredefinedNamespace = enum(c.uacpi_predefined_namespace) {
+        root = c.UACPI_PREDEFINED_NAMESPACE_ROOT,
+        gpe = c.UACPI_PREDEFINED_NAMESPACE_GPE,
+        pr = c.UACPI_PREDEFINED_NAMESPACE_PR,
+        sb = c.UACPI_PREDEFINED_NAMESPACE_SB,
+        si = c.UACPI_PREDEFINED_NAMESPACE_SI,
+        tz = c.UACPI_PREDEFINED_NAMESPACE_TZ,
+        gl = c.UACPI_PREDEFINED_NAMESPACE_GL,
+        os = c.UACPI_PREDEFINED_NAMESPACE_OS,
+        osi = c.UACPI_PREDEFINED_NAMESPACE_OSI,
+        rev = c.UACPI_PREDEFINED_NAMESPACE_REV,
     };
 
     pub fn getPredefined(predefined_namespace: PredefinedNamespace) *Node {
-        return @ptrCast(c_uacpi.uacpi_namespace_get_predefined(
+        return @ptrCast(c.uacpi_namespace_get_predefined(
             @intFromEnum(predefined_namespace),
         ));
     }
 
     /// Returns `true` if the node is an alias.
     pub fn isAlias(node: *const Node) bool {
-        return c_uacpi.uacpi_namespace_node_is_alias(@ptrCast(@constCast(node)));
+        return c.uacpi_namespace_node_is_alias(@ptrCast(@constCast(node)));
     }
 
     pub fn name(node: *const Node) Object.Name {
-        return @bitCast(c_uacpi.uacpi_namespace_node_name(@ptrCast(node)));
+        return @bitCast(c.uacpi_namespace_node_name(@ptrCast(node)));
     }
 
     /// Returns the type of object stored at the namespace node.
@@ -702,7 +703,7 @@ pub const Node = opaque {
     pub fn objectType(node: *const Node) !Object.Type {
         var object_type: Object.Type = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_type(
+        const ret: Status = @enumFromInt(c.uacpi_namespace_node_type(
             @ptrCast(node),
             @ptrCast(&object_type),
         ));
@@ -718,7 +719,7 @@ pub const Node = opaque {
     pub fn is(node: *const Node, object_type: Object.Type) !bool {
         var out: bool = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_is(
+        const ret: Status = @enumFromInt(c.uacpi_namespace_node_is(
             @ptrCast(node),
             @intFromEnum(object_type),
             @ptrCast(&out),
@@ -736,7 +737,7 @@ pub const Node = opaque {
     pub fn isOneOf(node: *const Node, object_type_bits: Object.TypeBits) !bool {
         var out: bool = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_is_one_of(
+        const ret: Status = @enumFromInt(c.uacpi_namespace_node_is_one_of(
             @ptrCast(node),
             @bitCast(object_type_bits),
             @ptrCast(&out),
@@ -747,17 +748,17 @@ pub const Node = opaque {
     }
 
     pub fn depth(node: *const Node) usize {
-        return c_uacpi.uacpi_namespace_node_depth(@ptrCast(node));
+        return c.uacpi_namespace_node_depth(@ptrCast(node));
     }
 
     pub fn parent(node: *const Node) *Node {
-        return @ptrCast(c_uacpi.uacpi_namespace_node_parent(@ptrCast(@constCast(node))));
+        return @ptrCast(c.uacpi_namespace_node_parent(@ptrCast(@constCast(node))));
     }
 
     pub fn find(parent_node: *const Node, path: [:0]const u8) !?*Node {
         var node: ?*Node = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_find(
+        const ret: Status = @enumFromInt(c.uacpi_namespace_node_find(
             @ptrCast(@constCast(parent_node)),
             path.ptr,
             @ptrCast(&node),
@@ -775,7 +776,7 @@ pub const Node = opaque {
     pub fn resolveFromAmlNamepath(scope_node: *const Node, path: [:0]const u8) !?*Node {
         var node: ?*Node = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_resolve_from_aml_namepath(
+        const ret: Status = @enumFromInt(c.uacpi_namespace_node_resolve_from_aml_namepath(
             @ptrCast(@constCast(scope_node)),
             path.ptr,
             @ptrCast(&node),
@@ -793,7 +794,7 @@ pub const Node = opaque {
         callback: IterationCallback(UserContextT),
         user_context: ?*UserContextT,
     ) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_for_each_child_simple(
+        const ret: Status = @enumFromInt(c.uacpi_namespace_for_each_child_simple(
             @ptrCast(@constCast(parent_node)),
             makeIterationCallbackWrapper(UserContextT, callback),
             user_context,
@@ -802,7 +803,7 @@ pub const Node = opaque {
     }
 
     pub const Depth = enum(u32) {
-        any = c_uacpi.UACPI_MAX_DEPTH_ANY,
+        any = c.UACPI_MAX_DEPTH_ANY,
 
         _,
     };
@@ -829,7 +830,7 @@ pub const Node = opaque {
         max_depth: Depth,
         user_context: ?*UserContextT,
     ) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_for_each_child(
+        const ret: Status = @enumFromInt(c.uacpi_namespace_for_each_child(
             @ptrCast(@constCast(parent_node)),
             if (opt_descending_callback) |descending_callback|
                 makeIterationCallbackWrapper(UserContextT, descending_callback)
@@ -850,7 +851,7 @@ pub const Node = opaque {
     pub fn childIterator(parent_node: *const Node) !ChildIterator {
         var child: ?*Node = null;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_next(
+        const ret: Status = @enumFromInt(c.uacpi_namespace_node_next(
             @ptrCast(@constCast(parent_node)),
             @ptrCast(&child),
         ));
@@ -874,7 +875,7 @@ pub const Node = opaque {
     pub fn childIteratorTyped(parent_node: *const Node, type_mask: Object.TypeBits) !ChildIterator {
         var child: ?*Node = null;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_namespace_node_next_typed(
+        const ret: Status = @enumFromInt(c.uacpi_namespace_node_next_typed(
             @ptrCast(@constCast(parent_node)),
             @ptrCast(&child),
             @bitCast(type_mask),
@@ -902,13 +903,13 @@ pub const Node = opaque {
             const child = child_iterator.current_child orelse return null;
 
             const ret: Status = if (child_iterator.type_mask) |type_mask|
-                @enumFromInt(c_uacpi.uacpi_namespace_node_next_typed(
+                @enumFromInt(c.uacpi_namespace_node_next_typed(
                     @ptrCast(@constCast(child_iterator.parent)),
                     @ptrCast(&child_iterator.current_child),
                     @bitCast(type_mask),
                 ))
             else
-                @enumFromInt(c_uacpi.uacpi_namespace_node_next(
+                @enumFromInt(c.uacpi_namespace_node_next(
                     @ptrCast(@constCast(child_iterator.parent)),
                     @ptrCast(&child_iterator.current_child),
                 ));
@@ -927,12 +928,12 @@ pub const Node = opaque {
         path: [:0]const u8,
 
         pub fn deinit(absolute_path: AbsoultePath) void {
-            c_uacpi.uacpi_free_absolute_path(absolute_path.path.ptr);
+            c.uacpi_free_absolute_path(absolute_path.path.ptr);
         }
     };
 
     pub fn getAbsolutePath(node: *const Node) AbsoultePath {
-        const ptr: [*:0]const u8 = c_uacpi.uacpi_namespace_node_generate_absolute_path(@ptrCast(node));
+        const ptr: [*:0]const u8 = c.uacpi_namespace_node_generate_absolute_path(@ptrCast(node));
         return .{ .path = std.mem.sliceTo(ptr, 0) };
     }
 
@@ -946,7 +947,7 @@ pub const Node = opaque {
         handler: NotifyHandler(UserContextT),
         user_context: ?*UserContextT,
     ) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_install_notify_handler(
+        const ret: Status = @enumFromInt(c.uacpi_install_notify_handler(
             @ptrCast(node),
             makeNotifyHandlerWrapper(UserContextT, handler),
             user_context,
@@ -959,30 +960,30 @@ pub const Node = opaque {
         comptime UserContextT: type,
         handler: NotifyHandler(UserContextT),
     ) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_uninstall_notify_handler(
+        const ret: Status = @enumFromInt(c.uacpi_uninstall_notify_handler(
             @ptrCast(node),
             makeNotifyHandlerWrapper(UserContextT, handler),
         ));
         try ret.toError();
     }
 
-    pub const AddressSpace = enum(c_uacpi.uacpi_address_space) {
-        system_memory = c_uacpi.UACPI_ADDRESS_SPACE_SYSTEM_MEMORY,
-        system_io = c_uacpi.UACPI_ADDRESS_SPACE_SYSTEM_IO,
-        pci_config = c_uacpi.UACPI_ADDRESS_SPACE_PCI_CONFIG,
-        embedded_controller = c_uacpi.UACPI_ADDRESS_SPACE_EMBEDDED_CONTROLLER,
-        smbus = c_uacpi.UACPI_ADDRESS_SPACE_SMBUS,
-        system_cmos = c_uacpi.UACPI_ADDRESS_SPACE_SYSTEM_CMOS,
-        pci_bar_target = c_uacpi.UACPI_ADDRESS_SPACE_PCI_BAR_TARGET,
-        ipmi = c_uacpi.UACPI_ADDRESS_SPACE_IPMI,
-        general_purpose_io = c_uacpi.UACPI_ADDRESS_SPACE_GENERAL_PURPOSE_IO,
-        generic_serial_bus = c_uacpi.UACPI_ADDRESS_SPACE_GENERIC_SERIAL_BUS,
-        pcc = c_uacpi.UACPI_ADDRESS_SPACE_PCC,
-        prm = c_uacpi.UACPI_ADDRESS_SPACE_PRM,
-        ffixedhw = c_uacpi.UACPI_ADDRESS_SPACE_FFIXEDHW,
+    pub const AddressSpace = enum(c.uacpi_address_space) {
+        system_memory = c.UACPI_ADDRESS_SPACE_SYSTEM_MEMORY,
+        system_io = c.UACPI_ADDRESS_SPACE_SYSTEM_IO,
+        pci_config = c.UACPI_ADDRESS_SPACE_PCI_CONFIG,
+        embedded_controller = c.UACPI_ADDRESS_SPACE_EMBEDDED_CONTROLLER,
+        smbus = c.UACPI_ADDRESS_SPACE_SMBUS,
+        system_cmos = c.UACPI_ADDRESS_SPACE_SYSTEM_CMOS,
+        pci_bar_target = c.UACPI_ADDRESS_SPACE_PCI_BAR_TARGET,
+        ipmi = c.UACPI_ADDRESS_SPACE_IPMI,
+        general_purpose_io = c.UACPI_ADDRESS_SPACE_GENERAL_PURPOSE_IO,
+        generic_serial_bus = c.UACPI_ADDRESS_SPACE_GENERIC_SERIAL_BUS,
+        pcc = c.UACPI_ADDRESS_SPACE_PCC,
+        prm = c.UACPI_ADDRESS_SPACE_PRM,
+        ffixedhw = c.UACPI_ADDRESS_SPACE_FFIXEDHW,
 
         // Internal type
-        table_data = c_uacpi.UACPI_ADDRESS_SPACE_TABLE_DATA,
+        table_data = c.UACPI_ADDRESS_SPACE_TABLE_DATA,
     };
 
     /// Install an address space handler to a device node.
@@ -998,7 +999,7 @@ pub const Node = opaque {
         handler: RegionHandler(UserContextT),
         user_context: ?*UserContextT,
     ) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_install_address_space_handler(
+        const ret: Status = @enumFromInt(c.uacpi_install_address_space_handler(
             @ptrCast(device_node),
             @intFromEnum(space),
             makeRegionHandlerWrapper(UserContextT, handler),
@@ -1012,7 +1013,7 @@ pub const Node = opaque {
         device_node: *Node,
         space: AddressSpace,
     ) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_uninstall_address_space_handler(
+        const ret: Status = @enumFromInt(c.uacpi_uninstall_address_space_handler(
             @ptrCast(device_node),
             @intFromEnum(space),
         ));
@@ -1027,7 +1028,7 @@ pub const Node = opaque {
         device_node: *Node,
         space: AddressSpace,
     ) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_reg_all_opregions(
+        const ret: Status = @enumFromInt(c.uacpi_reg_all_opregions(
             @ptrCast(device_node),
             @intFromEnum(space),
         ));
@@ -1040,7 +1041,7 @@ pub const Node = opaque {
     ///
     /// Note that the presence of the device (_STA) is not verified here.
     pub fn deviceMatchesPnpId(device_node: *const Node, list: [:null]const ?[*:0]const u8) bool {
-        return c_uacpi.uacpi_device_matches_pnp_id(
+        return c.uacpi_device_matches_pnp_id(
             @ptrCast(@constCast(device_node)),
             list.ptr,
         );
@@ -1059,7 +1060,7 @@ pub const Node = opaque {
         callback: IterationCallback(UserContextT),
         user_context: ?*UserContextT,
     ) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_find_devices_at(
+        const ret: Status = @enumFromInt(c.uacpi_find_devices_at(
             @ptrCast(@constCast(parent_node)),
             hids.ptr,
             makeIterationCallbackWrapper(UserContextT, callback),
@@ -1075,7 +1076,7 @@ pub const Node = opaque {
         callback: IterationCallback(UserContextT),
         user_context: ?*UserContextT,
     ) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_find_devices(
+        const ret: Status = @enumFromInt(c.uacpi_find_devices(
             hid.ptr,
             makeIterationCallbackWrapper(UserContextT, callback),
             user_context,
@@ -1093,7 +1094,7 @@ pub const Node = opaque {
         }
 
         pub fn deinit(pci_routing_table: *const PciRoutingTable) void {
-            c_uacpi.uacpi_free_pci_routing_table(@ptrCast(@constCast(pci_routing_table)));
+            c.uacpi_free_pci_routing_table(@ptrCast(@constCast(pci_routing_table)));
         }
 
         pub const Entry = extern struct {
@@ -1103,7 +1104,7 @@ pub const Node = opaque {
             pin: u8,
 
             comptime {
-                core.testing.expectSize(Entry, .of(c_uacpi.uacpi_pci_routing_table_entry));
+                core.testing.expectSize(Entry, .of(c.uacpi_pci_routing_table_entry));
             }
         };
     };
@@ -1113,7 +1114,7 @@ pub const Node = opaque {
     ) !*const PciRoutingTable {
         var table: *const PciRoutingTable = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_get_pci_routing_table(
+        const ret: Status = @enumFromInt(c.uacpi_get_pci_routing_table(
             @ptrCast(@constCast(device_node)),
             @ptrCast(&table),
         ));
@@ -1133,11 +1134,11 @@ pub const Node = opaque {
         }
 
         pub fn deinit(id_string: *const IdString) void {
-            c_uacpi.uacpi_free_id_string(@ptrCast(@constCast(id_string)));
+            c.uacpi_free_id_string(@ptrCast(@constCast(id_string)));
         }
 
         comptime {
-            core.testing.expectSize(IdString, .of(c_uacpi.uacpi_id_string));
+            core.testing.expectSize(IdString, .of(c.uacpi_id_string));
         }
     };
 
@@ -1145,7 +1146,7 @@ pub const Node = opaque {
     pub fn evalHid(node: *const Node) !?*const IdString {
         var id_string: *const IdString = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_hid(
+        const ret: Status = @enumFromInt(c.uacpi_eval_hid(
             @ptrCast(@constCast(node)),
             @ptrCast(&id_string),
         ));
@@ -1166,7 +1167,7 @@ pub const Node = opaque {
         }
 
         pub fn deinit(pnp_id_list: *const PnpIdList) void {
-            c_uacpi.uacpi_free_pnp_id_list(@ptrCast(@constCast(pnp_id_list)));
+            c.uacpi_free_pnp_id_list(@ptrCast(@constCast(pnp_id_list)));
         }
     };
 
@@ -1174,7 +1175,7 @@ pub const Node = opaque {
     pub fn evalCid(node: *const Node) !?*const PnpIdList {
         var list: *const PnpIdList = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_cid(
+        const ret: Status = @enumFromInt(c.uacpi_eval_cid(
             @ptrCast(@constCast(node)),
             @ptrCast(&list),
         ));
@@ -1188,7 +1189,7 @@ pub const Node = opaque {
     pub fn evalSta(node: *const Node) !?u32 {
         var value: u32 = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_sta(
+        const ret: Status = @enumFromInt(c.uacpi_eval_sta(
             @ptrCast(@constCast(node)),
             @ptrCast(&value),
         ));
@@ -1202,7 +1203,7 @@ pub const Node = opaque {
     pub fn evalAdr(node: *const Node) !?u64 {
         var value: u64 = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_adr(
+        const ret: Status = @enumFromInt(c.uacpi_eval_adr(
             @ptrCast(@constCast(node)),
             @ptrCast(&value),
         ));
@@ -1221,7 +1222,7 @@ pub const Node = opaque {
     pub fn evalCls(node: *const Node) !?*const IdString {
         var id_string: *const IdString = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_cls(
+        const ret: Status = @enumFromInt(c.uacpi_eval_cls(
             @ptrCast(@constCast(node)),
             @ptrCast(&id_string),
         ));
@@ -1235,7 +1236,7 @@ pub const Node = opaque {
     pub fn evalUid(node: *const Node) !?*const IdString {
         var id_string: *const IdString = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_uid(
+        const ret: Status = @enumFromInt(c.uacpi_eval_uid(
             @ptrCast(@constCast(node)),
             @ptrCast(&id_string),
         ));
@@ -1255,7 +1256,7 @@ pub const Node = opaque {
     ) !*Object {
         var value: *Object = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval(
+        const ret: Status = @enumFromInt(c.uacpi_eval(
             @ptrCast(parent_node),
             if (path) |p| p.ptr else null,
             &.{
@@ -1278,7 +1279,7 @@ pub const Node = opaque {
     ) !*Object {
         var value: *Object = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_simple(
+        const ret: Status = @enumFromInt(c.uacpi_eval_simple(
             @ptrCast(parent_node),
             if (path) |p| p.ptr else null,
             @ptrCast(&value),
@@ -1299,7 +1300,7 @@ pub const Node = opaque {
     ) !*Object {
         var value: *Object = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_typed(
+        const ret: Status = @enumFromInt(c.uacpi_eval_typed(
             @ptrCast(parent_node),
             if (path) |p| p.ptr else null,
             &.{
@@ -1324,7 +1325,7 @@ pub const Node = opaque {
     ) !*Object {
         var value: *Object = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_simple_typed(
+        const ret: Status = @enumFromInt(c.uacpi_eval_simple_typed(
             @ptrCast(parent_node),
             if (path) |p| p.ptr else null,
             @bitCast(ret_mask),
@@ -1341,7 +1342,7 @@ pub const Node = opaque {
         path: ?[:0]const u8,
         objects: []const *const Object,
     ) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_execute(
+        const ret: Status = @enumFromInt(c.uacpi_execute(
             @ptrCast(parent_node),
             if (path) |p| p.ptr else null,
             &.{
@@ -1357,7 +1358,7 @@ pub const Node = opaque {
         parent_node: *Node,
         path: ?[:0]const u8,
     ) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_execute_simple(
+        const ret: Status = @enumFromInt(c.uacpi_execute_simple(
             @ptrCast(parent_node),
             if (path) |p| p.ptr else null,
         ));
@@ -1372,7 +1373,7 @@ pub const Node = opaque {
     ) !u64 {
         var value: u64 = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_integer(
+        const ret: Status = @enumFromInt(c.uacpi_eval_integer(
             @ptrCast(parent_node),
             if (path) |p| p.ptr else null,
             &.{
@@ -1393,7 +1394,7 @@ pub const Node = opaque {
     ) !u64 {
         var value: u64 = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_simple_integer(
+        const ret: Status = @enumFromInt(c.uacpi_eval_simple_integer(
             @ptrCast(parent_node),
             if (path) |p| p.ptr else null,
             &value,
@@ -1413,7 +1414,7 @@ pub const Node = opaque {
     ) !*Object {
         var value: *Object = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_buffer_or_string(
+        const ret: Status = @enumFromInt(c.uacpi_eval_buffer_or_string(
             @ptrCast(parent_node),
             if (path) |p| p.ptr else null,
             &.{
@@ -1436,7 +1437,7 @@ pub const Node = opaque {
     ) !*Object {
         var value: *Object = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_simple_buffer_or_string(
+        const ret: Status = @enumFromInt(c.uacpi_eval_simple_buffer_or_string(
             @ptrCast(parent_node),
             if (path) |p| p.ptr else null,
             @ptrCast(&value),
@@ -1456,7 +1457,7 @@ pub const Node = opaque {
     ) !*Object {
         var value: *Object = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_string(
+        const ret: Status = @enumFromInt(c.uacpi_eval_string(
             @ptrCast(parent_node),
             if (path) |p| p.ptr else null,
             &.{
@@ -1479,7 +1480,7 @@ pub const Node = opaque {
     ) !*Object {
         var value: *Object = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_simple_string(
+        const ret: Status = @enumFromInt(c.uacpi_eval_simple_string(
             @ptrCast(parent_node),
             if (path) |p| p.ptr else null,
             @ptrCast(&value),
@@ -1499,7 +1500,7 @@ pub const Node = opaque {
     ) !*Object {
         var value: *Object = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_buffer(
+        const ret: Status = @enumFromInt(c.uacpi_eval_buffer(
             @ptrCast(parent_node),
             if (path) |p| p.ptr else null,
             &.{
@@ -1522,7 +1523,7 @@ pub const Node = opaque {
     ) !*Object {
         var value: *Object = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_simple_buffer(
+        const ret: Status = @enumFromInt(c.uacpi_eval_simple_buffer(
             @ptrCast(parent_node),
             if (path) |p| p.ptr else null,
             @ptrCast(&value),
@@ -1542,7 +1543,7 @@ pub const Node = opaque {
     ) !*Object {
         var value: *Object = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_package(
+        const ret: Status = @enumFromInt(c.uacpi_eval_package(
             @ptrCast(parent_node),
             if (path) |p| p.ptr else null,
             &.{
@@ -1565,7 +1566,7 @@ pub const Node = opaque {
     ) !*Object {
         var value: *Object = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_eval_simple_package(
+        const ret: Status = @enumFromInt(c.uacpi_eval_simple_package(
             @ptrCast(parent_node),
             if (path) |p| p.ptr else null,
             @ptrCast(&value),
@@ -1610,7 +1611,7 @@ pub const Node = opaque {
         };
 
         pub fn deinit(node_info: *const Info) void {
-            c_uacpi.uacpi_free_namespace_node_info(@ptrCast(@constCast(node_info)));
+            c.uacpi_free_namespace_node_info(@ptrCast(@constCast(node_info)));
         }
     };
 
@@ -1621,7 +1622,7 @@ pub const Node = opaque {
     pub fn info(node: *const Node) !*const Info {
         var info_ptr: *const Info = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_get_namespace_node_info(
+        const ret: Status = @enumFromInt(c.uacpi_get_namespace_node_info(
             @ptrCast(@constCast(node)),
             @ptrCast(&info_ptr),
         ));
@@ -1635,7 +1636,7 @@ pub const Node = opaque {
     /// NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
     pub fn gpeInfo(gpe_device: ?*const Node, index: u16) !EventInfo {
         var event_info: EventInfo = undefined;
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_gpe_info(
+        const ret: Status = @enumFromInt(c.uacpi_gpe_info(
             @ptrCast(@constCast(gpe_device)),
             index,
             @ptrCast(&event_info),
@@ -1659,7 +1660,7 @@ pub const Node = opaque {
         handler: GPEHandler(UserContextT),
         user_context: ?*UserContextT,
     ) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_install_gpe_handler(
+        const ret: Status = @enumFromInt(c.uacpi_install_gpe_handler(
             @ptrCast(gpe_device),
             index,
             @intFromEnum(triggering),
@@ -1681,7 +1682,7 @@ pub const Node = opaque {
         handler: GPEHandler(UserContextT),
         user_context: ?*UserContextT,
     ) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_install_gpe_handler_raw(
+        const ret: Status = @enumFromInt(c.uacpi_install_gpe_handler_raw(
             @ptrCast(gpe_device),
             index,
             makeGPEHandlerWrapper(UserContextT, handler),
@@ -1696,7 +1697,7 @@ pub const Node = opaque {
         comptime UserContextT: type,
         handler: GPEHandler(UserContextT),
     ) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_uninstall_gpe_handler(
+        const ret: Status = @enumFromInt(c.uacpi_uninstall_gpe_handler(
             @ptrCast(gpe_device),
             index,
             makeGPEHandlerWrapper(UserContextT, handler),
@@ -1714,7 +1715,7 @@ pub const Node = opaque {
         index: u16,
         wake_device: ?*Node,
     ) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_setup_gpe_for_wake(
+        const ret: Status = @enumFromInt(c.uacpi_setup_gpe_for_wake(
             @ptrCast(gpe_device),
             index,
             @ptrCast(wake_device),
@@ -1733,7 +1734,7 @@ pub const Node = opaque {
         gpe_device: ?*Node,
         index: u16,
     ) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_enable_gpe_for_wake(
+        const ret: Status = @enumFromInt(c.uacpi_enable_gpe_for_wake(
             @ptrCast(gpe_device),
             index,
         ));
@@ -1751,7 +1752,7 @@ pub const Node = opaque {
         gpe_device: ?*Node,
         index: u16,
     ) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_disable_gpe_for_wake(
+        const ret: Status = @enumFromInt(c.uacpi_disable_gpe_for_wake(
             @ptrCast(gpe_device),
             index,
         ));
@@ -1767,7 +1768,7 @@ pub const Node = opaque {
     ///
     /// NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
     pub fn enableGPE(gpe_device: ?*Node, index: u16) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_enable_gpe(
+        const ret: Status = @enumFromInt(c.uacpi_enable_gpe(
             @ptrCast(gpe_device),
             index,
         ));
@@ -1783,7 +1784,7 @@ pub const Node = opaque {
     ///
     /// NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
     pub fn disableGPE(gpe_device: ?*Node, index: u16) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_disable_gpe(
+        const ret: Status = @enumFromInt(c.uacpi_disable_gpe(
             @ptrCast(gpe_device),
             index,
         ));
@@ -1794,7 +1795,7 @@ pub const Node = opaque {
     ///
     /// NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
     pub fn clearGPE(gpe_device: ?*Node, index: u16) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_clear_gpe(
+        const ret: Status = @enumFromInt(c.uacpi_clear_gpe(
             @ptrCast(gpe_device),
             index,
         ));
@@ -1810,7 +1811,7 @@ pub const Node = opaque {
     ///
     /// NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
     pub fn suspendGPE(gpe_device: ?*Node, index: u16) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_suspend_gpe(
+        const ret: Status = @enumFromInt(c.uacpi_suspend_gpe(
             @ptrCast(gpe_device),
             index,
         ));
@@ -1826,7 +1827,7 @@ pub const Node = opaque {
     ///
     /// NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
     pub fn resumeGPE(gpe_device: ?*Node, index: u16) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_resume_gpe(
+        const ret: Status = @enumFromInt(c.uacpi_resume_gpe(
             @ptrCast(gpe_device),
             index,
         ));
@@ -1839,7 +1840,7 @@ pub const Node = opaque {
     ///
     /// NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
     pub fn finishHandlingGPE(gpe_device: ?*Node, index: u16) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_finish_handling_gpe(
+        const ret: Status = @enumFromInt(c.uacpi_finish_handling_gpe(
             @ptrCast(gpe_device),
             index,
         ));
@@ -1857,7 +1858,7 @@ pub const Node = opaque {
     ///
     /// NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
     pub fn maskGPE(gpe_device: ?*Node, index: u16) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_mask_gpe(
+        const ret: Status = @enumFromInt(c.uacpi_mask_gpe(
             @ptrCast(gpe_device),
             index,
         ));
@@ -1868,7 +1869,7 @@ pub const Node = opaque {
     ///
     /// NOTE: 'gpe_device' may be null for GPEs managed by \_GPE
     pub fn unmaskGPE(gpe_device: ?*Node, index: u16) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_unmask_gpe(
+        const ret: Status = @enumFromInt(c.uacpi_unmask_gpe(
             @ptrCast(gpe_device),
             index,
         ));
@@ -1883,7 +1884,7 @@ pub const Node = opaque {
         num_registers: u16,
         irq: u32,
     ) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_install_gpe_block(
+        const ret: Status = @enumFromInt(c.uacpi_install_gpe_block(
             @ptrCast(gpe_device),
             address,
             @intFromEnum(address_space),
@@ -1894,7 +1895,7 @@ pub const Node = opaque {
     }
 
     pub fn uninstallGPEBlock(gpe_device: *Node) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_uninstall_gpe_block(
+        const ret: Status = @enumFromInt(c.uacpi_uninstall_gpe_block(
             @ptrCast(gpe_device),
         ));
         try ret.toError();
@@ -1909,7 +1910,7 @@ pub const Node = opaque {
     pub fn getCurrentResources(device: *const Node) !?*Resources {
         var resources: *Resources = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_get_current_resources(
+        const ret: Status = @enumFromInt(c.uacpi_get_current_resources(
             @ptrCast(@constCast(device)),
             @ptrCast(&resources),
         ));
@@ -1928,7 +1929,7 @@ pub const Node = opaque {
     pub fn getPossibleResources(device: *const Node) !?*Resources {
         var resources: *Resources = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_get_possible_resources(
+        const ret: Status = @enumFromInt(c.uacpi_get_possible_resources(
             @ptrCast(@constCast(device)),
             @ptrCast(&resources),
         ));
@@ -1948,7 +1949,7 @@ pub const Node = opaque {
     pub fn getResources(device: *const Node, method: [:0]const u8) !?*Resources {
         var resources: *Resources = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_get_device_resources(
+        const ret: Status = @enumFromInt(c.uacpi_get_device_resources(
             @ptrCast(@constCast(device)),
             method.ptr,
             @ptrCast(&resources),
@@ -1966,7 +1967,7 @@ pub const Node = opaque {
     ///
     /// If you want to _SRS a raw AML resources bytestream, use 'Node.execute' or similar API directly.
     pub fn setResources(device: *Node, resources: *const Resources) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_set_resources(
+        const ret: Status = @enumFromInt(c.uacpi_set_resources(
             @ptrCast(device),
             @ptrCast(@constCast(resources)),
         ));
@@ -1981,7 +1982,7 @@ pub const Node = opaque {
         callback: ResourceIterationCallback(UserContextT),
         user_context: ?*UserContextT,
     ) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_for_each_device_resource(
+        const ret: Status = @enumFromInt(c.uacpi_for_each_device_resource(
             @ptrCast(@constCast(device)),
             method.ptr,
             makeResourceIterationCallbackWrapper(UserContextT, callback),
@@ -1993,27 +1994,27 @@ pub const Node = opaque {
 
 pub const Object = opaque {
     pub fn ref(object: *Object) void {
-        c_uacpi.uacpi_object_ref(@ptrCast(object));
+        c.uacpi_object_ref(@ptrCast(object));
     }
 
     pub fn unref(object: *Object) void {
-        c_uacpi.uacpi_object_unref(@ptrCast(object));
+        c.uacpi_object_unref(@ptrCast(object));
     }
 
     pub fn getType(object: *const Object) Type {
-        return @enumFromInt(c_uacpi.uacpi_object_get_type(@ptrCast(@constCast(object))));
+        return @enumFromInt(c.uacpi_object_get_type(@ptrCast(@constCast(object))));
     }
 
     pub fn getTypeBit(object: *const Object) TypeBits {
-        return @bitCast(c_uacpi.uacpi_object_get_type_bit(@ptrCast(@constCast(object))));
+        return @bitCast(c.uacpi_object_get_type_bit(@ptrCast(@constCast(object))));
     }
 
     pub fn is(object: *const Object, object_type: Type) bool {
-        return c_uacpi.uacpi_object_is(@ptrCast(@constCast(object)), @intFromEnum(object_type));
+        return c.uacpi_object_is(@ptrCast(@constCast(object)), @intFromEnum(object_type));
     }
 
     pub fn isOneOf(object: *const Object, type_mask: TypeBits) bool {
-        return c_uacpi.uacpi_object_is_one_of(
+        return c.uacpi_object_is_one_of(
             @ptrCast(@constCast(object)),
             @bitCast(type_mask),
         );
@@ -2023,22 +2024,22 @@ pub const Object = opaque {
     ///
     /// The object can be further overwritten via `Object.assign*` to anything.
     pub fn createUninitialized() error{OutOfMemory}!*Object {
-        return @ptrCast(c_uacpi.uacpi_object_create_uninitialized() orelse return error.OutOfMemory);
+        return @ptrCast(c.uacpi_object_create_uninitialized() orelse return error.OutOfMemory);
     }
 
     pub fn createInteger(value: u64) error{OutOfMemory}!*Object {
-        return @ptrCast(c_uacpi.uacpi_object_create_integer(value) orelse return error.OutOfMemory);
+        return @ptrCast(c.uacpi_object_create_integer(value) orelse return error.OutOfMemory);
     }
 
-    pub const OverflowBehavior = enum(c_uacpi.uacpi_overflow_behavior) {
-        allow = c_uacpi.UACPI_OVERFLOW_ALLOW,
-        truncate = c_uacpi.UACPI_OVERFLOW_TRUNCATE,
-        disallow = c_uacpi.UACPI_OVERFLOW_DISALLOW,
+    pub const OverflowBehavior = enum(c.uacpi_overflow_behavior) {
+        allow = c.UACPI_OVERFLOW_ALLOW,
+        truncate = c.UACPI_OVERFLOW_TRUNCATE,
+        disallow = c.UACPI_OVERFLOW_DISALLOW,
     };
 
     pub fn createIntegerSafe(value: u64, overflow_behavior: OverflowBehavior) !*Object {
         var object: *Object = undefined;
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_create_integer_safe(
+        const ret: Status = @enumFromInt(c.uacpi_object_create_integer_safe(
             value,
             @intFromEnum(overflow_behavior),
             @ptrCast(&object),
@@ -2048,7 +2049,7 @@ pub const Object = opaque {
     }
 
     pub fn assignInteger(object: *Object, value: u64) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_assign_integer(
+        const ret: Status = @enumFromInt(c.uacpi_object_assign_integer(
             @ptrCast(object),
             value,
         ));
@@ -2057,7 +2058,7 @@ pub const Object = opaque {
 
     pub fn getInteger(object: *const Object) !u64 {
         var value: u64 = undefined;
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_get_integer(
+        const ret: Status = @enumFromInt(c.uacpi_object_get_integer(
             @ptrCast(@constCast(object)),
             &value,
         ));
@@ -2071,7 +2072,7 @@ pub const Object = opaque {
     ///
     /// NOTE: The data is copied to a separately allocated buffer and is not taken ownership of.
     pub fn createString(str: []const u8) error{OutOfMemory}!*Object {
-        return @ptrCast(c_uacpi.uacpi_object_create_string(.{
+        return @ptrCast(c.uacpi_object_create_string(.{
             .unnamed_0 = .{ .const_bytes = str.ptr },
             .length = str.len,
         }) orelse return error.OutOfMemory);
@@ -2083,7 +2084,7 @@ pub const Object = opaque {
     ///
     /// NOTE: The data is copied to a separately allocated buffer and is not taken ownership of.
     pub fn createBuffer(str: []const u8) error{OutOfMemory}!*Object {
-        return @ptrCast(c_uacpi.uacpi_object_create_buffer(.{
+        return @ptrCast(c.uacpi_object_create_buffer(.{
             .unnamed_0 = .{ .const_bytes = str.ptr },
             .length = str.len,
         }) orelse return error.OutOfMemory);
@@ -2095,7 +2096,7 @@ pub const Object = opaque {
     ///
     /// NOTE: The data is copied to a separately allocated buffer and is not taken ownership of.
     pub fn assignString(object: *Object, str: []const u8) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_assign_string(
+        const ret: Status = @enumFromInt(c.uacpi_object_assign_string(
             @ptrCast(object),
             .{
                 .unnamed_0 = .{ .const_bytes = str.ptr },
@@ -2111,7 +2112,7 @@ pub const Object = opaque {
     ///
     /// NOTE: The data is copied to a separately allocated buffer and is not taken ownership of.
     pub fn assignBuffer(object: *Object, str: []const u8) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_assign_buffer(
+        const ret: Status = @enumFromInt(c.uacpi_object_assign_buffer(
             @ptrCast(object),
             .{
                 .unnamed_0 = .{ .const_bytes = str.ptr },
@@ -2123,8 +2124,8 @@ pub const Object = opaque {
 
     /// Returns a writable view of the data stored in the string or buffer object.
     pub fn getStringOrBuffer(object: *Object) ![]u8 {
-        var data_view: c_uacpi.uacpi_data_view = undefined;
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_get_string_or_buffer(
+        var data_view: c.uacpi_data_view = undefined;
+        const ret: Status = @enumFromInt(c.uacpi_object_get_string_or_buffer(
             @ptrCast(object),
             &data_view,
         ));
@@ -2134,8 +2135,8 @@ pub const Object = opaque {
 
     /// Returns a writable view of the data stored in the string object.
     pub fn getString(object: *Object) ![]u8 {
-        var data_view: c_uacpi.uacpi_data_view = undefined;
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_get_string(
+        var data_view: c.uacpi_data_view = undefined;
+        const ret: Status = @enumFromInt(c.uacpi_object_get_string(
             @ptrCast(object),
             &data_view,
         ));
@@ -2145,8 +2146,8 @@ pub const Object = opaque {
 
     /// Returns a writable view of the data stored in the buffer object.
     pub fn getBuffer(object: *Object) ![]u8 {
-        var data_view: c_uacpi.uacpi_data_view = undefined;
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_get_buffer(
+        var data_view: c.uacpi_data_view = undefined;
+        const ret: Status = @enumFromInt(c.uacpi_object_get_buffer(
             @ptrCast(object),
             &data_view,
         ));
@@ -2175,7 +2176,7 @@ pub const Object = opaque {
     ///    }
     /// ```
     pub fn isAmlNamepath(object: *const Object) bool {
-        return c_uacpi.uacpi_object_is_aml_namepath(@ptrCast(@constCast(object)));
+        return c.uacpi_object_is_aml_namepath(@ptrCast(@constCast(object)));
     }
 
     /// Resolve an AML namepath contained in a string object.
@@ -2185,7 +2186,7 @@ pub const Object = opaque {
     /// See an explanation of how this works in the comment above the declaration of `isAmlNamepath`.
     pub fn resolveAsAmlNamepath(object: *const Object, scope: *const Node) !*Node {
         var target_node: *Node = undefined;
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_resolve_as_aml_namepath(
+        const ret: Status = @enumFromInt(c.uacpi_object_resolve_as_aml_namepath(
             @ptrCast(@constCast(object)),
             @ptrCast(@constCast(scope)),
             @ptrCast(&target_node),
@@ -2201,7 +2202,7 @@ pub const Object = opaque {
     /// NOTE: the reference count of each object is incremented before being stored in the object.
     ///       Client code must remove all of the locally created references at its own discretion.
     pub fn createPackage(objects: []const *Object) error{OutOfMemory}!*Object {
-        return @ptrCast(c_uacpi.uacpi_object_create_package(
+        return @ptrCast(c.uacpi_object_create_package(
             .{
                 .count = objects.len,
                 .objects = @ptrCast(@constCast(objects.ptr)),
@@ -2215,9 +2216,9 @@ pub const Object = opaque {
     /// the object also potentially destroys all of the objects stored inside unless the reference count is incremented
     /// by the client via `Object.ref`.
     pub fn getPackage(object: *const Object) ![]const *Object {
-        var object_array: c_uacpi.uacpi_object_array = undefined;
+        var object_array: c.uacpi_object_array = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_get_package(
+        const ret: Status = @enumFromInt(c.uacpi_object_get_package(
             @ptrCast(@constCast(object)),
             &object_array,
         ));
@@ -2234,7 +2235,7 @@ pub const Object = opaque {
     /// NOTE: the reference count of each object is incremented before being stored in the object.
     ///       Client code must remove all of the locally created references at its own discretion.
     pub fn assignPackage(object: *Object, objects: []const *Object) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_assign_package(
+        const ret: Status = @enumFromInt(c.uacpi_object_assign_package(
             @ptrCast(object),
             .{
                 .count = objects.len,
@@ -2249,14 +2250,14 @@ pub const Object = opaque {
     /// NOTE: child's reference count is incremented by one.
     ///       Client code must remove all of the locally created references at its own discretion.
     pub fn createReference(child: *Object) error{OutOfMemory}!*Object {
-        return @ptrCast(c_uacpi.uacpi_object_create_reference(@ptrCast(child)) orelse return error.OutOfMemory);
+        return @ptrCast(c.uacpi_object_create_reference(@ptrCast(child)) orelse return error.OutOfMemory);
     }
     /// Make the provided object a reference and make it point to 'child'.
     ///
     /// NOTE: child's reference count is incremented by one.
     ///       Client code must remove all of the locally created references at its own discretion.
     pub fn assignReference(object: *Object, child: *Object) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_assign_reference(
+        const ret: Status = @enumFromInt(c.uacpi_object_assign_reference(
             @ptrCast(object),
             @ptrCast(child),
         ));
@@ -2269,7 +2270,7 @@ pub const Object = opaque {
     ///       client when no longer needed.
     pub fn getReference(object: *const Object) !*Object {
         var child: *Object = undefined;
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_get_dereferenced(
+        const ret: Status = @enumFromInt(c.uacpi_object_get_dereferenced(
             @ptrCast(@constCast(object)),
             @ptrCast(&child),
         ));
@@ -2283,14 +2284,14 @@ pub const Object = opaque {
         block_length: u8,
 
         comptime {
-            core.testing.expectSize(ProcessorInfo, .of(c_uacpi.uacpi_processor_info));
+            core.testing.expectSize(ProcessorInfo, .of(c.uacpi_processor_info));
         }
     };
 
     /// Returns the information about the provided processor object.
     pub fn getProcessorInfo(object: *const Object) !ProcessorInfo {
         var info: ProcessorInfo = undefined;
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_get_processor_info(
+        const ret: Status = @enumFromInt(c.uacpi_object_get_processor_info(
             @ptrCast(@constCast(object)),
             @ptrCast(&info),
         ));
@@ -2303,14 +2304,14 @@ pub const Object = opaque {
         resource_order: u16,
 
         comptime {
-            core.testing.expectSize(PowerResourceInfo, .of(c_uacpi.uacpi_power_resource_info));
+            core.testing.expectSize(PowerResourceInfo, .of(c.uacpi_power_resource_info));
         }
     };
 
     /// Returns the information about the provided power resource object.
     pub fn getPowerResourceInfo(object: *const Object) !PowerResourceInfo {
         var info: PowerResourceInfo = undefined;
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_object_get_power_resource_info(
+        const ret: Status = @enumFromInt(c.uacpi_object_get_power_resource_info(
             @ptrCast(@constCast(object)),
             @ptrCast(&info),
         ));
@@ -2323,32 +2324,32 @@ pub const Object = opaque {
         id: u32,
 
         comptime {
-            core.testing.expectSize(Name, .of(c_uacpi.uacpi_object_name));
+            core.testing.expectSize(Name, .of(c.uacpi_object_name));
         }
     };
 
-    pub const Type = enum(c_uacpi.uacpi_object_type) {
-        uninitialized = c_uacpi.UACPI_OBJECT_UNINITIALIZED,
-        integer = c_uacpi.UACPI_OBJECT_INTEGER,
-        string = c_uacpi.UACPI_OBJECT_STRING,
-        buffer = c_uacpi.UACPI_OBJECT_BUFFER,
-        package = c_uacpi.UACPI_OBJECT_PACKAGE,
-        field_unit = c_uacpi.UACPI_OBJECT_FIELD_UNIT,
-        device = c_uacpi.UACPI_OBJECT_DEVICE,
-        event = c_uacpi.UACPI_OBJECT_EVENT,
-        method = c_uacpi.UACPI_OBJECT_METHOD,
-        mutex = c_uacpi.UACPI_OBJECT_MUTEX,
-        operation_region = c_uacpi.UACPI_OBJECT_OPERATION_REGION,
-        power_resource = c_uacpi.UACPI_OBJECT_POWER_RESOURCE,
-        processor = c_uacpi.UACPI_OBJECT_PROCESSOR,
-        thermal_zone = c_uacpi.UACPI_OBJECT_THERMAL_ZONE,
-        buffer_field = c_uacpi.UACPI_OBJECT_BUFFER_FIELD,
-        debug = c_uacpi.UACPI_OBJECT_DEBUG,
-        reference = c_uacpi.UACPI_OBJECT_REFERENCE,
-        buffer_index = c_uacpi.UACPI_OBJECT_BUFFER_INDEX,
+    pub const Type = enum(c.uacpi_object_type) {
+        uninitialized = c.UACPI_OBJECT_UNINITIALIZED,
+        integer = c.UACPI_OBJECT_INTEGER,
+        string = c.UACPI_OBJECT_STRING,
+        buffer = c.UACPI_OBJECT_BUFFER,
+        package = c.UACPI_OBJECT_PACKAGE,
+        field_unit = c.UACPI_OBJECT_FIELD_UNIT,
+        device = c.UACPI_OBJECT_DEVICE,
+        event = c.UACPI_OBJECT_EVENT,
+        method = c.UACPI_OBJECT_METHOD,
+        mutex = c.UACPI_OBJECT_MUTEX,
+        operation_region = c.UACPI_OBJECT_OPERATION_REGION,
+        power_resource = c.UACPI_OBJECT_POWER_RESOURCE,
+        processor = c.UACPI_OBJECT_PROCESSOR,
+        thermal_zone = c.UACPI_OBJECT_THERMAL_ZONE,
+        buffer_field = c.UACPI_OBJECT_BUFFER_FIELD,
+        debug = c.UACPI_OBJECT_DEBUG,
+        reference = c.UACPI_OBJECT_REFERENCE,
+        buffer_index = c.UACPI_OBJECT_BUFFER_INDEX,
     };
 
-    pub const TypeBits = packed struct(c_uacpi.uacpi_object_type_bits) {
+    pub const TypeBits = packed struct(c.uacpi_object_type_bits) {
         _uninitialized: u1 = 0,
         integer: bool = false,
         string: bool = false,
@@ -2371,10 +2372,10 @@ pub const Object = opaque {
         buffer_index: bool = false,
         _unused22_31: u10 = 0,
 
-        pub const any: TypeBits = @bitCast(c_uacpi.UACPI_OBJECT_ANY_BIT);
+        pub const any: TypeBits = @bitCast(c.UACPI_OBJECT_ANY_BIT);
 
         comptime {
-            core.testing.expectSize(TypeBits, .of(c_uacpi.uacpi_object_type_bits));
+            core.testing.expectSize(TypeBits, .of(c.uacpi_object_type_bits));
         }
     };
 };
@@ -2391,7 +2392,7 @@ pub const Table = extern struct {
     ///
     /// Returns `true` if the table was found.
     pub fn nextWithSameSignature(table: *Table) !bool {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_table_find_next_with_same_signature(
+        const ret: Status = @enumFromInt(c.uacpi_table_find_next_with_same_signature(
             @ptrCast(table),
         ));
         if (ret == .not_found) return false;
@@ -2400,14 +2401,14 @@ pub const Table = extern struct {
     }
 
     pub fn ref(table: Table) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_table_ref(
+        const ret: Status = @enumFromInt(c.uacpi_table_ref(
             @ptrCast(@constCast(&table)),
         ));
         try ret.toError();
     }
 
     pub fn unref(table: Table) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_table_unref(
+        const ret: Status = @enumFromInt(c.uacpi_table_unref(
             @ptrCast(@constCast(&table)),
         ));
         try ret.toError();
@@ -2416,7 +2417,7 @@ pub const Table = extern struct {
     pub fn findBySignature(signature: *const [4]u8) !?Table {
         var table: Table = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_table_find_by_signature(
+        const ret: Status = @enumFromInt(c.uacpi_table_find_by_signature(
             signature,
             @ptrCast(&table),
         ));
@@ -2429,7 +2430,7 @@ pub const Table = extern struct {
     pub fn find(table_identifiers: *const TableIdentifiers) !?Table {
         var table: Table = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_table_find(
+        const ret: Status = @enumFromInt(c.uacpi_table_find(
             @ptrCast(table_identifiers),
             @ptrCast(&table),
         ));
@@ -2447,7 +2448,7 @@ pub const Table = extern struct {
     ///
     /// Manual calls to `install` are not subject to filtering via the table installation callback (if any).
     pub fn installVirtual(address: cascade.KernelVirtualAddress, out_table: ?*Table) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_table_install(
+        const ret: Status = @enumFromInt(c.uacpi_table_install(
             address.toPtr(?*anyopaque),
             @ptrCast(out_table),
         ));
@@ -2462,7 +2463,7 @@ pub const Table = extern struct {
     ///
     /// Manual calls to `install` are not subject to filtering via the table installation callback (if any).
     pub fn installPhysical(address: cascade.PhysicalAddress, out_table: ?*Table) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_table_install_physical(
+        const ret: Status = @enumFromInt(c.uacpi_table_install_physical(
             @bitCast(address),
             @ptrCast(out_table),
         ));
@@ -2471,7 +2472,7 @@ pub const Table = extern struct {
 
     /// Load a previously installed table by feeding it to the interpreter.
     pub fn load(index: usize) !void {
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_table_load(
+        const ret: Status = @enumFromInt(c.uacpi_table_load(
             @intCast(index),
         ));
         try ret.toError();
@@ -2485,7 +2486,7 @@ pub const Table = extern struct {
     pub fn fadt() !*acpi.FADT {
         var fadt_ptr: *acpi.FADT = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_table_fadt(
+        const ret: Status = @enumFromInt(c.uacpi_table_fadt(
             @ptrCast(&fadt_ptr),
         ));
         try ret.toError();
@@ -2507,27 +2508,27 @@ pub const Table = extern struct {
             }
         }.handlerWrapper;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_set_table_installation_handler(
+        const ret: Status = @enumFromInt(c.uacpi_set_table_installation_handler(
             @ptrCast(handler_wrapper),
         ));
         try ret.toError();
     }
 
-    pub const TableInstallationDisposition = enum(c_uacpi.uacpi_table_installation_disposition) {
+    pub const TableInstallationDisposition = enum(c.uacpi_table_installation_disposition) {
         /// Allow the table to be installed as-is
-        allow = c_uacpi.UACPI_TABLE_INSTALLATION_DISPOSITON_ALLOW,
+        allow = c.UACPI_TABLE_INSTALLATION_DISPOSITON_ALLOW,
 
         /// Deny the table from being installed completely.
         ///
         /// This is useful for debugging various problems, e.g. AML loading bad SSDTs that cause the system to hang or
         /// enter an undesired state.
-        deny = c_uacpi.UACPI_TABLE_INSTALLATION_DISPOSITON_DENY,
+        deny = c.UACPI_TABLE_INSTALLATION_DISPOSITON_DENY,
 
         /// Override the table being installed with the table at the virtual address returned in 'out_override_address'.
-        virtual_override = c_uacpi.UACPI_TABLE_INSTALLATION_DISPOSITON_VIRTUAL_OVERRIDE,
+        virtual_override = c.UACPI_TABLE_INSTALLATION_DISPOSITON_VIRTUAL_OVERRIDE,
 
         /// Override the table being installed with the table at the physical address returned in 'out_override_address'.
-        physical_override = c_uacpi.UACPI_TABLE_INSTALLATION_DISPOSITON_PHYSICAL_OVERRIDE,
+        physical_override = c.UACPI_TABLE_INSTALLATION_DISPOSITON_PHYSICAL_OVERRIDE,
     };
 
     pub const TableInstallationHandler = fn (
@@ -2545,12 +2546,12 @@ pub const Table = extern struct {
         oem_table_id: [8]u8 = @splat(0),
 
         comptime {
-            core.testing.expectSize(TableIdentifiers, .of(c_uacpi.uacpi_table_identifiers));
+            core.testing.expectSize(TableIdentifiers, .of(c.uacpi_table_identifiers));
         }
     };
 
     comptime {
-        core.testing.expectSize(Table, .of(c_uacpi.uacpi_table));
+        core.testing.expectSize(Table, .of(c.uacpi_table));
     }
 };
 
@@ -2560,7 +2561,7 @@ pub const Resources = extern struct {
     entries: [*]const Resource,
 
     pub fn deinit(resources: *const Resources) void {
-        c_uacpi.uacpi_free_resources(@ptrCast(@constCast(resources)));
+        c.uacpi_free_resources(@ptrCast(@constCast(resources)));
     }
 
     // uacpi_for_each_resource not implemented as below iterator is superior
@@ -2586,7 +2587,7 @@ pub const Resources = extern struct {
     };
 
     comptime {
-        core.testing.expectSize(Resources, .of(c_uacpi.uacpi_resources));
+        core.testing.expectSize(Resources, .of(c.uacpi_resources));
     }
 };
 
@@ -2605,7 +2606,7 @@ pub const Resource = extern struct {
     pub fn fromBuffer(buffer: []const u8) !*Resource {
         var resource: *Resource = undefined;
 
-        const ret: Status = @enumFromInt(c_uacpi.uacpi_get_resource_from_buffer(
+        const ret: Status = @enumFromInt(c.uacpi_get_resource_from_buffer(
             .{
                 .unnamed_0 = .{ .const_bytes = buffer.ptr },
                 .length = buffer.len,
@@ -2618,57 +2619,57 @@ pub const Resource = extern struct {
     }
 
     pub fn deinit(resource: *Resource) void {
-        c_uacpi.uacpi_free_resource(@ptrCast(resource));
+        c.uacpi_free_resource(@ptrCast(resource));
     }
 
-    pub const Type = enum(c_uacpi.uacpi_resource_type) {
-        irq = c_uacpi.UACPI_RESOURCE_TYPE_IRQ,
-        extended_irq = c_uacpi.UACPI_RESOURCE_TYPE_EXTENDED_IRQ,
+    pub const Type = enum(c.uacpi_resource_type) {
+        irq = c.UACPI_RESOURCE_TYPE_IRQ,
+        extended_irq = c.UACPI_RESOURCE_TYPE_EXTENDED_IRQ,
 
-        dma = c_uacpi.UACPI_RESOURCE_TYPE_DMA,
-        fixed_dma = c_uacpi.UACPI_RESOURCE_TYPE_FIXED_DMA,
+        dma = c.UACPI_RESOURCE_TYPE_DMA,
+        fixed_dma = c.UACPI_RESOURCE_TYPE_FIXED_DMA,
 
-        io = c_uacpi.UACPI_RESOURCE_TYPE_IO,
-        fixed_io = c_uacpi.UACPI_RESOURCE_TYPE_FIXED_IO,
+        io = c.UACPI_RESOURCE_TYPE_IO,
+        fixed_io = c.UACPI_RESOURCE_TYPE_FIXED_IO,
 
-        address16 = c_uacpi.UACPI_RESOURCE_TYPE_ADDRESS16,
-        address32 = c_uacpi.UACPI_RESOURCE_TYPE_ADDRESS32,
-        address64 = c_uacpi.UACPI_RESOURCE_TYPE_ADDRESS64,
-        address64_extended = c_uacpi.UACPI_RESOURCE_TYPE_ADDRESS64_EXTENDED,
+        address16 = c.UACPI_RESOURCE_TYPE_ADDRESS16,
+        address32 = c.UACPI_RESOURCE_TYPE_ADDRESS32,
+        address64 = c.UACPI_RESOURCE_TYPE_ADDRESS64,
+        address64_extended = c.UACPI_RESOURCE_TYPE_ADDRESS64_EXTENDED,
 
-        memory24 = c_uacpi.UACPI_RESOURCE_TYPE_MEMORY24,
-        memory32 = c_uacpi.UACPI_RESOURCE_TYPE_MEMORY32,
-        fixed_memory32 = c_uacpi.UACPI_RESOURCE_TYPE_FIXED_MEMORY32,
+        memory24 = c.UACPI_RESOURCE_TYPE_MEMORY24,
+        memory32 = c.UACPI_RESOURCE_TYPE_MEMORY32,
+        fixed_memory32 = c.UACPI_RESOURCE_TYPE_FIXED_MEMORY32,
 
-        start_dependent = c_uacpi.UACPI_RESOURCE_TYPE_START_DEPENDENT,
+        start_dependent = c.UACPI_RESOURCE_TYPE_START_DEPENDENT,
 
         // internal to the C API
-        // end_dependent = c_uacpi.UACPI_RESOURCE_TYPE_END_DEPENDENT,
+        // end_dependent = c.UACPI_RESOURCE_TYPE_END_DEPENDENT,
 
         // Up to 7 bytes - called vendor_small in the C API
-        vendor = c_uacpi.UACPI_RESOURCE_TYPE_VENDOR_SMALL,
+        vendor = c.UACPI_RESOURCE_TYPE_VENDOR_SMALL,
 
         // Up to 2^16 - 1 bytes - called vendor_large in the C API
-        vendor_typed = c_uacpi.UACPI_RESOURCE_TYPE_VENDOR_LARGE,
+        vendor_typed = c.UACPI_RESOURCE_TYPE_VENDOR_LARGE,
 
-        generic_register = c_uacpi.UACPI_RESOURCE_TYPE_GENERIC_REGISTER,
-        gpio_connection = c_uacpi.UACPI_RESOURCE_TYPE_GPIO_CONNECTION,
+        generic_register = c.UACPI_RESOURCE_TYPE_GENERIC_REGISTER,
+        gpio_connection = c.UACPI_RESOURCE_TYPE_GPIO_CONNECTION,
 
         // These must always be contiguous in this order
-        i2c_connection = c_uacpi.UACPI_RESOURCE_TYPE_SERIAL_I2C_CONNECTION,
-        spi_connection = c_uacpi.UACPI_RESOURCE_TYPE_SERIAL_SPI_CONNECTION,
-        uart_connection = c_uacpi.UACPI_RESOURCE_TYPE_SERIAL_UART_CONNECTION,
-        csi2_connection = c_uacpi.UACPI_RESOURCE_TYPE_SERIAL_CSI2_CONNECTION,
+        i2c_connection = c.UACPI_RESOURCE_TYPE_SERIAL_I2C_CONNECTION,
+        spi_connection = c.UACPI_RESOURCE_TYPE_SERIAL_SPI_CONNECTION,
+        uart_connection = c.UACPI_RESOURCE_TYPE_SERIAL_UART_CONNECTION,
+        csi2_connection = c.UACPI_RESOURCE_TYPE_SERIAL_CSI2_CONNECTION,
 
-        pin_function = c_uacpi.UACPI_RESOURCE_TYPE_PIN_FUNCTION,
-        pin_configuration = c_uacpi.UACPI_RESOURCE_TYPE_PIN_CONFIGURATION,
-        pin_group = c_uacpi.UACPI_RESOURCE_TYPE_PIN_GROUP,
-        pin_group_function = c_uacpi.UACPI_RESOURCE_TYPE_PIN_GROUP_FUNCTION,
-        pin_group_configuration = c_uacpi.UACPI_RESOURCE_TYPE_PIN_GROUP_CONFIGURATION,
+        pin_function = c.UACPI_RESOURCE_TYPE_PIN_FUNCTION,
+        pin_configuration = c.UACPI_RESOURCE_TYPE_PIN_CONFIGURATION,
+        pin_group = c.UACPI_RESOURCE_TYPE_PIN_GROUP,
+        pin_group_function = c.UACPI_RESOURCE_TYPE_PIN_GROUP_FUNCTION,
+        pin_group_configuration = c.UACPI_RESOURCE_TYPE_PIN_GROUP_CONFIGURATION,
 
-        clock_input = c_uacpi.UACPI_RESOURCE_TYPE_CLOCK_INPUT,
+        clock_input = c.UACPI_RESOURCE_TYPE_CLOCK_INPUT,
 
-        end_tag = c_uacpi.UACPI_RESOURCE_TYPE_END_TAG,
+        end_tag = c.UACPI_RESOURCE_TYPE_END_TAG,
     };
 
     pub const Data = extern union {
@@ -2717,7 +2718,7 @@ pub const Resource = extern struct {
         }
 
         comptime {
-            core.testing.expectSize(Irq, core.Size.of(c_uacpi.uacpi_resource_irq).add(.of(u8)));
+            core.testing.expectSize(Irq, core.Size.of(c.uacpi_resource_irq).add(.of(u8)));
         }
     };
 
@@ -2738,7 +2739,7 @@ pub const Resource = extern struct {
 
         comptime {
             // `u64` due to the alignment forced by the `source` field
-            core.testing.expectSize(ExtendedIrq, core.Size.of(c_uacpi.uacpi_resource_extended_irq).add(.of(u64)));
+            core.testing.expectSize(ExtendedIrq, core.Size.of(c.uacpi_resource_extended_irq).add(.of(u64)));
         }
     };
 
@@ -2755,26 +2756,26 @@ pub const Resource = extern struct {
         }
 
         pub const TransferType = enum(u8) {
-            @"8_bit" = c_uacpi.UACPI_TRANSFER_TYPE_8_BIT,
-            @"8_and_16_bit" = c_uacpi.UACPI_TRANSFER_TYPE_8_AND_16_BIT,
-            @"16_bit" = c_uacpi.UACPI_TRANSFER_TYPE_16_BIT,
+            @"8_bit" = c.UACPI_TRANSFER_TYPE_8_BIT,
+            @"8_and_16_bit" = c.UACPI_TRANSFER_TYPE_8_AND_16_BIT,
+            @"16_bit" = c.UACPI_TRANSFER_TYPE_16_BIT,
         };
 
         pub const BusMasterStatus = packed struct(u8) {
-            bus_master: bool, // c_uacpi.UACPI_BUS_MASTER
+            bus_master: bool, // c.UACPI_BUS_MASTER
 
             _reserved: u7,
         };
 
         pub const ChannelSpeed = enum(u8) {
-            compatibility = c_uacpi.UACPI_DMA_COMPATIBILITY,
-            a = c_uacpi.UACPI_DMA_TYPE_A,
-            b = c_uacpi.UACPI_DMA_TYPE_B,
-            f = c_uacpi.UACPI_DMA_TYPE_F,
+            compatibility = c.UACPI_DMA_COMPATIBILITY,
+            a = c.UACPI_DMA_TYPE_A,
+            b = c.UACPI_DMA_TYPE_B,
+            f = c.UACPI_DMA_TYPE_F,
         };
 
         comptime {
-            core.testing.expectSize(Dma, core.Size.of(c_uacpi.uacpi_resource_dma).add(.of(u8)));
+            core.testing.expectSize(Dma, core.Size.of(c.uacpi_resource_dma).add(.of(u8)));
         }
     };
 
@@ -2784,16 +2785,16 @@ pub const Resource = extern struct {
         transfer_width: TransferWidth,
 
         pub const TransferWidth = enum(u8) {
-            @"8" = c_uacpi.UACPI_TRANSFER_WIDTH_8,
-            @"16" = c_uacpi.UACPI_TRANSFER_WIDTH_16,
-            @"32" = c_uacpi.UACPI_TRANSFER_WIDTH_32,
-            @"64" = c_uacpi.UACPI_TRANSFER_WIDTH_64,
-            @"128" = c_uacpi.UACPI_TRANSFER_WIDTH_128,
-            @"256" = c_uacpi.UACPI_TRANSFER_WIDTH_256,
+            @"8" = c.UACPI_TRANSFER_WIDTH_8,
+            @"16" = c.UACPI_TRANSFER_WIDTH_16,
+            @"32" = c.UACPI_TRANSFER_WIDTH_32,
+            @"64" = c.UACPI_TRANSFER_WIDTH_64,
+            @"128" = c.UACPI_TRANSFER_WIDTH_128,
+            @"256" = c.UACPI_TRANSFER_WIDTH_256,
         };
 
         comptime {
-            core.testing.expectSize(FixedDma, .of(c_uacpi.uacpi_resource_fixed_dma));
+            core.testing.expectSize(FixedDma, .of(c.uacpi_resource_fixed_dma));
         }
     };
 
@@ -2805,12 +2806,12 @@ pub const Resource = extern struct {
         length: u8,
 
         pub const DecodeType = enum(u8) {
-            @"16" = c_uacpi.UACPI_DECODE_16,
-            @"10" = c_uacpi.UACPI_DECODE_10,
+            @"16" = c.UACPI_DECODE_16,
+            @"10" = c.UACPI_DECODE_10,
         };
 
         comptime {
-            core.testing.expectSize(Io, .of(c_uacpi.uacpi_resource_io));
+            core.testing.expectSize(Io, .of(c.uacpi_resource_io));
         }
     };
 
@@ -2819,7 +2820,7 @@ pub const Resource = extern struct {
         length: u8,
 
         comptime {
-            core.testing.expectSize(FixedIo, .of(c_uacpi.uacpi_resource_fixed_io));
+            core.testing.expectSize(FixedIo, .of(c.uacpi_resource_fixed_io));
         }
     };
 
@@ -2833,7 +2834,7 @@ pub const Resource = extern struct {
         source: Source,
 
         comptime {
-            core.testing.expectSize(Address16, .of(c_uacpi.uacpi_resource_address16));
+            core.testing.expectSize(Address16, .of(c.uacpi_resource_address16));
         }
     };
 
@@ -2847,7 +2848,7 @@ pub const Resource = extern struct {
         source: Source,
 
         comptime {
-            core.testing.expectSize(Address32, .of(c_uacpi.uacpi_resource_address32));
+            core.testing.expectSize(Address32, .of(c.uacpi_resource_address32));
         }
     };
 
@@ -2861,7 +2862,7 @@ pub const Resource = extern struct {
         source: Source,
 
         comptime {
-            core.testing.expectSize(Address64, .of(c_uacpi.uacpi_resource_address64));
+            core.testing.expectSize(Address64, .of(c.uacpi_resource_address64));
         }
     };
 
@@ -2876,7 +2877,7 @@ pub const Resource = extern struct {
         attributes: u64,
 
         comptime {
-            core.testing.expectSize(Address64Extended, .of(c_uacpi.uacpi_resource_address64_extended));
+            core.testing.expectSize(Address64Extended, .of(c.uacpi_resource_address64_extended));
         }
     };
 
@@ -2888,7 +2889,7 @@ pub const Resource = extern struct {
         length: u16,
 
         comptime {
-            core.testing.expectSize(Memory24, .of(c_uacpi.uacpi_resource_memory24));
+            core.testing.expectSize(Memory24, .of(c.uacpi_resource_memory24));
         }
     };
 
@@ -2900,7 +2901,7 @@ pub const Resource = extern struct {
         length: u32,
 
         comptime {
-            core.testing.expectSize(Memory32, .of(c_uacpi.uacpi_resource_memory32));
+            core.testing.expectSize(Memory32, .of(c.uacpi_resource_memory32));
         }
     };
 
@@ -2910,7 +2911,7 @@ pub const Resource = extern struct {
         length: u32,
 
         comptime {
-            core.testing.expectSize(FixedMemory32, .of(c_uacpi.uacpi_resource_fixed_memory32));
+            core.testing.expectSize(FixedMemory32, .of(c.uacpi_resource_fixed_memory32));
         }
     };
 
@@ -2920,7 +2921,7 @@ pub const Resource = extern struct {
         performance: CompatibilityPerformance,
 
         comptime {
-            core.testing.expectSize(StartDependent, .of(c_uacpi.uacpi_resource_start_dependent));
+            core.testing.expectSize(StartDependent, .of(c.uacpi_resource_start_dependent));
         }
     };
 
@@ -2934,7 +2935,7 @@ pub const Resource = extern struct {
         }
 
         comptime {
-            core.testing.expectSize(Vendor, core.Size.of(c_uacpi.uacpi_resource_vendor).add(.of(u8)));
+            core.testing.expectSize(Vendor, core.Size.of(c.uacpi_resource_vendor).add(.of(u8)));
         }
     };
 
@@ -2950,7 +2951,7 @@ pub const Resource = extern struct {
         }
 
         comptime {
-            core.testing.expectSize(VendorTyped, .of(c_uacpi.uacpi_resource_vendor_typed));
+            core.testing.expectSize(VendorTyped, .of(c.uacpi_resource_vendor_typed));
         }
     };
 
@@ -2962,7 +2963,7 @@ pub const Resource = extern struct {
         address: u64,
 
         comptime {
-            core.testing.expectSize(GenericRegister, .of(c_uacpi.uacpi_resource_generic_register));
+            core.testing.expectSize(GenericRegister, .of(c.uacpi_resource_generic_register));
         }
     };
 
@@ -2987,8 +2988,8 @@ pub const Resource = extern struct {
         };
 
         pub const GpioType = enum(u8) {
-            interrupt = c_uacpi.UACPI_GPIO_CONNECTION_INTERRUPT,
-            io = c_uacpi.UACPI_GPIO_CONNECTION_IO,
+            interrupt = c.UACPI_GPIO_CONNECTION_INTERRUPT,
+            io = c.UACPI_GPIO_CONNECTION_IO,
         };
 
         pub const InterruptConnectionFlags = extern struct {
@@ -2998,7 +2999,7 @@ pub const Resource = extern struct {
             wake_capability: WakeCapability,
 
             comptime {
-                core.testing.expectSize(InterruptConnectionFlags, .of(c_uacpi.uacpi_interrupt_connection_flags));
+                core.testing.expectSize(InterruptConnectionFlags, .of(c.uacpi_interrupt_connection_flags));
             }
         };
 
@@ -3007,19 +3008,19 @@ pub const Resource = extern struct {
             sharing: Sharing,
 
             pub const Restriction = enum(u8) {
-                none = c_uacpi.UACPI_IO_RESTRICTION_NONE,
-                input = c_uacpi.UACPI_IO_RESTRICTION_INPUT,
-                output = c_uacpi.UACPI_IO_RESTRICTION_OUTPUT,
-                none_preserve = c_uacpi.UACPI_IO_RESTRICTION_NONE_PRESERVE,
+                none = c.UACPI_IO_RESTRICTION_NONE,
+                input = c.UACPI_IO_RESTRICTION_INPUT,
+                output = c.UACPI_IO_RESTRICTION_OUTPUT,
+                none_preserve = c.UACPI_IO_RESTRICTION_NONE_PRESERVE,
             };
 
             comptime {
-                core.testing.expectSize(IoConnectionFlags, .of(c_uacpi.uacpi_io_connection_flags));
+                core.testing.expectSize(IoConnectionFlags, .of(c.uacpi_io_connection_flags));
             }
         };
 
         comptime {
-            core.testing.expectSize(GpioConnection, .of(c_uacpi.uacpi_resource_gpio_connection));
+            core.testing.expectSize(GpioConnection, .of(c.uacpi_resource_gpio_connection));
         }
     };
 
@@ -3030,12 +3031,12 @@ pub const Resource = extern struct {
         connection_speed: u32,
 
         pub const AddressingMode = enum(u8) {
-            @"7bit" = c_uacpi.UACPI_I2C_7BIT,
-            @"10bit" = c_uacpi.UACPI_I2C_10BIT,
+            @"7bit" = c.UACPI_I2C_7BIT,
+            @"10bit" = c.UACPI_I2C_10BIT,
         };
 
         comptime {
-            core.testing.expectSize(I2cConnection, .of(c_uacpi.uacpi_resource_i2c_connection));
+            core.testing.expectSize(I2cConnection, .of(c.uacpi_resource_i2c_connection));
         }
     };
 
@@ -3050,27 +3051,27 @@ pub const Resource = extern struct {
         connection_speed: u32,
 
         pub const WireMode = enum(u8) {
-            @"4" = c_uacpi.UACPI_SPI_4_WIRES,
-            @"3" = c_uacpi.UACPI_SPI_3_WIRES,
+            @"4" = c.UACPI_SPI_4_WIRES,
+            @"3" = c.UACPI_SPI_3_WIRES,
         };
 
         pub const DevicePolarity = enum(u8) {
-            active_low = c_uacpi.UACPI_SPI_ACTIVE_LOW,
-            active_high = c_uacpi.UACPI_SPI_ACTIVE_HIGH,
+            active_low = c.UACPI_SPI_ACTIVE_LOW,
+            active_high = c.UACPI_SPI_ACTIVE_HIGH,
         };
 
         pub const Phase = enum(u8) {
-            first = c_uacpi.UACPI_SPI_PHASE_FIRST,
-            second = c_uacpi.UACPI_SPI_PHASE_SECOND,
+            first = c.UACPI_SPI_PHASE_FIRST,
+            second = c.UACPI_SPI_PHASE_SECOND,
         };
 
         pub const SpiPolarity = enum(u8) {
-            start_low = c_uacpi.UACPI_SPI_START_LOW,
-            start_high = c_uacpi.UACPI_SPI_START_HIGH,
+            start_low = c.UACPI_SPI_START_LOW,
+            start_high = c.UACPI_SPI_START_HIGH,
         };
 
         comptime {
-            core.testing.expectSize(SpiConnection, .of(c_uacpi.uacpi_resource_spi_connection));
+            core.testing.expectSize(SpiConnection, .of(c.uacpi_resource_spi_connection));
         }
     };
 
@@ -3087,31 +3088,31 @@ pub const Resource = extern struct {
         tx_fifo: u16,
 
         pub const StopBits = enum(u8) {
-            none = c_uacpi.UACPI_UART_STOP_BITS_NONE,
-            @"1" = c_uacpi.UACPI_UART_STOP_BITS_1,
-            @"1_5" = c_uacpi.UACPI_UART_STOP_BITS_1_5,
-            @"2" = c_uacpi.UACPI_UART_STOP_BITS_2,
+            none = c.UACPI_UART_STOP_BITS_NONE,
+            @"1" = c.UACPI_UART_STOP_BITS_1,
+            @"1_5" = c.UACPI_UART_STOP_BITS_1_5,
+            @"2" = c.UACPI_UART_STOP_BITS_2,
         };
 
         pub const DataBits = enum(u8) {
-            @"5" = c_uacpi.UACPI_UART_DATA_5BITS,
-            @"6" = c_uacpi.UACPI_UART_DATA_6BITS,
-            @"7" = c_uacpi.UACPI_UART_DATA_7BITS,
-            @"8" = c_uacpi.UACPI_UART_DATA_8BITS,
-            @"9" = c_uacpi.UACPI_UART_DATA_9BITS,
+            @"5" = c.UACPI_UART_DATA_5BITS,
+            @"6" = c.UACPI_UART_DATA_6BITS,
+            @"7" = c.UACPI_UART_DATA_7BITS,
+            @"8" = c.UACPI_UART_DATA_8BITS,
+            @"9" = c.UACPI_UART_DATA_9BITS,
         };
 
         pub const Endianness = enum(u8) {
-            little = c_uacpi.UACPI_UART_LITTLE_ENDIAN,
-            big = c_uacpi.UACPI_UART_BIG_ENDIAN,
+            little = c.UACPI_UART_LITTLE_ENDIAN,
+            big = c.UACPI_UART_BIG_ENDIAN,
         };
 
         pub const Parity = enum(u8) {
-            none = c_uacpi.UACPI_UART_PARITY_NONE,
-            even = c_uacpi.UACPI_UART_PARITY_EVEN,
-            odd = c_uacpi.UACPI_UART_PARITY_ODD,
-            mark = c_uacpi.UACPI_UART_PARITY_MARK,
-            space = c_uacpi.UACPI_UART_PARITY_SPACE,
+            none = c.UACPI_UART_PARITY_NONE,
+            even = c.UACPI_UART_PARITY_EVEN,
+            odd = c.UACPI_UART_PARITY_ODD,
+            mark = c.UACPI_UART_PARITY_MARK,
+            space = c.UACPI_UART_PARITY_SPACE,
         };
 
         pub const LinesEnabled = packed struct(u8) {
@@ -3125,13 +3126,13 @@ pub const Resource = extern struct {
         };
 
         pub const FlowControl = enum(u8) {
-            none = c_uacpi.UACPI_UART_FLOW_CONTROL_NONE,
-            hardware = c_uacpi.UACPI_UART_FLOW_CONTROL_HW,
-            xon_xoff = c_uacpi.UACPI_UART_FLOW_CONTROL_XON_XOFF,
+            none = c.UACPI_UART_FLOW_CONTROL_NONE,
+            hardware = c.UACPI_UART_FLOW_CONTROL_HW,
+            xon_xoff = c.UACPI_UART_FLOW_CONTROL_XON_XOFF,
         };
 
         comptime {
-            core.testing.expectSize(UartConnection, .of(c_uacpi.uacpi_resource_uart_connection));
+            core.testing.expectSize(UartConnection, .of(c.uacpi_resource_uart_connection));
         }
     };
 
@@ -3141,12 +3142,12 @@ pub const Resource = extern struct {
         local_port: u8,
 
         pub const PhyType = enum(u8) {
-            c = c_uacpi.UACPI_CSI2_PHY_C,
-            d = c_uacpi.UACPI_CSI2_PHY_D,
+            c = c.UACPI_CSI2_PHY_C,
+            d = c.UACPI_CSI2_PHY_D,
         };
 
         comptime {
-            core.testing.expectSize(Csi2Connection, .of(c_uacpi.uacpi_resource_csi2_connection));
+            core.testing.expectSize(Csi2Connection, .of(c.uacpi_resource_csi2_connection));
         }
     };
 
@@ -3162,7 +3163,7 @@ pub const Resource = extern struct {
         vendor_data: [*]const u8,
 
         comptime {
-            core.testing.expectSize(PinFunction, .of(c_uacpi.uacpi_resource_pin_function));
+            core.testing.expectSize(PinFunction, .of(c.uacpi_resource_pin_function));
         }
     };
 
@@ -3179,15 +3180,15 @@ pub const Resource = extern struct {
         vendor_data: [*]const u8,
 
         comptime {
-            core.testing.expectSize(PinConfiguration, .of(c_uacpi.uacpi_resource_pin_configuration));
+            core.testing.expectSize(PinConfiguration, .of(c.uacpi_resource_pin_configuration));
         }
     };
 
     pub const PullConfiguration = enum(u8) {
-        default = c_uacpi.UACPI_PIN_CONFIG_DEFAULT,
-        pull_up = c_uacpi.UACPI_PIN_CONFIG_PULL_UP,
-        pull_down = c_uacpi.UACPI_PIN_CONFIG_PULL_DOWN,
-        no_pull = c_uacpi.UACPI_PIN_CONFIG_NO_PULL,
+        default = c.UACPI_PIN_CONFIG_DEFAULT,
+        pull_up = c.UACPI_PIN_CONFIG_PULL_UP,
+        pull_down = c.UACPI_PIN_CONFIG_PULL_DOWN,
+        no_pull = c.UACPI_PIN_CONFIG_NO_PULL,
     };
 
     pub const PinGroup = extern struct {
@@ -3200,7 +3201,7 @@ pub const Resource = extern struct {
         vendor_data: [*]const u8,
 
         comptime {
-            core.testing.expectSize(PinGroup, .of(c_uacpi.uacpi_resource_pin_group));
+            core.testing.expectSize(PinGroup, .of(c.uacpi_resource_pin_group));
         }
     };
 
@@ -3215,7 +3216,7 @@ pub const Resource = extern struct {
         vendor_data: [*]const u8,
 
         comptime {
-            core.testing.expectSize(PinGroupFunction, .of(c_uacpi.uacpi_resource_pin_group_function));
+            core.testing.expectSize(PinGroupFunction, .of(c.uacpi_resource_pin_group_function));
         }
     };
 
@@ -3231,25 +3232,25 @@ pub const Resource = extern struct {
         vendor_data: [*]const u8,
 
         comptime {
-            core.testing.expectSize(PinConfiguration, .of(c_uacpi.uacpi_resource_pin_group_configuration));
+            core.testing.expectSize(PinConfiguration, .of(c.uacpi_resource_pin_group_configuration));
         }
     };
 
     pub const PinConfigurationType = enum(u8) {
-        default = c_uacpi.UACPI_PIN_CONFIG_DEFAULT,
-        bias_pull_up = c_uacpi.UACPI_PIN_CONFIG_BIAS_PULL_UP,
-        bias_pull_down = c_uacpi.UACPI_PIN_CONFIG_BIAS_PULL_DOWN,
-        bias_default = c_uacpi.UACPI_PIN_CONFIG_BIAS_DEFAULT,
-        bias_disable = c_uacpi.UACPI_PIN_CONFIG_BIAS_DISABLE,
-        bias_high_impedance = c_uacpi.UACPI_PIN_CONFIG_BIAS_HIGH_IMPEDANCE,
-        bias_bus_hold = c_uacpi.UACPI_PIN_CONFIG_BIAS_BUS_HOLD,
-        drive_open_drain = c_uacpi.UACPI_PIN_CONFIG_DRIVE_OPEN_DRAIN,
-        drive_open_source = c_uacpi.UACPI_PIN_CONFIG_DRIVE_OPEN_SOURCE,
-        drive_push_pull = c_uacpi.UACPI_PIN_CONFIG_DRIVE_PUSH_PULL,
-        drive_strength = c_uacpi.UACPI_PIN_CONFIG_DRIVE_STRENGTH,
-        slew_rate = c_uacpi.UACPI_PIN_CONFIG_SLEW_RATE,
-        input_debounce = c_uacpi.UACPI_PIN_CONFIG_INPUT_DEBOUNCE,
-        input_schmitt_trigger = c_uacpi.UACPI_PIN_CONFIG_INPUT_SCHMITT_TRIGGER,
+        default = c.UACPI_PIN_CONFIG_DEFAULT,
+        bias_pull_up = c.UACPI_PIN_CONFIG_BIAS_PULL_UP,
+        bias_pull_down = c.UACPI_PIN_CONFIG_BIAS_PULL_DOWN,
+        bias_default = c.UACPI_PIN_CONFIG_BIAS_DEFAULT,
+        bias_disable = c.UACPI_PIN_CONFIG_BIAS_DISABLE,
+        bias_high_impedance = c.UACPI_PIN_CONFIG_BIAS_HIGH_IMPEDANCE,
+        bias_bus_hold = c.UACPI_PIN_CONFIG_BIAS_BUS_HOLD,
+        drive_open_drain = c.UACPI_PIN_CONFIG_DRIVE_OPEN_DRAIN,
+        drive_open_source = c.UACPI_PIN_CONFIG_DRIVE_OPEN_SOURCE,
+        drive_push_pull = c.UACPI_PIN_CONFIG_DRIVE_PUSH_PULL,
+        drive_strength = c.UACPI_PIN_CONFIG_DRIVE_STRENGTH,
+        slew_rate = c.UACPI_PIN_CONFIG_SLEW_RATE,
+        input_debounce = c.UACPI_PIN_CONFIG_INPUT_DEBOUNCE,
+        input_schmitt_trigger = c.UACPI_PIN_CONFIG_INPUT_SCHMITT_TRIGGER,
     };
 
     pub const ClockInput = extern struct {
@@ -3261,18 +3262,18 @@ pub const Resource = extern struct {
         source: Source,
 
         pub const Scale = enum(u8) {
-            hz = c_uacpi.UACPI_SCALE_HZ,
-            khz = c_uacpi.UACPI_SCALE_KHZ,
-            mhz = c_uacpi.UACPI_SCALE_MHZ,
+            hz = c.UACPI_SCALE_HZ,
+            khz = c.UACPI_SCALE_KHZ,
+            mhz = c.UACPI_SCALE_MHZ,
         };
 
         pub const Frequency = enum(u8) {
-            fixed = c_uacpi.UACPI_FREQUENCY_FIXED,
-            variable = c_uacpi.UACPI_FREQUENCY_VARIABLE,
+            fixed = c.UACPI_FREQUENCY_FIXED,
+            variable = c.UACPI_FREQUENCY_VARIABLE,
         };
 
         comptime {
-            core.testing.expectSize(ClockInput, .of(c_uacpi.uacpi_resource_clock_input));
+            core.testing.expectSize(ClockInput, .of(c.uacpi_resource_clock_input));
         }
     };
 
@@ -3289,19 +3290,19 @@ pub const Resource = extern struct {
         vendor_data: [*]const u8,
 
         pub const Mode = enum(u8) {
-            controller_initiated = c_uacpi.UACPI_MODE_CONTROLLER_INITIATED,
-            device_initiated = c_uacpi.UACPI_MODE_DEVICE_INITIATED,
+            controller_initiated = c.UACPI_MODE_CONTROLLER_INITIATED,
+            device_initiated = c.UACPI_MODE_DEVICE_INITIATED,
         };
 
         comptime {
-            core.testing.expectSize(SerialBusCommon, .of(c_uacpi.uacpi_resource_serial_bus_common));
+            core.testing.expectSize(SerialBusCommon, .of(c.uacpi_resource_serial_bus_common));
         }
     };
 
     pub const CompatibilityPerformance = enum(u8) {
-        good = c_uacpi.UACPI_GOOD,
-        acceptable = c_uacpi.UACPI_ACCEPTABLE,
-        sub_optimal = c_uacpi.UACPI_SUB_OPTIMAL,
+        good = c.UACPI_GOOD,
+        acceptable = c.UACPI_ACCEPTABLE,
+        sub_optimal = c.UACPI_SUB_OPTIMAL,
     };
 
     pub const AddressCommon = extern struct {
@@ -3313,19 +3314,19 @@ pub const Resource = extern struct {
         fixed_max_address: FixedAddress,
 
         pub const FixedAddress = enum(u8) {
-            not_fixed = c_uacpi.UACPI_ADDRESS_NOT_FIXED,
-            fixed = c_uacpi.UACPI_ADDRESS_FIXED,
+            not_fixed = c.UACPI_ADDRESS_NOT_FIXED,
+            fixed = c.UACPI_ADDRESS_FIXED,
         };
 
         pub const AddressType = enum(u8) {
-            memory = c_uacpi.UACPI_RANGE_MEMORY,
-            io = c_uacpi.UACPI_RANGE_IO,
-            bus = c_uacpi.UACPI_RANGE_BUS,
+            memory = c.UACPI_RANGE_MEMORY,
+            io = c.UACPI_RANGE_IO,
+            bus = c.UACPI_RANGE_BUS,
         };
 
         pub const DecodeType = enum(u8) {
-            positive = c_uacpi.UACPI_POSITIVE_DECODE,
-            subtractive = c_uacpi.UACPI_SUBTRACTIVE_DECODE,
+            positive = c.UACPI_POSITIVE_DECODE,
+            subtractive = c.UACPI_SUBTRACTIVE_DECODE,
         };
 
         pub const AddressAttribute = extern union {
@@ -3340,14 +3341,14 @@ pub const Resource = extern struct {
                 translation: Translation,
 
                 pub const Caching = enum(u8) {
-                    non_cacheable = c_uacpi.UACPI_NON_CACHEABLE,
-                    cacheable = c_uacpi.UACPI_CACHEABLE,
-                    write_combining = c_uacpi.UACPI_CACHEABLE_WRITE_COMBINING,
-                    prefetchable = c_uacpi.UACPI_PREFETCHABLE,
+                    non_cacheable = c.UACPI_NON_CACHEABLE,
+                    cacheable = c.UACPI_CACHEABLE,
+                    write_combining = c.UACPI_CACHEABLE_WRITE_COMBINING,
+                    prefetchable = c.UACPI_PREFETCHABLE,
                 };
 
                 comptime {
-                    core.testing.expectSize(MemoryAttribute, .of(c_uacpi.uacpi_memory_attribute));
+                    core.testing.expectSize(MemoryAttribute, .of(c.uacpi_memory_attribute));
                 }
             };
 
@@ -3357,50 +3358,50 @@ pub const Resource = extern struct {
                 translation_type: TranslationType,
 
                 pub const TranslationType = enum(u8) {
-                    dense = c_uacpi.UACPI_TRANSLATION_DENSE,
-                    sparse = c_uacpi.UACPI_TRANSLATION_SPARSE,
+                    dense = c.UACPI_TRANSLATION_DENSE,
+                    sparse = c.UACPI_TRANSLATION_SPARSE,
                 };
 
                 comptime {
-                    core.testing.expectSize(IoAttribute, .of(c_uacpi.uacpi_io_attribute));
+                    core.testing.expectSize(IoAttribute, .of(c.uacpi_io_attribute));
                 }
             };
 
             comptime {
-                core.testing.expectSize(AddressAttribute, .of(c_uacpi.uacpi_address_attribute));
+                core.testing.expectSize(AddressAttribute, .of(c.uacpi_address_attribute));
             }
         };
 
         comptime {
-            core.testing.expectSize(AddressCommon, .of(c_uacpi.uacpi_resource_address_common));
+            core.testing.expectSize(AddressCommon, .of(c.uacpi_resource_address_common));
         }
     };
 
     pub const LengthKind = enum(u8) {
-        dont_care = c_uacpi.UACPI_RESOURCE_LENGTH_KIND_DONT_CARE,
-        one_less = c_uacpi.UACPI_RESOURCE_LENGTH_KIND_ONE_LESS,
-        full = c_uacpi.UACPI_RESOURCE_LENGTH_KIND_FULL,
+        dont_care = c.UACPI_RESOURCE_LENGTH_KIND_DONT_CARE,
+        one_less = c.UACPI_RESOURCE_LENGTH_KIND_ONE_LESS,
+        full = c.UACPI_RESOURCE_LENGTH_KIND_FULL,
     };
 
     pub const Direction = enum(u8) {
-        producer = c_uacpi.UACPI_PRODUCER,
-        consumer = c_uacpi.UACPI_CONSUMER,
+        producer = c.UACPI_PRODUCER,
+        consumer = c.UACPI_CONSUMER,
     };
 
     pub const Polarity = enum(u8) {
-        high = c_uacpi.UACPI_POLARITY_ACTIVE_HIGH,
-        low = c_uacpi.UACPI_POLARITY_ACTIVE_LOW,
-        both = c_uacpi.UACPI_POLARITY_ACTIVE_BOTH,
+        high = c.UACPI_POLARITY_ACTIVE_HIGH,
+        low = c.UACPI_POLARITY_ACTIVE_LOW,
+        both = c.UACPI_POLARITY_ACTIVE_BOTH,
     };
 
     pub const Sharing = enum(u8) {
-        exclusive = c_uacpi.UACPI_EXCLUSIVE,
-        shared = c_uacpi.UACPI_SHARED,
+        exclusive = c.UACPI_EXCLUSIVE,
+        shared = c.UACPI_SHARED,
     };
 
     pub const WakeCapability = enum(u8) {
-        capable = c_uacpi.UACPI_WAKE_CAPABLE,
-        not_capable = c_uacpi.UACPI_NOT_WAKE_CAPABLE,
+        capable = c.UACPI_WAKE_CAPABLE,
+        not_capable = c.UACPI_NOT_WAKE_CAPABLE,
     };
 
     pub const Source = extern struct {
@@ -3414,25 +3415,25 @@ pub const Resource = extern struct {
         }
 
         comptime {
-            core.testing.expectSize(Source, .of(c_uacpi.uacpi_resource_source));
+            core.testing.expectSize(Source, .of(c.uacpi_resource_source));
         }
     };
 
     pub const WriteStatus = enum(u8) {
-        non_writable = c_uacpi.UACPI_NON_WRITABLE,
-        writable = c_uacpi.UACPI_WRITABLE,
+        non_writable = c.UACPI_NON_WRITABLE,
+        writable = c.UACPI_WRITABLE,
     };
 
     pub const RangeType = enum(u8) {
-        memory = c_uacpi.UACPI_RANGE_TYPE_MEMORY,
-        reserved = c_uacpi.UACPI_RANGE_TYPE_RESERVED,
-        acpi = c_uacpi.UACPI_RANGE_TYPE_ACPI,
-        nvs = c_uacpi.UACPI_RANGE_TYPE_NVS,
+        memory = c.UACPI_RANGE_TYPE_MEMORY,
+        reserved = c.UACPI_RANGE_TYPE_RESERVED,
+        acpi = c.UACPI_RANGE_TYPE_ACPI,
+        nvs = c.UACPI_RANGE_TYPE_NVS,
     };
 
     pub const Translation = enum(u8) {
-        translation = c_uacpi.UACPI_IO_MEM_TRANSLATION,
-        static = c_uacpi.UACPI_IO_MEM_STATIC,
+        translation = c.UACPI_IO_MEM_TRANSLATION,
+        static = c.UACPI_IO_MEM_STATIC,
     };
 
     pub const Label = extern struct {
@@ -3444,12 +3445,12 @@ pub const Resource = extern struct {
         }
 
         comptime {
-            core.testing.expectSize(Label, .of(c_uacpi.uacpi_resource_label));
+            core.testing.expectSize(Label, .of(c.uacpi_resource_label));
         }
     };
 
     comptime {
-        core.testing.expectSize(Resource, .of(c_uacpi.uacpi_resource));
+        core.testing.expectSize(Resource, .of(c.uacpi_resource));
     }
 };
 
@@ -3459,7 +3460,7 @@ pub const ByteWidth = enum(u8) {
     four = 4,
 };
 
-pub const EventInfo = packed struct(c_uacpi.uacpi_event_info) {
+pub const EventInfo = packed struct(c.uacpi_event_info) {
     /// Event is enabled in software
     enabled: bool,
     /// Event is enabled in software (only for wake)
@@ -3476,12 +3477,12 @@ pub const EventInfo = packed struct(c_uacpi.uacpi_event_info) {
     _reserved: u26,
 };
 
-pub const InterruptReturn = enum(c_uacpi.uacpi_interrupt_ret) {
-    not_handled = c_uacpi.UACPI_INTERRUPT_NOT_HANDLED,
-    handled = c_uacpi.UACPI_INTERRUPT_HANDLED,
+pub const InterruptReturn = enum(c.uacpi_interrupt_ret) {
+    not_handled = c.UACPI_INTERRUPT_NOT_HANDLED,
+    handled = c.UACPI_INTERRUPT_HANDLED,
 
     /// Only valid for GPE handlers, returned if the handler wishes to reenable the GPE it just handled.
-    gpe_reenable = c_uacpi.UACPI_GPE_REENABLE,
+    gpe_reenable = c.UACPI_GPE_REENABLE,
 };
 
 pub const Timeout = enum(u16) {
@@ -3492,50 +3493,50 @@ pub const Timeout = enum(u16) {
 };
 
 pub const Triggering = enum(u8) {
-    level = c_uacpi.UACPI_GPE_TRIGGERING_LEVEL,
-    edge = c_uacpi.UACPI_GPE_TRIGGERING_EDGE,
+    level = c.UACPI_GPE_TRIGGERING_LEVEL,
+    edge = c.UACPI_GPE_TRIGGERING_EDGE,
 
     comptime {
-        std.debug.assert(c_uacpi.UACPI_GPE_TRIGGERING_LEVEL == c_uacpi.UACPI_TRIGGERING_LEVEL);
-        std.debug.assert(c_uacpi.UACPI_GPE_TRIGGERING_EDGE == c_uacpi.UACPI_TRIGGERING_EDGE);
+        std.debug.assert(c.UACPI_GPE_TRIGGERING_LEVEL == c.UACPI_TRIGGERING_LEVEL);
+        std.debug.assert(c.UACPI_GPE_TRIGGERING_EDGE == c.UACPI_TRIGGERING_EDGE);
     }
 };
 
-pub const Status = enum(c_uacpi.uacpi_status) {
-    ok = c_uacpi.UACPI_STATUS_OK,
-    mapping_failed = c_uacpi.UACPI_STATUS_MAPPING_FAILED,
-    out_of_memory = c_uacpi.UACPI_STATUS_OUT_OF_MEMORY,
-    bad_checksum = c_uacpi.UACPI_STATUS_BAD_CHECKSUM,
-    invalid_signature = c_uacpi.UACPI_STATUS_INVALID_SIGNATURE,
-    invalid_table_length = c_uacpi.UACPI_STATUS_INVALID_TABLE_LENGTH,
-    not_found = c_uacpi.UACPI_STATUS_NOT_FOUND,
-    invalid_argument = c_uacpi.UACPI_STATUS_INVALID_ARGUMENT,
-    unimplemented = c_uacpi.UACPI_STATUS_UNIMPLEMENTED,
-    already_exists = c_uacpi.UACPI_STATUS_ALREADY_EXISTS,
-    internal_error = c_uacpi.UACPI_STATUS_INTERNAL_ERROR,
-    type_mismatch = c_uacpi.UACPI_STATUS_TYPE_MISMATCH,
-    init_level_mismatch = c_uacpi.UACPI_STATUS_INIT_LEVEL_MISMATCH,
-    namespace_node_dangling = c_uacpi.UACPI_STATUS_NAMESPACE_NODE_DANGLING,
-    no_handler = c_uacpi.UACPI_STATUS_NO_HANDLER,
-    no_resource_end_tag = c_uacpi.UACPI_STATUS_NO_RESOURCE_END_TAG,
-    compiled_out = c_uacpi.UACPI_STATUS_COMPILED_OUT,
-    hardware_timeout = c_uacpi.UACPI_STATUS_HARDWARE_TIMEOUT,
-    timeout = c_uacpi.UACPI_STATUS_TIMEOUT,
-    overridden = c_uacpi.UACPI_STATUS_OVERRIDDEN,
-    denied = c_uacpi.UACPI_STATUS_DENIED,
+pub const Status = enum(c.uacpi_status) {
+    ok = c.UACPI_STATUS_OK,
+    mapping_failed = c.UACPI_STATUS_MAPPING_FAILED,
+    out_of_memory = c.UACPI_STATUS_OUT_OF_MEMORY,
+    bad_checksum = c.UACPI_STATUS_BAD_CHECKSUM,
+    invalid_signature = c.UACPI_STATUS_INVALID_SIGNATURE,
+    invalid_table_length = c.UACPI_STATUS_INVALID_TABLE_LENGTH,
+    not_found = c.UACPI_STATUS_NOT_FOUND,
+    invalid_argument = c.UACPI_STATUS_INVALID_ARGUMENT,
+    unimplemented = c.UACPI_STATUS_UNIMPLEMENTED,
+    already_exists = c.UACPI_STATUS_ALREADY_EXISTS,
+    internal_error = c.UACPI_STATUS_INTERNAL_ERROR,
+    type_mismatch = c.UACPI_STATUS_TYPE_MISMATCH,
+    init_level_mismatch = c.UACPI_STATUS_INIT_LEVEL_MISMATCH,
+    namespace_node_dangling = c.UACPI_STATUS_NAMESPACE_NODE_DANGLING,
+    no_handler = c.UACPI_STATUS_NO_HANDLER,
+    no_resource_end_tag = c.UACPI_STATUS_NO_RESOURCE_END_TAG,
+    compiled_out = c.UACPI_STATUS_COMPILED_OUT,
+    hardware_timeout = c.UACPI_STATUS_HARDWARE_TIMEOUT,
+    timeout = c.UACPI_STATUS_TIMEOUT,
+    overridden = c.UACPI_STATUS_OVERRIDDEN,
+    denied = c.UACPI_STATUS_DENIED,
 
     // All errors that have bytecode-related origin should go here
-    aml_undefined_reference = c_uacpi.UACPI_STATUS_AML_UNDEFINED_REFERENCE,
-    aml_invalid_namestring = c_uacpi.UACPI_STATUS_AML_INVALID_NAMESTRING,
-    aml_object_already_exists = c_uacpi.UACPI_STATUS_AML_OBJECT_ALREADY_EXISTS,
-    aml_invalid_opcode = c_uacpi.UACPI_STATUS_AML_INVALID_OPCODE,
-    aml_incompatible_object_type = c_uacpi.UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE,
-    aml_bad_encoding = c_uacpi.UACPI_STATUS_AML_BAD_ENCODING,
-    aml_out_of_bounds_index = c_uacpi.UACPI_STATUS_AML_OUT_OF_BOUNDS_INDEX,
-    aml_sync_level_too_high = c_uacpi.UACPI_STATUS_AML_SYNC_LEVEL_TOO_HIGH,
-    aml_invalid_resource = c_uacpi.UACPI_STATUS_AML_INVALID_RESOURCE,
-    aml_loop_timeout = c_uacpi.UACPI_STATUS_AML_LOOP_TIMEOUT,
-    aml_call_stack_depth_limit = c_uacpi.UACPI_STATUS_AML_CALL_STACK_DEPTH_LIMIT,
+    aml_undefined_reference = c.UACPI_STATUS_AML_UNDEFINED_REFERENCE,
+    aml_invalid_namestring = c.UACPI_STATUS_AML_INVALID_NAMESTRING,
+    aml_object_already_exists = c.UACPI_STATUS_AML_OBJECT_ALREADY_EXISTS,
+    aml_invalid_opcode = c.UACPI_STATUS_AML_INVALID_OPCODE,
+    aml_incompatible_object_type = c.UACPI_STATUS_AML_INCOMPATIBLE_OBJECT_TYPE,
+    aml_bad_encoding = c.UACPI_STATUS_AML_BAD_ENCODING,
+    aml_out_of_bounds_index = c.UACPI_STATUS_AML_OUT_OF_BOUNDS_INDEX,
+    aml_sync_level_too_high = c.UACPI_STATUS_AML_SYNC_LEVEL_TOO_HIGH,
+    aml_invalid_resource = c.UACPI_STATUS_AML_INVALID_RESOURCE,
+    aml_loop_timeout = c.UACPI_STATUS_AML_LOOP_TIMEOUT,
+    aml_call_stack_depth_limit = c.UACPI_STATUS_AML_CALL_STACK_DEPTH_LIMIT,
 
     fn toError(status: Status) Error!void {
         return switch (status) {
@@ -3618,9 +3619,9 @@ pub const FirmwareRequest = extern struct {
 
     data: Data,
 
-    const Type = enum(c_uacpi.uacpi_firmware_request_type) {
-        breakpoint = c_uacpi.UACPI_FIRMWARE_REQUEST_TYPE_BREAKPOINT,
-        fatal = c_uacpi.UACPI_FIRMWARE_REQUEST_TYPE_FATAL,
+    const Type = enum(c.uacpi_firmware_request_type) {
+        breakpoint = c.UACPI_FIRMWARE_REQUEST_TYPE_BREAKPOINT,
+        fatal = c.UACPI_FIRMWARE_REQUEST_TYPE_FATAL,
     };
 
     const Data = extern union {
@@ -3640,47 +3641,47 @@ pub const FirmwareRequest = extern struct {
     };
 
     comptime {
-        core.testing.expectSize(FirmwareRequest, .of(c_uacpi.uacpi_firmware_request));
+        core.testing.expectSize(FirmwareRequest, .of(c.uacpi_firmware_request));
     }
 };
 
-pub const LogLevel = enum(c_uacpi.uacpi_log_level) {
+pub const LogLevel = enum(c.uacpi_log_level) {
     /// Super verbose logging, every op & uop being processed is logged.
     /// Mostly useful for tracking down hangs/lockups.
-    DEBUG = c_uacpi.UACPI_LOG_DEBUG,
+    DEBUG = c.UACPI_LOG_DEBUG,
 
     /// A little verbose, every operation region access is traced with a bit of
     /// extra information on top.
-    TRACE = c_uacpi.UACPI_LOG_TRACE,
+    TRACE = c.UACPI_LOG_TRACE,
 
     /// Only logs the bare minimum information about state changes and/or
     /// initialization progress.
-    INFO = c_uacpi.UACPI_LOG_INFO,
+    INFO = c.UACPI_LOG_INFO,
 
     /// Logs recoverable errors and/or non-important aborts.
-    WARN = c_uacpi.UACPI_LOG_WARN,
+    WARN = c.UACPI_LOG_WARN,
 
     /// Logs only critical errors that might affect the ability to initialize or
     /// prevent stable runtime.
-    ERROR = c_uacpi.UACPI_LOG_ERROR,
+    ERROR = c.UACPI_LOG_ERROR,
 };
 
-pub const WorkType = enum(c_uacpi.uacpi_work_type) {
+pub const WorkType = enum(c.uacpi_work_type) {
     /// Schedule a GPE handler method for execution.
     ///
     /// This should be scheduled to run on CPU0 to avoid potential SMI-related firmware bugs.
-    gpe_execution = c_uacpi.UACPI_WORK_GPE_EXECUTION,
+    gpe_execution = c.UACPI_WORK_GPE_EXECUTION,
 
     /// Schedule a Notify(device) firmware request for execution.
     ///
     /// This can run on any CPU.
-    work_notification = c_uacpi.UACPI_WORK_NOTIFICATION,
+    work_notification = c.UACPI_WORK_NOTIFICATION,
 };
 
 pub const WorkHandler = *const fn (*anyopaque) callconv(.c) void;
 pub const RawInterruptHandler = *const fn (?*anyopaque) callconv(.c) InterruptReturn;
-pub const CpuFlags = c_uacpi.uacpi_cpu_flags;
-pub const InterruptState = c_uacpi.uacpi_interrupt_state;
+pub const CpuFlags = c.uacpi_cpu_flags;
+pub const InterruptState = c.uacpi_interrupt_state;
 
 pub const DataView = extern struct {
     bytes: [*]const u8,
@@ -3691,19 +3692,19 @@ pub const DataView = extern struct {
     }
 
     comptime {
-        core.testing.expectSize(DataView, .of(c_uacpi.uacpi_data_view));
+        core.testing.expectSize(DataView, .of(c.uacpi_data_view));
     }
 };
 
-pub const IterationDecision = enum(c_uacpi.uacpi_iteration_decision) {
-    @"continue" = c_uacpi.UACPI_ITERATION_DECISION_CONTINUE,
+pub const IterationDecision = enum(c.uacpi_iteration_decision) {
+    @"continue" = c.UACPI_ITERATION_DECISION_CONTINUE,
 
-    @"break" = c_uacpi.UACPI_ITERATION_DECISION_BREAK,
+    @"break" = c.UACPI_ITERATION_DECISION_BREAK,
 
     /// Ignore all of the children of the current node and proceed directly to its peer nodes.
     ///
     /// Only applicable for API that interacts with the AML namespace such as `forEachChild`, `findDevices`, etc.
-    next_peer = c_uacpi.UACPI_ITERATION_DECISION_NEXT_PEER,
+    next_peer = c.UACPI_ITERATION_DECISION_NEXT_PEER,
 };
 
 pub fn IterationCallback(comptime UserContextT: type) type {
@@ -3717,7 +3718,7 @@ pub fn IterationCallback(comptime UserContextT: type) type {
 inline fn makeIterationCallbackWrapper(
     comptime UserContextT: type,
     callback: IterationCallback(UserContextT),
-) c_uacpi.uacpi_iteration_callback {
+) c.uacpi_iteration_callback {
     return comptime @ptrCast(&struct {
         fn callbackWrapper(
             user_ctx: ?*anyopaque,
@@ -3739,7 +3740,7 @@ pub fn ResourceIterationCallback(comptime UserContextT: type) type {
 inline fn makeResourceIterationCallbackWrapper(
     comptime UserContextT: type,
     callback: ResourceIterationCallback(UserContextT),
-) c_uacpi.uacpi_resource_iteration_callback {
+) c.uacpi_resource_iteration_callback {
     return comptime @ptrCast(&struct {
         fn callbackWrapper(user_ctx: ?*anyopaque, resource: *const Resource) callconv(.c) Node.IterationDecision {
             return callback(resource, @ptrCast(user_ctx));
@@ -3758,7 +3759,7 @@ pub fn NotifyHandler(comptime UserContextT: type) type {
 inline fn makeNotifyHandlerWrapper(
     comptime UserContextT: type,
     handler: NotifyHandler(UserContextT),
-) c_uacpi.uacpi_notify_handler {
+) c.uacpi_notify_handler {
     return comptime @ptrCast(&struct {
         fn handlerWrapper(
             user_ctx: ?*anyopaque,
@@ -3781,7 +3782,7 @@ pub fn GPEHandler(comptime UserContextT: type) type {
 inline fn makeGPEHandlerWrapper(
     comptime UserContextT: type,
     handler: GPEHandler(UserContextT),
-) c_uacpi.uacpi_gpe_handler {
+) c.uacpi_gpe_handler {
     return comptime @ptrCast(&struct {
         fn handlerWrapper(
             user_ctx: ?*anyopaque,
@@ -3802,7 +3803,7 @@ pub fn InterruptHandler(comptime UserContextT: type) type {
 inline fn makeInterruptHandlerWrapper(
     comptime UserContextT: type,
     handler: InterruptHandler(UserContextT),
-) c_uacpi.uacpi_interrupt_handler {
+) c.uacpi_interrupt_handler {
     return comptime @ptrCast(&struct {
         fn handlerWrapper(
             user_ctx: ?*anyopaque,
@@ -3812,27 +3813,27 @@ inline fn makeInterruptHandlerWrapper(
     }.handlerWrapper);
 }
 
-pub const RegionOperationType = enum(c_uacpi.uacpi_region_op) {
-    attach = c_uacpi.UACPI_REGION_OP_ATTACH,
+pub const RegionOperationType = enum(c.uacpi_region_op) {
+    attach = c.UACPI_REGION_OP_ATTACH,
 
-    detach = c_uacpi.UACPI_REGION_OP_DETACH,
+    detach = c.UACPI_REGION_OP_DETACH,
 
-    read = c_uacpi.UACPI_REGION_OP_READ,
-    write = c_uacpi.UACPI_REGION_OP_WRITE,
+    read = c.UACPI_REGION_OP_READ,
+    write = c.UACPI_REGION_OP_WRITE,
 
-    pcc_send = c_uacpi.UACPI_REGION_OP_PCC_SEND,
+    pcc_send = c.UACPI_REGION_OP_PCC_SEND,
 
-    gpio_read = c_uacpi.UACPI_REGION_OP_GPIO_READ,
-    gpio_write = c_uacpi.UACPI_REGION_OP_GPIO_WRITE,
+    gpio_read = c.UACPI_REGION_OP_GPIO_READ,
+    gpio_write = c.UACPI_REGION_OP_GPIO_WRITE,
 
-    ipmi_command = c_uacpi.UACPI_REGION_OP_IPMI_COMMAND,
+    ipmi_command = c.UACPI_REGION_OP_IPMI_COMMAND,
 
-    ffixedhw_command = c_uacpi.UACPI_REGION_OP_FFIXEDHW_COMMAND,
+    ffixedhw_command = c.UACPI_REGION_OP_FFIXEDHW_COMMAND,
 
-    prm_command = c_uacpi.UACPI_REGION_OP_PRM_COMMAND,
+    prm_command = c.UACPI_REGION_OP_PRM_COMMAND,
 
-    serial_read = c_uacpi.UACPI_REGION_OP_SERIAL_READ,
-    serial_write = c_uacpi.UACPI_REGION_OP_SERIAL_WRITE,
+    serial_read = c.UACPI_REGION_OP_SERIAL_READ,
+    serial_write = c.UACPI_REGION_OP_SERIAL_WRITE,
 };
 
 pub fn RegionOperation(comptime UserContextT: type) type {
@@ -3866,7 +3867,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
                     length: u64,
 
                     comptime {
-                        core.testing.expectSize(Generic, .of(c_uacpi.uacpi_generic_region_info));
+                        core.testing.expectSize(Generic, .of(c.uacpi_generic_region_info));
                     }
                 };
 
@@ -3875,7 +3876,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
                     subspace_id: u8,
 
                     comptime {
-                        core.testing.expectSize(Pcc, .of(c_uacpi.uacpi_pcc_region_info));
+                        core.testing.expectSize(Pcc, .of(c.uacpi_pcc_region_info));
                     }
                 };
 
@@ -3883,13 +3884,13 @@ pub fn RegionOperation(comptime UserContextT: type) type {
                     num_pins: u64,
 
                     comptime {
-                        core.testing.expectSize(Gpio, .of(c_uacpi.uacpi_gpio_region_info));
+                        core.testing.expectSize(Gpio, .of(c.uacpi_gpio_region_info));
                     }
                 };
             };
 
             comptime {
-                core.testing.expectSize(Attach, .of(c_uacpi.uacpi_region_attach_data));
+                core.testing.expectSize(Attach, .of(c.uacpi_region_attach_data));
             }
         };
 
@@ -3899,7 +3900,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             region_node: *Node,
 
             comptime {
-                core.testing.expectSize(Detach, .of(c_uacpi.uacpi_region_detach_data));
+                core.testing.expectSize(Detach, .of(c.uacpi_region_detach_data));
             }
         };
 
@@ -3914,7 +3915,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             byte_width: ByteWidth,
 
             comptime {
-                core.testing.expectSize(ReadWrite, .of(c_uacpi.uacpi_region_rw_data));
+                core.testing.expectSize(ReadWrite, .of(c.uacpi_region_rw_data));
             }
         };
 
@@ -3924,7 +3925,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             buffer: DataView,
 
             comptime {
-                core.testing.expectSize(PccSend, .of(c_uacpi.uacpi_region_pcc_send_data));
+                core.testing.expectSize(PccSend, .of(c.uacpi_region_pcc_send_data));
             }
         };
 
@@ -3937,7 +3938,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             value: u64,
 
             comptime {
-                core.testing.expectSize(GpioReadWrite, .of(c_uacpi.uacpi_region_gpio_rw_data));
+                core.testing.expectSize(GpioReadWrite, .of(c.uacpi_region_gpio_rw_data));
             }
         };
 
@@ -3948,7 +3949,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             command: u64,
 
             comptime {
-                core.testing.expectSize(IpmiCommand, .of(c_uacpi.uacpi_region_ipmi_rw_data));
+                core.testing.expectSize(IpmiCommand, .of(c.uacpi_region_ipmi_rw_data));
             }
         };
 
@@ -3959,7 +3960,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             command: u64,
 
             comptime {
-                core.testing.expectSize(FixedHardwareCommand, .of(c_uacpi.uacpi_region_ffixedhw_rw_data));
+                core.testing.expectSize(FixedHardwareCommand, .of(c.uacpi_region_ffixedhw_rw_data));
             }
         };
 
@@ -3969,7 +3970,7 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             in_out_message: DataView,
 
             comptime {
-                core.testing.expectSize(PrmReadWrite, .of(c_uacpi.uacpi_region_prm_rw_data));
+                core.testing.expectSize(PrmReadWrite, .of(c.uacpi_region_prm_rw_data));
             }
         };
 
@@ -3987,21 +3988,21 @@ pub fn RegionOperation(comptime UserContextT: type) type {
             ///  - `raw_process_bytes`
             access_length: u8,
 
-            pub const AccessAttribute = enum(c_uacpi.uacpi_access_attribute) {
-                quick = c_uacpi.UACPI_ACCESS_ATTRIBUTE_QUICK,
-                send_receive = c_uacpi.UACPI_ACCESS_ATTRIBUTE_SEND_RECEIVE,
-                byte = c_uacpi.UACPI_ACCESS_ATTRIBUTE_BYTE,
-                word = c_uacpi.UACPI_ACCESS_ATTRIBUTE_WORD,
-                block = c_uacpi.UACPI_ACCESS_ATTRIBUTE_BLOCK,
-                bytes = c_uacpi.UACPI_ACCESS_ATTRIBUTE_BYTES,
-                process_call = c_uacpi.UACPI_ACCESS_ATTRIBUTE_PROCESS_CALL,
-                block_process_call = c_uacpi.UACPI_ACCESS_ATTRIBUTE_BLOCK_PROCESS_CALL,
-                raw_bytes = c_uacpi.UACPI_ACCESS_ATTRIBUTE_RAW_BYTES,
-                raw_process_bytes = c_uacpi.UACPI_ACCESS_ATTRIBUTE_RAW_PROCESS_BYTES,
+            pub const AccessAttribute = enum(c.uacpi_access_attribute) {
+                quick = c.UACPI_ACCESS_ATTRIBUTE_QUICK,
+                send_receive = c.UACPI_ACCESS_ATTRIBUTE_SEND_RECEIVE,
+                byte = c.UACPI_ACCESS_ATTRIBUTE_BYTE,
+                word = c.UACPI_ACCESS_ATTRIBUTE_WORD,
+                block = c.UACPI_ACCESS_ATTRIBUTE_BLOCK,
+                bytes = c.UACPI_ACCESS_ATTRIBUTE_BYTES,
+                process_call = c.UACPI_ACCESS_ATTRIBUTE_PROCESS_CALL,
+                block_process_call = c.UACPI_ACCESS_ATTRIBUTE_BLOCK_PROCESS_CALL,
+                raw_bytes = c.UACPI_ACCESS_ATTRIBUTE_RAW_BYTES,
+                raw_process_bytes = c.UACPI_ACCESS_ATTRIBUTE_RAW_PROCESS_BYTES,
             };
 
             comptime {
-                core.testing.expectSize(SerialReadWrite, .of(c_uacpi.uacpi_region_serial_rw_data));
+                core.testing.expectSize(SerialReadWrite, .of(c.uacpi_region_serial_rw_data));
             }
         };
     };
@@ -4014,7 +4015,7 @@ pub fn RegionHandler(comptime UserContextT: type) type {
 inline fn makeRegionHandlerWrapper(
     comptime UserContextT: type,
     handler: RegionHandler(UserContextT),
-) c_uacpi.uacpi_region_handler {
+) c.uacpi_region_handler {
     return comptime @ptrCast(&struct {
         fn handlerWrapper(
             op: RegionOperationType,
@@ -4045,7 +4046,7 @@ pub const InterfaceHandler = fn (
 
 inline fn makeInterfaceHandlerWrapper(
     handler: InterfaceHandler,
-) c_uacpi.uacpi_interface_handler {
+) c.uacpi_interface_handler {
     return comptime @ptrCast(&struct {
         fn handlerWrapper(
             name: [*:0]const u8,
@@ -4057,23 +4058,6 @@ inline fn makeInterfaceHandlerWrapper(
 }
 
 comptime {
-    std.debug.assert(@sizeOf(cascade.PhysicalAddress) == @sizeOf(c_uacpi.uacpi_phys_addr));
-    std.debug.assert(@sizeOf(acpi.Address) == @sizeOf(c_uacpi.acpi_gas));
+    std.debug.assert(@sizeOf(cascade.PhysicalAddress) == @sizeOf(c.uacpi_phys_addr));
+    std.debug.assert(@sizeOf(acpi.Address) == @sizeOf(c.acpi_gas));
 }
-
-const c_uacpi = @cImport({
-    @cInclude("uacpi/event.h");
-    @cInclude("uacpi/io.h");
-    @cInclude("uacpi/namespace.h");
-    @cInclude("uacpi/notify.h");
-    @cInclude("uacpi/opregion.h");
-    @cInclude("uacpi/osi.h");
-    @cInclude("uacpi/registers.h");
-    @cInclude("uacpi/resources.h");
-    @cInclude("uacpi/sleep.h");
-    @cInclude("uacpi/status.h");
-    @cInclude("uacpi/tables.h");
-    @cInclude("uacpi/types.h");
-    @cInclude("uacpi/uacpi.h");
-    @cInclude("uacpi/utilities.h");
-});

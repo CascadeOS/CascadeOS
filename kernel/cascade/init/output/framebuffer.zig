@@ -2,16 +2,12 @@
 // SPDX-FileCopyrightText: CascadeOS Contributors
 
 const boot = @import("boot");
+const c = @import("flanterm");
 const cascade = @import("cascade");
 
 const Output = @import("Output.zig");
 
 const init_log = cascade.debug.log.scoped(.output_init);
-
-const c = @cImport({
-    @cInclude("flanterm.h");
-    @cInclude("flanterm_backends/fb.h");
-});
 
 pub fn tryGetFramebufferOutput(memory_system_available: bool) ?Output {
     return tryGetFramebufferOutputInner(memory_system_available) catch |err| {
