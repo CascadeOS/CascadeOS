@@ -16,7 +16,7 @@ CascadeOS is a general purpose operating system targeting standard desktops and 
 
 ## Build, testing, running
 ### Prerequisites:
-- zig 0.16.0-dev.2973+06b85a4fd
+- zig 0.16.0-dev.3133+5ec8e45f3
 - qemu (optional; used for running and host testing)
 
 Run the x64 kernel in QEMU:
