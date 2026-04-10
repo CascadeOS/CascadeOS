@@ -75,7 +75,7 @@ pub fn initStage1() !noreturn {
     try cascade.user.init.initialize();
 
     log.debug("initializing kernel executors", .{});
-    const executors, const new_executor = try createExecutors();
+    const executors, const new_bootstrap_executor = try createExecutors();
     cascade.Executor.init.setExecutors(executors);
 
     if (executors.len > 1) {
@@ -83,7 +83,7 @@ pub fn initStage1() !noreturn {
         try bootNonBootstrapExecutors();
     }
 
-    try initStage2(new_executor);
+    try initStage2(new_bootstrap_executor);
     unreachable;
 }
 
