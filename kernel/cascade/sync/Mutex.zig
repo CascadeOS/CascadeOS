@@ -3,6 +3,8 @@
 
 //! A fair in order mutex.
 //!
+//! Recursive locks are not supported.
+//!
 //! Preemption is disabled while locked.
 
 const std = @import("std");

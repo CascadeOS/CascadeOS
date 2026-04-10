@@ -3,6 +3,8 @@
 
 //! A fair in order spinlock.
 //!
+//! Recursive locks are not supported.
+//!
 //! Interrupts are disabled while locked.
 
 const std = @import("std");
@@ -16,7 +18,6 @@ const TicketSpinLock = @This();
 container: Container = .{ .full = 0 },
 holding_executor: ?*const cascade.Executor = null,
 
-/// Locks the spinlock.
 pub fn lock(ticket_spin_lock: *TicketSpinLock) void {
     const current_task: cascade.Task.Current = .get();
 
@@ -39,7 +40,6 @@ pub fn lock(ticket_spin_lock: *TicketSpinLock) void {
     current_task.task.spinlocks_held += 1;
 }
 
-/// Try to lock the spinlock.
 pub fn tryLock(ticket_spin_lock: *TicketSpinLock) bool {
     // no need to check if we already have the lock as the below logic will not allow us
     // to acquire it again
