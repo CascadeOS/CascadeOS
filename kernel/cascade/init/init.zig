@@ -176,8 +176,12 @@ fn initStage4() !void {
     log.debug("initializing ACPI", .{});
     try cascade.acpi.init.initialize();
 
+    try cascade.time.init.printInitializationTime();
+
     log.debug("starting first user process", .{});
-    const hello_world_process: *cascade.user.Process = try .create(.{ .name = try .fromSlice("hello world") });
+    const hello_world_process: *cascade.user.Process = try .create(
+        .{ .name = try .fromSlice("hello world") },
+    );
     defer hello_world_process.decrementReferenceCount();
 
     const hello_world_main_thread = try hello_world_process.createThread(
@@ -187,8 +191,6 @@ fn initStage4() !void {
     const scheduler_handle: cascade.Task.SchedulerHandle = .get();
     defer scheduler_handle.unlock();
     scheduler_handle.queueTask(&hello_world_main_thread.task);
-
-    try cascade.time.init.printInitializationTime();
 }
 
 fn constructAndLoadBootstrapExecutorAndTask() !void {
