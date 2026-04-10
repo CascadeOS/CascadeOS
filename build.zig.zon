@@ -21,7 +21,7 @@
         },
 
         .flanterm = .{
-            .url = "git+https://codeberg.org/Mintsuki/Flanterm.git?ref=v3.0.2#112434532822dde252c84b25a6798a9c00515d66",
+            .url = "git+https://github.com/Mintsuki/Flanterm.git?ref=v3.0.2#112434532822dde252c84b25a6798a9c00515d66",
             .hash = "N-V-__8AANhpAgCqVERv9sa-fOs0kLrpWT1o9AkID9GEKiMu",
         },
 
