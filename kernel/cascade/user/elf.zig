@@ -278,10 +278,6 @@ pub const ProgramHeader = struct {
         index: usize = 0,
         program_header_table: []const u8,
 
-        pub fn reset(it: *Iterator) void {
-            it.index = 0;
-        }
-
         pub fn next(it: *Iterator) ?ProgramHeader {
             const index = it.index;
             const header = it.header;
@@ -521,10 +517,6 @@ pub const LoadableRegion = struct {
 
     pub const Iterator = struct {
         program_header_iterator: ProgramHeader.Iterator,
-
-        pub fn reset(it: *Iterator) void {
-            it.program_header_iterator.reset();
-        }
 
         pub fn next(it: *Iterator) !?LoadableRegion {
             while (it.program_header_iterator.next()) |program_header| {

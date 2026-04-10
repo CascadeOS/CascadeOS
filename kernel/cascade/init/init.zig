@@ -340,18 +340,20 @@ fn loadHelloWorld() !void {
         break :blk hello_world_elf[program_header_table_location.base..][0..program_header_table_location.length];
     };
 
-    var iter = header.loadableRegionIterator(program_header_table);
-
     // map all loadable segments read write - this allows the address space to merge the entries
     // TODO: this only makes sense for an embedded program, not if it is loaded from disk
-    while (try iter.next()) |loadable_region| {
-        _ = try process.address_space.map(.{
-            .base = loadable_region.virtual_range.address.toVirtualAddress(),
-            .size = loadable_region.virtual_range.size,
-            .protection = .{ .read = true, .write = true },
-            .max_protection = .all,
-            .type = .zero_fill,
-        });
+    {
+        var iter = header.loadableRegionIterator(program_header_table);
+
+        while (try iter.next()) |loadable_region| {
+            _ = try process.address_space.map(.{
+                .base = loadable_region.virtual_range.address.toVirtualAddress(),
+                .size = loadable_region.virtual_range.size,
+                .protection = .{ .read = true, .write = true },
+                .max_protection = .all,
+                .type = .zero_fill,
+            });
+        }
     }
 
     // copy the regions from the elf into the address space
@@ -359,7 +361,7 @@ fn loadHelloWorld() !void {
         current_task.incrementEnableAccessToUserMemory();
         defer current_task.decrementEnableAccessToUserMemory();
 
-        iter.reset();
+        var iter = header.loadableRegionIterator(program_header_table);
 
         while (try iter.next()) |loadable_region| {
             if (loadable_region.source_length == 0) continue;
@@ -373,19 +375,21 @@ fn loadHelloWorld() !void {
         }
     }
 
-    iter.reset();
-
     // change each regions protections as per the elf
-    while (try iter.next()) |loadable_region| {
-        try process.address_space.changeProtection(
-            loadable_region.virtual_range.toVirtualRange(),
-            .{
-                .both = .{
-                    .protection = loadable_region.protection,
-                    .max_protection = loadable_region.protection,
+    {
+        var iter = header.loadableRegionIterator(program_header_table);
+
+        while (try iter.next()) |loadable_region| {
+            try process.address_space.changeProtection(
+                loadable_region.virtual_range.toVirtualRange(),
+                .{
+                    .both = .{
+                        .protection = loadable_region.protection,
+                        .max_protection = loadable_region.protection,
+                    },
                 },
-            },
-        );
+            );
+        }
     }
 
     const user_stack = try process.address_space.map(.{
