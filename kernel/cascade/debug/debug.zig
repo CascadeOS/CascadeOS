@@ -144,7 +144,7 @@ fn printPanicBacktrace(
         .normal => |normal| {
             if (normal.error_return_trace) |trace| if (trace.index != 0) {
                 try t.writer.writeAll("error return context:\n");
-                try std.debug.writeStackTrace(trace, t);
+                try std.debug.writeErrorReturnTrace(trace, t);
                 try t.writer.writeAll("\nstack trace:\n");
             };
             try std.debug.writeCurrentStackTrace(.{ .first_address = normal.return_address }, t);
