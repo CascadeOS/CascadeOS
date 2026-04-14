@@ -29,3 +29,9 @@ path = "kernel/cascade/init/output/simple.font"
 precedence = "aggregate"
 SPDX-License-Identifier = "OFL-1.1"
 SPDX-FileCopyrightText = ""
+
+[[annotations]]
+path = ".keys/**"
+precedence = "aggregate"
+SPDX-License-Identifier = "LicenseRef-NON-AI-CC0-1.0"
+SPDX-FileCopyrightText = "CascadeOS Contributors"
