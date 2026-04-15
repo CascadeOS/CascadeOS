@@ -22,82 +22,6 @@ pub const allocator: std.mem.Allocator = .{
     },
 };
 
-pub const AllocateError = error{
-    ZeroLength,
-    OutOfMemory,
-};
-
-pub fn allocate(size: core.Size, alignment: std.mem.Alignment) AllocateError!cascade.KernelVirtualRange {
-    return innerAllocate(size, alignment, true);
-}
-
-fn innerAllocate(size: core.Size, alignment: std.mem.Alignment, comptime set_to_undefined: bool) AllocateError!cascade.KernelVirtualRange {
-    if (alignment.toByteUnits() <= heap_arena_quantum) {
-        const allocation = globals.heap_arena.allocate(size.value, .instant_fit) catch |err| {
-            @branchHint(.unlikely);
-            return switch (err) {
-                error.ZeroLength => error.ZeroLength,
-                else => error.OutOfMemory,
-            };
-        };
-
-        var virtual_range = allocation.toVirtualRange();
-
-        if (set_to_undefined and core.is_debug) @memset(virtual_range.byteSlice(), undefined);
-
-        // the range returned by the heap arena will be aligned to the quantum size, but we want to return the size requested
-        virtual_range.size = size;
-
-        return virtual_range;
-    }
-
-    const unaligned_allocation = globals.heap_arena.allocate(
-        size.value + alignment.toByteUnits() - 1,
-        .instant_fit,
-    ) catch |err| {
-        @branchHint(.unlikely);
-        return switch (err) {
-            error.ZeroLength => error.ZeroLength,
-            else => error.OutOfMemory,
-        };
-    };
-
-    const unaligned_virtual_range = unaligned_allocation.toVirtualRange();
-
-    if (set_to_undefined and core.is_debug) @memset(unaligned_virtual_range.byteSlice(), undefined);
-
-    return .{
-        .address = unaligned_virtual_range.address.alignForward(alignment),
-        // the range returned by the heap arena will be aligned to the quantum size, but we want to return the size requested
-        .size = size,
-    };
-}
-
-pub fn deallocate(range: cascade.KernelVirtualRange, alignment: std.mem.Alignment) void {
-    const aligned_range: cascade.KernelVirtualRange = if (alignment.toByteUnits() <= heap_arena_quantum)
-        .from(
-            range.address,
-            range.size.alignForward(heap_arena_quantum_size_alignment),
-        )
-    else
-        .from(
-            range.address
-                .moveBackward(.one)
-                .alignBackward(alignment),
-            range.size
-                .add(.from(alignment.toByteUnits(), .byte))
-                .subtract(.one)
-                .alignForward(heap_arena_quantum_size_alignment),
-        );
-
-    globals.heap_arena.deallocate(.fromVirtualRange(aligned_range));
-}
-
-pub const AllocatorSpecialMapType = struct {
-    protection: cascade.mem.MapType.Protection,
-    cache: cascade.mem.MapType.Cache,
-};
-
 /// Allocate a range of memory that is mapped to a specific physical range with the given map type.
 pub fn allocateSpecial(
     physical_range: cascade.PhysicalRange,
@@ -112,7 +36,7 @@ pub fn allocateSpecial(
         @branchHint(.unlikely);
         return switch (err) {
             error.ZeroLength => error.ZeroLength,
-            else => error.OutOfMemory,
+            error.RequestedLengthUnavailable, error.OutOfBoundaryTags => error.OutOfMemory,
         };
     };
     errdefer globals.special_heap_address_space_arena.deallocate(allocation);
@@ -177,6 +101,16 @@ pub fn deallocateSpecial(virtual_range: cascade.KernelVirtualRange) void {
     globals.special_heap_address_space_arena.deallocate(.fromVirtualRange(page_aligned_virtual_range));
 }
 
+pub const AllocateError = error{
+    ZeroLength,
+    OutOfMemory,
+};
+
+pub const AllocatorSpecialMapType = struct {
+    protection: cascade.mem.MapType.Protection,
+    cache: cascade.mem.MapType.Cache,
+};
+
 // pub to allow access by `cascade.mem.cache`
 pub const heap_page_arena = &globals.heap_page_arena;
 
@@ -190,11 +124,13 @@ pub const c = struct {
             @branchHint(.unlikely);
             return null;
         }
-        const virtual_range = allocate(.from(size, .byte), .@"16") catch {
+
+        const mem = allocator.alignedAlloc(u8, .@"16", size) catch {
             @branchHint(.unlikely);
             return null;
         };
-        return virtual_range.address.toPtr([*]u8);
+
+        return mem.ptr;
     }
 
     /// Free a block of memory allocated with 'mallocWithSizedFree'.
@@ -203,8 +139,7 @@ pub const c = struct {
             @branchHint(.unlikely);
             return;
         };
-        if (core.is_debug) std.debug.assert(size != 0);
-        deallocate(.fromSlice(u8, ptr[0..size]), .@"16");
+        allocator.rawFree(ptr[0..size], .@"16", @returnAddress());
     }
 
     /// Allocate a block of memory of 'size' bytes.
@@ -213,15 +148,14 @@ pub const c = struct {
     pub fn mallocWithNonSizedFree(size: usize) ?[*]u8 {
         const full_size = core.Size.from(size, .byte).add(.of(cascade.KernelVirtualRange));
 
-        const full_virtual_range = allocate(full_size, .@"16") catch {
+        const mem = allocator.alignedAlloc(u8, .@"16", full_size) catch {
             @branchHint(.unlikely);
             return null;
         };
 
-        const base_ptr = full_virtual_range.address.toPtr([*]align(heap_arena_quantum) u8);
-        const result_ptr = base_ptr + @sizeOf(cascade.KernelVirtualRange);
+        const result_ptr = mem.ptr + @sizeOf(cascade.KernelVirtualRange);
 
-        getAllocationHeader(result_ptr).* = full_virtual_range;
+        getAllocationHeader(result_ptr).* = .fromSlice(u8, mem);
 
         return result_ptr;
     }
@@ -232,8 +166,11 @@ pub const c = struct {
             @branchHint(.unlikely);
             return;
         };
-
-        deallocate(getAllocationHeader(@alignCast(ptr)).*, .@"16");
+        allocator.rawFree(
+            getAllocationHeader(ptr).byteSlice(),
+            .@"16",
+            @returnAddress(),
+        );
     }
 
     inline fn getAllocationHeader(ptr: [*]align(heap_arena_quantum) u8) *cascade.KernelVirtualRange {
@@ -250,12 +187,23 @@ const allocator_impl = struct {
     ) ?[*]u8 {
         if (core.is_debug) std.debug.assert(len != 0);
 
-        const virtual_range = innerAllocate(.from(len, .byte), alignment, false) catch {
+        if (alignment.toByteUnits() <= heap_arena_quantum) {
+            // no need to overallocate to ensure alignment
+            const allocation = globals.heap_arena.allocate(len, .instant_fit) catch {
+                @branchHint(.unlikely);
+                return null;
+            };
+            return allocation.toVirtualRange().address.toPtr([*]u8);
+        }
+
+        const unaligned_allocation = globals.heap_arena.allocate(
+            len + alignment.toByteUnits() - 1,
+            .instant_fit,
+        ) catch {
             @branchHint(.unlikely);
             return null;
         };
-
-        return virtual_range.address.toPtr([*]u8);
+        return unaligned_allocation.toVirtualRange().address.alignForward(alignment).toPtr([*]u8);
     }
 
     fn resize(
@@ -293,19 +241,30 @@ const allocator_impl = struct {
     fn free(
         _: *anyopaque,
         memory: []u8,
-        _: std.mem.Alignment,
+        alignment: std.mem.Alignment,
         _: usize,
     ) void {
         if (core.is_debug) std.debug.assert(memory.len != 0);
 
-        globals.heap_arena.deallocate(
-            .fromVirtualRange(
-                .{
-                    .address = .fromPtr(memory.ptr),
-                    .size = core.Size.from(memory.len, .byte).alignForward(heap_arena_quantum_size_alignment),
-                },
-            ),
-        );
+        const unaligned_range: cascade.KernelVirtualRange = .fromSlice(u8, memory);
+
+        const aligned_range: cascade.KernelVirtualRange = if (alignment.toByteUnits() <= heap_arena_quantum)
+            .from(
+                unaligned_range.address,
+                unaligned_range.size.alignForward(heap_arena_quantum_size_alignment),
+            )
+        else
+            .from(
+                unaligned_range.address
+                    .moveBackward(.one)
+                    .alignBackward(alignment),
+                unaligned_range.size
+                    .add(.from(alignment.toByteUnits(), .byte))
+                    .subtract(.one)
+                    .alignForward(heap_arena_quantum_size_alignment),
+            );
+
+        globals.heap_arena.deallocate(.fromVirtualRange(aligned_range));
     }
 
     fn heapPageArenaImport(
