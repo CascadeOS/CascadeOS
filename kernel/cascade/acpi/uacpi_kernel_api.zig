@@ -312,7 +312,7 @@ export fn uacpi_kernel_unmap(ptr: [*]u8, len: usize) void {
 ///
 /// The contents of the allocated memory are unspecified.
 export fn uacpi_kernel_alloc(size: usize) ?[*]u8 {
-    log.verbose("uacpi_kernel_alloc called", .{});
+    log.verbose("uacpi_kernel_alloc called: {f}", .{core.Size.from(size, .byte)});
     return cascade.mem.heap.c.mallocWithSizedFree(size);
 }
 
@@ -320,7 +320,7 @@ export fn uacpi_kernel_alloc(size: usize) ?[*]u8 {
 ///
 /// 'mem' might be a NULL pointer. In this case, the call is assumed to be a no-op.
 export fn uacpi_kernel_free(opt_mem: ?[*]u8, size: usize) void {
-    log.verbose("uacpi_kernel_free called {}", .{size});
+    log.verbose("uacpi_kernel_free called: {*} {f}", .{ opt_mem, core.Size.from(size, .byte) });
     cascade.mem.heap.c.sizedFree(opt_mem, size);
 }
 
