@@ -14,7 +14,7 @@ const core = @import("core");
 
 const Mutex = @This();
 
-locked_by: std.atomic.Value(?*cascade.Task) = .init(null),
+locked_by: std.atomic.Value(?*cascade.Task) align(std.atomic.cache_line) = .init(null),
 
 unlock_type: UnlockType = .unlocked,
 

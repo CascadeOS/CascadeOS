@@ -15,7 +15,7 @@ const core = @import("core");
 
 const SingleSpinLock = @This();
 
-holding_executor: std.atomic.Value(?*const cascade.Executor) = .init(null),
+holding_executor: std.atomic.Value(?*const cascade.Executor) align(std.atomic.cache_line) = .init(null),
 
 pub fn lock(single_spin_lock: *SingleSpinLock) void {
     const current_task: cascade.Task.Current = .get();

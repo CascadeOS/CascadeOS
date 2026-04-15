@@ -15,7 +15,7 @@ const core = @import("core");
 
 const TicketSpinLock = @This();
 
-container: Container = .{ .full = 0 },
+container: Container align(std.atomic.cache_line) = .{ .full = 0 },
 holding_executor: ?*const cascade.Executor = null,
 
 pub fn lock(ticket_spin_lock: *TicketSpinLock) void {

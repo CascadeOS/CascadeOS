@@ -191,7 +191,7 @@ const ProcessCleanup = struct {
     fn execute(process_cleanup: *ProcessCleanup) noreturn {
         while (true) {
             while (process_cleanup.incoming.popFirst()) |node| {
-                cleanupProcess(@fieldParentPtr("cleanup_node", node));
+                cleanupProcess(@alignCast(@fieldParentPtr("cleanup_node", node)));
             }
 
             process_cleanup.parker.park();
