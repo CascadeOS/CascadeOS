@@ -161,8 +161,8 @@ pub const init = struct {
                 .end_bus = base_allocation.end_pci_bus,
                 .segment_group = base_allocation.segment_group,
                 .config_space = try cascade.mem.heap.allocateSpecial(
-                    ecam_config_space_physical_range,
                     .{
+                        .physical_range = ecam_config_space_physical_range,
                         .protection = .{ .read = true, .write = true },
                         .cache = .uncached,
                     },

@@ -22,18 +22,28 @@ pub const allocator: std.mem.Allocator = .{
     },
 };
 
+pub const AllocateSpecialOptions = struct {
+    physical_range: cascade.PhysicalRange,
+    protection: cascade.mem.MapType.Protection,
+    cache: cascade.mem.MapType.Cache,
+
+    pub const Error = error{
+        ZeroLength,
+        OutOfMemory,
+    };
+};
+
 /// Allocate a range of memory that is mapped to a specific physical range with the given map type.
 pub fn allocateSpecial(
-    physical_range: cascade.PhysicalRange,
-    map_type: AllocatorSpecialMapType,
-) AllocateError!cascade.KernelVirtualRange {
-    const page_aligned_physical_range = physical_range.pageAlign();
+    options: AllocateSpecialOptions,
+) AllocateSpecialOptions.Error!cascade.KernelVirtualRange {
+    const page_aligned_physical_range = options.physical_range.pageAlign();
 
     const allocation = globals.special_heap_address_space_arena.allocate(
         page_aligned_physical_range.size.value,
         .instant_fit,
     ) catch |err| {
-        @branchHint(.unlikely);
+        @branchHint(.cold);
         return switch (err) {
             error.ZeroLength => error.ZeroLength,
             error.RequestedLengthUnavailable, error.OutOfBoundaryTags => error.OutOfMemory,
@@ -53,14 +63,14 @@ pub fn allocateSpecial(
             page_aligned_physical_range,
             .{
                 .type = .kernel,
-                .protection = map_type.protection,
-                .cache = map_type.cache,
+                .protection = options.protection,
+                .cache = options.cache,
             },
             .kernel,
             .keep,
             cascade.mem.PhysicalPage.allocator,
         ) catch |err| {
-            @branchHint(.unlikely);
+            @branchHint(.cold);
             switch (err) {
                 error.AlreadyMapped, error.MappingNotValid => std.debug.panic("allocate special failed: {s}", .{@errorName(err)}),
                 error.PagesExhausted => return error.OutOfMemory,
@@ -69,8 +79,9 @@ pub fn allocateSpecial(
     }
 
     return .from(
-        page_aligned_virtual_range.address.moveForward(page_aligned_physical_range.address.difference(physical_range.address)),
-        physical_range.size,
+        page_aligned_virtual_range.address
+            .moveForward(page_aligned_physical_range.address.difference(options.physical_range.address)),
+        options.physical_range.size,
     );
 }
 
@@ -100,83 +111,6 @@ pub fn deallocateSpecial(virtual_range: cascade.KernelVirtualRange) void {
 
     globals.special_heap_address_space_arena.deallocate(.fromVirtualRange(page_aligned_virtual_range));
 }
-
-pub const AllocateError = error{
-    ZeroLength,
-    OutOfMemory,
-};
-
-pub const AllocatorSpecialMapType = struct {
-    protection: cascade.mem.MapType.Protection,
-    cache: cascade.mem.MapType.Cache,
-};
-
-// pub to allow access by `cascade.mem.cache`
-pub const heap_page_arena = &globals.heap_page_arena;
-
-/// These functions are provided to allow C code to use the heap allocator and should not be used by zig code.
-pub const c = struct {
-    /// Allocate a block of memory of 'size' bytes.
-    ///
-    /// Freeing the memory must be done with 'sizedFree'.
-    pub fn mallocWithSizedFree(size: usize) ?[*]u8 {
-        if (size == 0) {
-            @branchHint(.unlikely);
-            return null;
-        }
-
-        const mem = allocator.alignedAlloc(u8, .@"16", size) catch {
-            @branchHint(.unlikely);
-            return null;
-        };
-
-        return mem.ptr;
-    }
-
-    /// Free a block of memory allocated with 'mallocWithSizedFree'.
-    pub fn sizedFree(opt_ptr: ?[*]u8, size: usize) void {
-        const ptr = opt_ptr orelse {
-            @branchHint(.unlikely);
-            return;
-        };
-        allocator.rawFree(ptr[0..size], .@"16", @returnAddress());
-    }
-
-    /// Allocate a block of memory of 'size' bytes.
-    ///
-    /// Freeing the memory must be done with 'nonSizedFree'.
-    pub fn mallocWithNonSizedFree(size: usize) ?[*]u8 {
-        const full_size = core.Size.from(size, .byte).add(.of(cascade.KernelVirtualRange));
-
-        const mem = allocator.alignedAlloc(u8, .@"16", full_size) catch {
-            @branchHint(.unlikely);
-            return null;
-        };
-
-        const result_ptr = mem.ptr + @sizeOf(cascade.KernelVirtualRange);
-
-        getAllocationHeader(result_ptr).* = .fromSlice(u8, mem);
-
-        return result_ptr;
-    }
-
-    /// Free a block of memory allocated with 'mallocWithNonSizedFree'.
-    pub fn nonSizedFree(opt_ptr: ?[*]u8) void {
-        const ptr = opt_ptr orelse {
-            @branchHint(.unlikely);
-            return;
-        };
-        allocator.rawFree(
-            getAllocationHeader(ptr).byteSlice(),
-            .@"16",
-            @returnAddress(),
-        );
-    }
-
-    inline fn getAllocationHeader(ptr: [*]align(heap_arena_quantum) u8) *cascade.KernelVirtualRange {
-        return @ptrCast(@alignCast(ptr - @sizeOf(cascade.KernelVirtualRange)));
-    }
-};
 
 const allocator_impl = struct {
     fn alloc(
@@ -342,6 +276,9 @@ const heap_arena_quantum_caches: usize = 512 / heap_arena_quantum; // cache up t
 const heap_arena_quantum_size: core.Size = .from(heap_arena_quantum, .byte);
 const heap_arena_quantum_size_alignment = heap_arena_quantum_size.toAlignment();
 
+// pub to allow access by `cascade.mem.cache`
+pub const heap_page_arena = &globals.heap_page_arena;
+
 const globals = struct {
     /// An arena managing the heap's virtual address space.
     ///
@@ -446,6 +383,70 @@ pub const init = struct {
                 );
             };
         }
+    }
+};
+
+/// These functions are provided to allow C code to use the heap allocator and should not be used by zig code.
+pub const c = struct {
+    const standard_alignment: std.mem.Alignment = .@"16";
+
+    /// Allocate a block of memory of 'size' bytes.
+    ///
+    /// Freeing the memory must be done with 'sizedFree'.
+    pub fn mallocWithSizedFree(size: usize) ?[*]u8 {
+        if (size == 0) {
+            @branchHint(.unlikely);
+            return null;
+        }
+
+        const mem = allocator.alignedAlloc(u8, standard_alignment, size) catch {
+            @branchHint(.unlikely);
+            return null;
+        };
+
+        return mem.ptr;
+    }
+
+    /// Free a block of memory allocated with 'mallocWithSizedFree'.
+    pub fn sizedFree(opt_ptr: ?[*]u8, size: usize) void {
+        const ptr = opt_ptr orelse {
+            @branchHint(.unlikely);
+            return;
+        };
+        allocator.rawFree(ptr[0..size], standard_alignment, @returnAddress());
+    }
+
+    /// Allocate a block of memory of 'size' bytes.
+    ///
+    /// Freeing the memory must be done with 'nonSizedFree'.
+    pub fn mallocWithNonSizedFree(size: usize) ?[*]u8 {
+        comptime std.debug.assert(standard_alignment.compare(.eq, .of(cascade.KernelVirtualRange)));
+
+        const full_size = core.Size.from(size, .byte).add(.of(cascade.KernelVirtualRange));
+
+        const mem = allocator.alignedAlloc(u8, standard_alignment, full_size) catch {
+            @branchHint(.unlikely);
+            return null;
+        };
+
+        const result_ptr = mem.ptr + @sizeOf(cascade.KernelVirtualRange);
+
+        getAllocationHeader(result_ptr).* = .fromSlice(u8, mem);
+
+        return result_ptr;
+    }
+
+    /// Free a block of memory allocated with 'mallocWithNonSizedFree'.
+    pub fn nonSizedFree(opt_ptr: ?[*]u8) void {
+        const ptr = opt_ptr orelse {
+            @branchHint(.unlikely);
+            return;
+        };
+        allocator.rawFree(getAllocationHeader(ptr).byteSlice(), standard_alignment, @returnAddress());
+    }
+
+    inline fn getAllocationHeader(ptr: [*]align(@alignOf(cascade.KernelVirtualRange)) u8) *cascade.KernelVirtualRange {
+        return @ptrCast(@alignCast(ptr - @sizeOf(cascade.KernelVirtualRange)));
     }
 };
 

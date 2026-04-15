@@ -142,11 +142,11 @@ fn getSerialOutputFromNS16550a(dt: DeviceTree, node: DeviceTree.Node, memory_sys
     };
 
     const register_range = try cascade.mem.heap.allocateSpecial(
-        .from(
-            .from(address),
-            uart.Memory16550.register_region_size,
-        ),
         .{
+            .physical_range = .from(
+                .from(address),
+                uart.Memory16550.register_region_size,
+            ),
             .protection = .{ .read = true, .write = true },
             .cache = .uncached,
         },
@@ -224,11 +224,11 @@ fn getSerialOutputFromPL011(dt: DeviceTree, node: DeviceTree.Node, memory_system
     };
 
     const register_range = try cascade.mem.heap.allocateSpecial(
-        .from(
-            .from(address),
-            uart.PL011.register_region_size,
-        ),
         .{
+            .physical_range = .from(
+                .from(address),
+                uart.PL011.register_region_size,
+            ),
             .protection = .{ .read = true, .write = true },
             .cache = .uncached,
         },
@@ -258,5 +258,5 @@ const compatible_lookup = std.StaticStringMap(GetSerialOutputFn).initComptime(.{
 const GetSerialOutputError = DeviceTree.IteratorError ||
     DeviceTree.Property.Value.ListIteratorError ||
     uart.CreateError ||
-    cascade.mem.heap.AllocateError;
+    cascade.mem.heap.AllocateSpecialOptions.Error;
 const GetSerialOutputFn = *const fn (dt: DeviceTree, node: DeviceTree.Node, memory_system_available: bool) GetSerialOutputError!?uart.Uart;

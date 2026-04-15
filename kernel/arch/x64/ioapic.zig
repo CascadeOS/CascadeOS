@@ -118,8 +118,11 @@ pub const init = struct {
                     const io_apic_data = entry.specific.io_apic;
 
                     const register_region_range = try cascade.mem.heap.allocateSpecial(
-                        .from(.from(io_apic_data.ioapic_address), IOAPIC.register_region_size),
                         .{
+                            .physical_range = .from(
+                                .from(io_apic_data.ioapic_address),
+                                IOAPIC.register_region_size,
+                            ),
                             .protection = .{ .read = true, .write = true },
                             .cache = .uncached,
                         },

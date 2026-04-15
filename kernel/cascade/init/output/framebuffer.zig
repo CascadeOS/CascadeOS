@@ -22,12 +22,12 @@ fn tryGetFramebufferOutputInner(memory_system_available: bool) !?Output {
     const framebuffer = boot.framebuffer() orelse return null;
 
     const virtual_range = try cascade.mem.heap.allocateSpecial(
-        .from(
-            .fromDirectMap(.fromPtr(framebuffer.ptr)),
-            .from(framebuffer.height * framebuffer.pitch, .byte),
-        ),
         .{
-            .protection = .{ .read = true, .write = true },
+            .physical_range = .from(
+                .fromDirectMap(.fromPtr(framebuffer.ptr)),
+                .from(framebuffer.height * framebuffer.pitch, .byte),
+            ),
+            .protection = .{ .write = true },
             .cache = .write_combining,
         },
     );

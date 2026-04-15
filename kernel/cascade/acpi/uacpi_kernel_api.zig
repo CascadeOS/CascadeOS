@@ -281,8 +281,11 @@ export fn uacpi_kernel_map(physical_address: cascade.PhysicalAddress, len: usize
     }
 
     const virtual_range = cascade.mem.heap.allocateSpecial(
-        .from(physical_address, .from(len, .byte)),
-        .{ .cache = .write_back, .protection = .{ .read = true, .write = true } },
+        .{
+            .physical_range = .from(physical_address, .from(len, .byte)),
+            .protection = .{ .read = true, .write = true },
+            .cache = .write_back,
+        },
     ) catch |err| {
         log.warn("uacpi_kernel_map failed: {s}", .{@errorName(err)});
         return null;

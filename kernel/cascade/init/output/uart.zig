@@ -56,11 +56,11 @@ pub fn tryGetSerialOutput16X50(
             };
 
             const register_range = try cascade.mem.heap.allocateSpecial(
-                .from(
-                    .from(base_address),
-                    UartT.register_region_size,
-                ),
                 .{
+                    .physical_range = .from(
+                        .from(base_address),
+                        UartT.register_region_size,
+                    ),
                     .protection = .{ .read = true, .write = true },
                     .cache = .uncached,
                 },
@@ -109,11 +109,11 @@ pub fn tryGetSerialOutputPL011(
     } else null;
 
     const register_range = try cascade.mem.heap.allocateSpecial(
-        .from(
-            .from(base_address),
-            PL011.register_region_size,
-        ),
         .{
+            .physical_range = .from(
+                .from(base_address),
+                PL011.register_region_size,
+            ),
             .protection = .{ .read = true, .write = true },
             .cache = .uncached,
         },
