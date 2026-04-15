@@ -20,25 +20,34 @@ holding_executor: std.atomic.Value(?*const cascade.Executor) = .init(null),
 pub fn lock(single_spin_lock: *SingleSpinLock) void {
     const current_task: cascade.Task.Current = .get();
     current_task.incrementInterruptDisable();
+
+    defer current_task.task.spinlocks_held += 1;
+
     const current_executor = current_task.knownExecutor();
+
+    const locked_by = single_spin_lock.holding_executor.cmpxchgStrong(
+        null,
+        current_executor,
+        .acquire,
+        .monotonic,
+    ) orelse {
+        @branchHint(.likely);
+        return;
+    };
+
+    if (locked_by == current_executor) {
+        @branchHint(.cold);
+        @panic("recursive lock");
+    }
 
     while (single_spin_lock.holding_executor.cmpxchgWeak(
         null,
         current_executor,
         .acquire,
         .monotonic,
-    )) |locked_by| {
-        @branchHint(.unlikely);
-
-        if (locked_by == current_executor) {
-            @branchHint(.cold);
-            @panic("recursive lock");
-        }
-
+    )) |_| {
         arch.spinLoopHint();
     }
-
-    current_task.task.spinlocks_held += 1;
 }
 
 pub fn tryLock(single_spin_lock: *SingleSpinLock) bool {
@@ -51,8 +60,14 @@ pub fn tryLock(single_spin_lock: *SingleSpinLock) bool {
         current_executor,
         .acquire,
         .monotonic,
-    )) |_| {
+    )) |locked_by| {
         @branchHint(.unlikely);
+
+        if (locked_by == current_executor) {
+            @branchHint(.cold);
+            @panic("recursive lock");
+        }
+
         current_task.decrementInterruptDisable();
         return false;
     }
