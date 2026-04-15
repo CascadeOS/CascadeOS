@@ -482,6 +482,7 @@ pub const Handle = struct {
             std.debug.assert(scheduler_task.is_scheduler_task);
             std.debug.assert(scheduler_task.scheduler_locked);
             std.debug.assert(scheduler_task.interrupt_disable_count.load(.acquire) == 1);
+            std.debug.assert(scheduler_task.migration_disable_count.load(.acquire) == 1);
             std.debug.assert(scheduler_task.spinlocks_held == 1);
             std.debug.assert(!arch.interrupts.areEnabled());
         }
