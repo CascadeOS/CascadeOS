@@ -27,8 +27,34 @@ pub const AllocateError = error{
     OutOfMemory,
 };
 
-pub fn allocate(size: core.Size) AllocateError!cascade.KernelVirtualRange {
-    const allocation = globals.heap_arena.allocate(size.value, .instant_fit) catch |err| {
+pub fn allocate(size: core.Size, alignment: std.mem.Alignment) AllocateError!cascade.KernelVirtualRange {
+    return innerAllocate(size, alignment, true);
+}
+
+fn innerAllocate(size: core.Size, alignment: std.mem.Alignment, comptime set_to_undefined: bool) AllocateError!cascade.KernelVirtualRange {
+    if (alignment.toByteUnits() <= heap_arena_quantum) {
+        const allocation = globals.heap_arena.allocate(size.value, .instant_fit) catch |err| {
+            @branchHint(.unlikely);
+            return switch (err) {
+                error.ZeroLength => error.ZeroLength,
+                else => error.OutOfMemory,
+            };
+        };
+
+        var virtual_range = allocation.toVirtualRange();
+
+        if (set_to_undefined and core.is_debug) @memset(virtual_range.byteSlice(), undefined);
+
+        // the range returned by the heap arena will be aligned to the quantum size, but we want to return the size requested
+        virtual_range.size = size;
+
+        return virtual_range;
+    }
+
+    const unaligned_allocation = globals.heap_arena.allocate(
+        size.value + alignment.toByteUnits() - 1,
+        .instant_fit,
+    ) catch |err| {
         @branchHint(.unlikely);
         return switch (err) {
             error.ZeroLength => error.ZeroLength,
@@ -36,23 +62,35 @@ pub fn allocate(size: core.Size) AllocateError!cascade.KernelVirtualRange {
         };
     };
 
-    var virtual_range = allocation.toVirtualRange();
+    const unaligned_virtual_range = unaligned_allocation.toVirtualRange();
 
-    if (core.is_debug) @memset(virtual_range.byteSlice(), undefined);
+    if (set_to_undefined and core.is_debug) @memset(unaligned_virtual_range.byteSlice(), undefined);
 
-    // the range returned by the heap arena will be aligned to the quantum size, but we want to return the size requested
-    virtual_range.size = size;
-
-    return virtual_range;
+    return .{
+        .address = unaligned_virtual_range.address.alignForward(alignment),
+        // the range returned by the heap arena will be aligned to the quantum size, but we want to return the size requested
+        .size = size,
+    };
 }
 
-pub fn deallocate(range: cascade.KernelVirtualRange) void {
-    globals.heap_arena.deallocate(
-        .fromVirtualRange(.from(
+pub fn deallocate(range: cascade.KernelVirtualRange, alignment: std.mem.Alignment) void {
+    const aligned_range: cascade.KernelVirtualRange = if (alignment.toByteUnits() <= heap_arena_quantum)
+        .from(
             range.address,
-            range.size.alignForward(allocator_impl.heap_arena_quantum_size_alignment),
-        )),
-    );
+            range.size.alignForward(heap_arena_quantum_size_alignment),
+        )
+    else
+        .from(
+            range.address
+                .moveBackward(.one)
+                .alignBackward(alignment),
+            range.size
+                .add(.from(alignment.toByteUnits(), .byte))
+                .subtract(.one)
+                .alignForward(heap_arena_quantum_size_alignment),
+        );
+
+    globals.heap_arena.deallocate(.fromVirtualRange(aligned_range));
 }
 
 pub const AllocatorSpecialMapType = struct {
@@ -152,7 +190,7 @@ pub const c = struct {
             @branchHint(.unlikely);
             return null;
         }
-        const virtual_range = allocate(.from(size, .byte)) catch {
+        const virtual_range = allocate(.from(size, .byte), .@"16") catch {
             @branchHint(.unlikely);
             return null;
         };
@@ -166,33 +204,24 @@ pub const c = struct {
             return;
         };
         if (core.is_debug) std.debug.assert(size != 0);
-        deallocate(.fromSlice(u8, ptr[0..size]));
+        deallocate(.fromSlice(u8, ptr[0..size]), .@"16");
     }
 
     /// Allocate a block of memory of 'size' bytes.
     ///
     /// Freeing the memory must be done with 'nonSizedFree'.
     pub fn mallocWithNonSizedFree(size: usize) ?[*]u8 {
-        // this function assumes that the C code expects an alignment of 16 bytes or less
-        comptime {
-            std.debug.assert(allocator_impl.heap_arena_quantum >= 16);
-            std.debug.assert(allocator_impl.heap_arena_quantum_size.equal(.of(Allocation)));
-        }
+        const full_size = core.Size.from(size, .byte).add(.of(cascade.KernelVirtualRange));
 
-        const allocation = globals.heap_arena.allocate(
-            size + @sizeOf(Allocation),
-            .instant_fit,
-        ) catch {
+        const full_virtual_range = allocate(full_size, .@"16") catch {
             @branchHint(.unlikely);
             return null;
         };
 
-        if (core.is_debug) @memset(allocation.toVirtualRange().byteSlice(), undefined);
+        const base_ptr = full_virtual_range.address.toPtr([*]align(heap_arena_quantum) u8);
+        const result_ptr = base_ptr + @sizeOf(cascade.KernelVirtualRange);
 
-        const base_ptr: [*]u8 = @ptrFromInt(allocation.base);
-        const result_ptr = base_ptr + @sizeOf(Allocation);
-
-        getAllocationHeader(result_ptr).* = allocation;
+        getAllocationHeader(result_ptr).* = full_virtual_range;
 
         return result_ptr;
     }
@@ -203,14 +232,13 @@ pub const c = struct {
             @branchHint(.unlikely);
             return;
         };
-        globals.heap_arena.deallocate(getAllocationHeader(ptr).*);
+
+        deallocate(getAllocationHeader(@alignCast(ptr)).*, .@"16");
     }
 
-    inline fn getAllocationHeader(ptr: [*]u8) *Allocation {
-        return @ptrCast(@alignCast(ptr - @sizeOf(Allocation)));
+    inline fn getAllocationHeader(ptr: [*]align(heap_arena_quantum) u8) *cascade.KernelVirtualRange {
+        return @ptrCast(@alignCast(ptr - @sizeOf(cascade.KernelVirtualRange)));
     }
-
-    const Allocation = cascade.mem.resource_arena.Allocation;
 };
 
 const allocator_impl = struct {
@@ -222,29 +250,24 @@ const allocator_impl = struct {
     ) ?[*]u8 {
         if (core.is_debug) std.debug.assert(len != 0);
 
-        const alignment_bytes = alignment.toByteUnits();
-        if (alignment_bytes > heap_arena_quantum) @panic("alignment greater than heap quantum");
-
-        const allocation = globals.heap_arena.allocate(len, .instant_fit) catch {
+        const virtual_range = innerAllocate(.from(len, .byte), alignment, false) catch {
             @branchHint(.unlikely);
             return null;
         };
 
-        // no need to set to `undefined` as the allocator interface will do it for us
-        return allocation.toVirtualRange().address.toPtr([*]u8);
+        return virtual_range.address.toPtr([*]u8);
     }
 
     fn resize(
         _: *anyopaque,
         memory: []u8,
-        alignment: std.mem.Alignment,
+        _: std.mem.Alignment,
         new_len: usize,
         _: usize,
     ) bool {
         if (core.is_debug) {
             std.debug.assert(memory.len != 0);
             std.debug.assert(new_len != 0);
-            std.debug.assert(alignment.toByteUnits() <= heap_arena_quantum);
         }
 
         const max_allowed_size = std.mem.alignForward(
@@ -270,13 +293,10 @@ const allocator_impl = struct {
     fn free(
         _: *anyopaque,
         memory: []u8,
-        alignment: std.mem.Alignment,
+        _: std.mem.Alignment,
         _: usize,
     ) void {
-        if (core.is_debug) {
-            std.debug.assert(memory.len != 0);
-            std.debug.assert(alignment.toByteUnits() <= heap_arena_quantum);
-        }
+        if (core.is_debug) std.debug.assert(memory.len != 0);
 
         globals.heap_arena.deallocate(
             .fromVirtualRange(
@@ -355,13 +375,13 @@ const allocator_impl = struct {
 
         arena.deallocate(allocation);
     }
-
-    const heap_arena_quantum: usize = 16;
-    const heap_arena_quantum_caches: usize = 512 / heap_arena_quantum; // cache up to 512 bytes
-
-    const heap_arena_quantum_size: core.Size = .from(heap_arena_quantum, .byte);
-    const heap_arena_quantum_size_alignment = heap_arena_quantum_size.toAlignment();
 };
+
+const heap_arena_quantum: usize = 16;
+const heap_arena_quantum_caches: usize = 512 / heap_arena_quantum; // cache up to 512 bytes
+
+const heap_arena_quantum_size: core.Size = .from(heap_arena_quantum, .byte);
+const heap_arena_quantum_size_alignment = heap_arena_quantum_size.toAlignment();
 
 const globals = struct {
     /// An arena managing the heap's virtual address space.
@@ -429,7 +449,7 @@ pub const init = struct {
             try globals.heap_arena.init(
                 .{
                     .name = try .fromSlice("heap"),
-                    .quantum = allocator_impl.heap_arena_quantum,
+                    .quantum = heap_arena_quantum,
                     .source = globals.heap_page_arena.createSource(.{}),
                 },
             );
@@ -471,4 +491,4 @@ pub const init = struct {
 };
 
 const Arena = resource_arena.Arena(.none);
-const HeapArena = resource_arena.Arena(.{ .heap = allocator_impl.heap_arena_quantum_caches });
+const HeapArena = resource_arena.Arena(.{ .heap = heap_arena_quantum_caches });
