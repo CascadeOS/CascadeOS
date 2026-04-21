@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LicenseRef-NON-AI-MIT AND MIT
+// SPDX-License-Identifier: BSD-3-Clause AND MIT
 // SPDX-FileCopyrightText: CascadeOS Contributors
 // SPDX-FileCopyrightText: 2022-2025 Daniil Tatianin (https://github.com/uACPI/uACPI/blob/e05715b2e6a3ae913aecdb86f4fd2dba30304e45/LICENSE)
 

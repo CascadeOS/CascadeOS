@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: LicenseRef-NON-AI-CC0-1.0 */
+/* SPDX-License-Identifier: CC0-1.0 */
 /* SPDX-FileCopyrightText: CascadeOS Contributors */
 
 KERNEL_BASE = 0xffffffff80000000; /* this must be kept in sync with `cascade.config.kernel_base_address` */

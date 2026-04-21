@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LicenseRef-NON-AI-MIT
+// SPDX-License-Identifier: BSD-3-Clause
 // SPDX-FileCopyrightText: CascadeOS Contributors
 
 .cfi_sections .debug_frame
@@ -318,4 +318,3 @@ INTERRUPT_HANDLER .NoError,  252
 INTERRUPT_HANDLER .NoError,  253
 INTERRUPT_HANDLER .NoError,  254
 INTERRUPT_HANDLER .NoError,  255
- 

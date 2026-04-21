@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LicenseRef-NON-AI-MIT
+// SPDX-License-Identifier: BSD-3-Clause
 // SPDX-FileCopyrightText: CascadeOS Contributors
 
 //! A synchronization primitive that allows a single task to block (park) and any other task to wake it (unpark).

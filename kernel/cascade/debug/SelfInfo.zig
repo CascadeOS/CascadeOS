@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LicenseRef-NON-AI-MIT AND MIT
+// SPDX-License-Identifier: BSD-3-Clause AND MIT
 // SPDX-FileCopyrightText: CascadeOS Contributors
 // SPDX-FileCopyrightText: Zig contributors
 

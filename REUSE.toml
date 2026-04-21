@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: LicenseRef-NON-AI-CC0-1.0
+# SPDX-License-Identifier: CC0-1.0
 # SPDX-FileCopyrightText: CascadeOS Contributors
 
 version = 1
@@ -9,7 +9,7 @@ SPDX-PackageDownloadLocation = "https://github.com/CascadeOS/CascadeOS"
 [[annotations]]
 path = "**.md"
 precedence = "aggregate"
-SPDX-License-Identifier = "LicenseRef-NON-AI-CC0-1.0"
+SPDX-License-Identifier = "CC0-1.0"
 SPDX-FileCopyrightText = "CascadeOS Contributors"
 
 [[annotations]]
@@ -33,5 +33,5 @@ SPDX-FileCopyrightText = ""
 [[annotations]]
 path = ".keys/**"
 precedence = "aggregate"
-SPDX-License-Identifier = "LicenseRef-NON-AI-CC0-1.0"
+SPDX-License-Identifier = "CC0-1.0"
 SPDX-FileCopyrightText = "CascadeOS Contributors"

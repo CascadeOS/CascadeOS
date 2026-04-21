@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LicenseRef-NON-AI-MIT and BSD-2-Clause
+// SPDX-License-Identifier: BSD-3-Clause AND BSD-2-Clause
 // SPDX-FileCopyrightText: CascadeOS Contributors
 // SPDX-FileCopyrightText: Copyright (c) 1997 Charles D. Cranor and Washington University.
 

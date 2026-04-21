@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LicenseRef-NON-AI-MIT AND 0BSD
+// SPDX-License-Identifier: 0BSD
 // SPDX-FileCopyrightText: CascadeOS Contributors
 // SPDX-FileCopyrightText: 2022-2026 Mintsuki and contributors (https://github.com/Limine-Bootloader/limine-protocol/blob/trunk/LICENSE)
 

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LicenseRef-NON-AI-MIT
+// SPDX-License-Identifier: BSD-3-Clause
 // SPDX-FileCopyrightText: CascadeOS Contributors
 
 //! A spinlock optimized for non-contended use cases e.g. protecting per-executor data that is rarely accessed by other executors.
