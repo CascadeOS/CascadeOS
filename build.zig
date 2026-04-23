@@ -84,7 +84,7 @@ pub const c = struct {
     }
 
     fn init(b: *std.Build) void {
-        translate_c_dep = b.dependency("translate_c", .{ .optimize = .ReleaseSafe });
+        translate_c_dep = b.dependency("translate_c", .{ .optimize = .Debug });
     }
 
     var translate_c_dep: *std.Build.Dependency = undefined;
