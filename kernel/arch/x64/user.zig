@@ -374,10 +374,14 @@ pub const PerThread = struct {
         };
 
         fn zero(extended_state: *ExtendedState) void {
-            extended_state.fs_base = 0;
-            extended_state.gs_base = 0;
+            extended_state.* = .{
+                .fs_base = 0,
+                .gs_base = 0,
+                .xsave_area = extended_state.xsave_area,
+                .state = .memory,
+            };
+
             @memset(extended_state.xsave_area, 0);
-            extended_state.state = .memory;
         }
 
         /// Save the extended state into memory if it is currently stored in the registers.
