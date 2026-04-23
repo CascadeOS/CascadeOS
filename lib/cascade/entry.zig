@@ -110,7 +110,7 @@ fn callMainAndExit(entry_stack_pointer: [*]usize) callconv(.c) noreturn {
     _ = return_value; // TODO: don't just throw this away
 
     // TODO: exit the process rather than just the current thread
-    cascade.exitThread();
+    cascade.thread.exitCurrent();
 }
 
 inline fn callMain(args: std.process.Args.Vector, environ: std.process.Environ.Block) u8 {

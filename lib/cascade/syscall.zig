@@ -4,7 +4,7 @@
 const builtin = @import("builtin");
 
 pub const Syscall = enum(usize) {
-    exit_thread = 0,
+    exit_current_thread = 0,
 
     pub inline fn call0(
         syscall: Syscall,
