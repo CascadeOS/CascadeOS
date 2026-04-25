@@ -329,7 +329,8 @@ fn loadHelloWorld() !void {
     const hello_world_elf = @embedFile("hello_world");
 
     const current_task: cascade.Task.Current = .get();
-    const process: *cascade.user.Process = .from(current_task.task);
+    const thread: *cascade.user.Thread = .from(current_task.task);
+    const address_space = &thread.process.address_space;
 
     const header = try cascade.user.elf.Header.parse(hello_world_elf);
 
@@ -350,7 +351,7 @@ fn loadHelloWorld() !void {
         var iter = header.loadableRegionIterator(program_header_table);
 
         while (try iter.next()) |loadable_region| {
-            _ = try process.address_space.map(.{
+            _ = try address_space.map(.{
                 .base = loadable_region.virtual_range.address.toVirtualAddress(),
                 .size = loadable_region.virtual_range.size,
                 .protection = .{ .read = true, .write = true },
@@ -384,7 +385,7 @@ fn loadHelloWorld() !void {
         var iter = header.loadableRegionIterator(program_header_table);
 
         while (try iter.next()) |loadable_region| {
-            try process.address_space.changeProtection(
+            try address_space.changeProtection(
                 loadable_region.virtual_range.toVirtualRange(),
                 .{
                     .both = .{
@@ -396,14 +397,6 @@ fn loadHelloWorld() !void {
         }
     }
 
-    const user_stack = try process.address_space.map(.{
-        .size = .from(64, .kib),
-        .protection = .{ .read = true, .write = true },
-        .type = .zero_fill,
-    });
-
-    arch.user.enterUserspace(.{
-        .entry_point = entry_point,
-        .stack_pointer = user_stack.toUser().after(),
-    });
+    try thread.start(entry_point);
+    unreachable;
 }

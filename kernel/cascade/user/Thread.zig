@@ -9,6 +9,8 @@ const arch = @import("arch");
 const cascade = @import("cascade");
 const core = @import("core");
 
+const log = cascade.debug.log.scoped(.user);
+
 const Thread = @This();
 
 task: cascade.Task,
@@ -25,6 +27,29 @@ pub inline fn from(task: *cascade.Task) *Thread {
 pub inline fn fromConst(task: *const cascade.Task) *const Thread {
     if (core.is_debug) std.debug.assert(task.type == .user);
     return @fieldParentPtr("task", task);
+}
+
+/// Enter userspace for the first time.
+///
+/// Asserts that the current task is the same as the thread's task.
+pub fn start(thread: *Thread, entry_point: cascade.UserVirtualAddress) !noreturn {
+    if (core.is_debug) {
+        const current_task: cascade.Task.Current = .get();
+        std.debug.assert(current_task.task == &thread.task);
+    }
+
+    const user_stack = try thread.process.address_space.map(.{
+        .size = .from(64, .kib),
+        .protection = .{ .read = true, .write = true },
+        .type = .zero_fill,
+    });
+
+    log.debug("starting userspace thread: {f}", .{thread});
+
+    arch.user.enterUserspace(.{
+        .entry_point = entry_point,
+        .stack_pointer = user_stack.toUser().after(),
+    });
 }
 
 pub fn format(thread: *const Thread, writer: *std.Io.Writer) !void {
