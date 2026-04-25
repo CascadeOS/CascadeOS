@@ -20,7 +20,7 @@ pub fn initStage1() !noreturn {
     // we need basic memory layout information to be able to panic
     cascade.mem.init.determineEarlyMemoryLayout();
 
-    try constructAndLoadBootstrapExecutorAndTask();
+    try loadBootstrapExecutorAndTask();
 
     // now that we have an executor and task we can panic in a meaningful way
     cascade.debug.setPanicMode(.single_executor_init_panic);
@@ -194,7 +194,7 @@ fn initStage4() !void {
     scheduler_handle.queueTask(&hello_world_main_thread.task);
 }
 
-fn constructAndLoadBootstrapExecutorAndTask() !void {
+fn loadBootstrapExecutorAndTask() !void {
     const static = struct {
         var bootstrap_init_task: cascade.Task = undefined;
         var bootstrap_executor: cascade.Executor = .{
