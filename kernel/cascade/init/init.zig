@@ -40,7 +40,11 @@ pub fn initStage1() !noreturn {
     arch.interrupts.init.initializeEarlyInterrupts();
 
     log.debug("capturing early system information", .{});
-    arch.init.captureEarlySystemInformation();
+    const capture_system_information_options: arch.init.CaptureSystemInformationOptions = switch (arch.current_arch) {
+        .x64 => .{ .x2apic_enabled = boot.x2apicEnabled() },
+        .arm, .riscv => .{},
+    };
+    try arch.init.captureSystemInformation(.early, capture_system_information_options);
 
     log.debug("configuring per-executor system features with early system information", .{});
     arch.init.configurePerExecutorSystemFeatures();
@@ -52,10 +56,7 @@ pub fn initStage1() !noreturn {
     Output.registerOutputs(.full);
 
     log.debug("capturing system information", .{});
-    try arch.init.captureSystemInformation(switch (arch.current_arch) {
-        .x64 => .{ .x2apic_enabled = boot.x2apicEnabled() },
-        .arm, .riscv => .{},
-    });
+    try arch.init.captureSystemInformation(.full, capture_system_information_options);
 
     log.debug("configuring per-executor system features with full system information", .{});
     arch.init.configurePerExecutorSystemFeatures();

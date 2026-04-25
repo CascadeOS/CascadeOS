@@ -130,44 +130,84 @@ pub fn initExecutor(executor: *cascade.Executor) void {
     x64.interrupts.init.loadIdt();
 }
 
-/// Capture any system information that can be without using mmio.
-///
-/// For example, on x64 this should capture CPUID but not APIC or ACPI information.
-pub fn captureEarlySystemInformation() void {
-    log.debug("capturing cpuid information", .{});
-    x64.info.cpu_id.capture() catch @panic("failed to capture cpuid information");
+pub const CaptureSystemInformationOptions = struct {
+    x2apic_enabled: bool,
+};
 
-    if (x64.info.cpu_id.physical_address_size.? > x64.paging.PageTable.maximum_physical_address_bit) {
-        std.debug.panic("unsupported physical address size: {}", .{x64.info.cpu_id.physical_address_size.?});
+pub fn captureSystemInformation(stage: arch.init.CaptureSystemInformationStage, options: CaptureSystemInformationOptions) !void {
+    switch (stage) {
+        .early => {
+            log.debug("capturing cpuid information", .{});
+            x64.info.cpu_id.capture() catch @panic("failed to capture cpuid information");
+
+            if (x64.info.cpu_id.physical_address_size.? > x64.paging.PageTable.maximum_physical_address_bit) {
+                std.debug.panic("unsupported physical address size: {}", .{x64.info.cpu_id.physical_address_size.?});
+            }
+
+            if (!x64.info.cpu_id.mtrr) {
+                @panic("MTRRs not supported");
+            }
+
+            const mtrr_cap = x64.registers.IA32_MTRRCAP.read();
+            x64.info.mtrr_number_of_variable_registers = mtrr_cap.number_of_variable_range_registers;
+            x64.info.mtrr_write_combining_supported = mtrr_cap.write_combining_supported;
+            log.debug("mtrr number of variable registers: {}", .{x64.info.mtrr_number_of_variable_registers});
+            log.debug("mtrr write combining supported: {}", .{x64.info.mtrr_write_combining_supported});
+
+            if (!x64.info.cpu_id.pat) {
+                @panic("PAT not supported");
+            }
+
+            if (x64.info.cpu_id.determineCrystalFrequency()) |crystal_frequency| {
+                const lapic_base_tick_duration_fs = cascade.time.fs_per_s / crystal_frequency;
+                x64.info.lapic_base_tick_duration_fs = lapic_base_tick_duration_fs;
+                log.debug("lapic base tick duration: {} fs", .{lapic_base_tick_duration_fs});
+            }
+
+            if (x64.info.cpu_id.determineTscFrequency()) |tsc_frequency| {
+                const tsc_tick_duration_fs = cascade.time.fs_per_s / tsc_frequency;
+                x64.info.tsc_tick_duration_fs = tsc_tick_duration_fs;
+                log.debug("tsc tick duration: {} fs", .{tsc_tick_duration_fs});
+            }
+
+            captureXsaveInformation();
+        },
+        .full => {
+            const madt_acpi_table = AcpiTable(cascade.acpi.tables.MADT).get(0) orelse return error.NoMADT;
+            defer madt_acpi_table.deinit();
+            const madt = madt_acpi_table.table;
+
+            const fadt_acpi_table = AcpiTable(cascade.acpi.tables.FADT).get(0) orelse return error.NoFADT;
+            defer fadt_acpi_table.deinit();
+            const fadt = fadt_acpi_table.table;
+
+            log.debug("capturing FADT information", .{});
+            {
+                const flags = fadt.IA_PC_BOOT_ARCH;
+
+                x64.info.have_ps2_controller = flags.@"8042";
+                log.debug("have ps2 controller: {}", .{x64.info.have_ps2_controller});
+
+                x64.info.msi_supported = !flags.msi_not_supported;
+                log.debug("message signaled interrupts supported: {}", .{x64.info.msi_supported});
+
+                x64.info.have_cmos_rtc = !flags.cmos_rtc_not_present;
+                log.debug("have cmos rtc: {}", .{x64.info.have_cmos_rtc});
+            }
+
+            log.debug("capturing MADT information", .{});
+            {
+                x64.info.have_pic = madt.flags.PCAT_COMPAT;
+                log.debug("have pic: {}", .{x64.info.have_pic});
+            }
+
+            log.debug("capturing APIC information", .{});
+            try x64.apic.init.captureApicInformation(fadt, madt, options.x2apic_enabled);
+
+            log.debug("capturing IOAPIC information", .{});
+            try x64.ioapic.init.captureMADTInformation(madt);
+        },
     }
-
-    if (!x64.info.cpu_id.mtrr) {
-        @panic("MTRRs not supported");
-    }
-
-    const mtrr_cap = x64.registers.IA32_MTRRCAP.read();
-    x64.info.mtrr_number_of_variable_registers = mtrr_cap.number_of_variable_range_registers;
-    x64.info.mtrr_write_combining_supported = mtrr_cap.write_combining_supported;
-    log.debug("mtrr number of variable registers: {}", .{x64.info.mtrr_number_of_variable_registers});
-    log.debug("mtrr write combining supported: {}", .{x64.info.mtrr_write_combining_supported});
-
-    if (!x64.info.cpu_id.pat) {
-        @panic("PAT not supported");
-    }
-
-    if (x64.info.cpu_id.determineCrystalFrequency()) |crystal_frequency| {
-        const lapic_base_tick_duration_fs = cascade.time.fs_per_s / crystal_frequency;
-        x64.info.lapic_base_tick_duration_fs = lapic_base_tick_duration_fs;
-        log.debug("lapic base tick duration: {} fs", .{lapic_base_tick_duration_fs});
-    }
-
-    if (x64.info.cpu_id.determineTscFrequency()) |tsc_frequency| {
-        const tsc_tick_duration_fs = cascade.time.fs_per_s / tsc_frequency;
-        x64.info.tsc_tick_duration_fs = tsc_tick_duration_fs;
-        log.debug("tsc tick duration: {} fs", .{tsc_tick_duration_fs});
-    }
-
-    captureXsaveInformation();
 }
 
 fn captureXsaveInformation() void {
@@ -200,49 +240,6 @@ fn captureXsaveInformation() void {
 
     x64.info.xsave.xsave_area_size = x64.info.cpu_id.xsave.enabledStateSize().?;
     log.debug("size of XSAVE area: {f}", .{x64.info.xsave.xsave_area_size});
-}
-
-pub const CaptureSystemInformationOptions = struct {
-    x2apic_enabled: bool,
-};
-
-/// Capture any system information that needs mmio.
-///
-/// For example, on x64 this should capture APIC and ACPI information.
-pub fn captureSystemInformation(options: CaptureSystemInformationOptions) !void {
-    const madt_acpi_table = AcpiTable(cascade.acpi.tables.MADT).get(0) orelse return error.NoMADT;
-    defer madt_acpi_table.deinit();
-    const madt = madt_acpi_table.table;
-
-    const fadt_acpi_table = AcpiTable(cascade.acpi.tables.FADT).get(0) orelse return error.NoFADT;
-    defer fadt_acpi_table.deinit();
-    const fadt = fadt_acpi_table.table;
-
-    log.debug("capturing FADT information", .{});
-    {
-        const flags = fadt.IA_PC_BOOT_ARCH;
-
-        x64.info.have_ps2_controller = flags.@"8042";
-        log.debug("have ps2 controller: {}", .{x64.info.have_ps2_controller});
-
-        x64.info.msi_supported = !flags.msi_not_supported;
-        log.debug("message signaled interrupts supported: {}", .{x64.info.msi_supported});
-
-        x64.info.have_cmos_rtc = !flags.cmos_rtc_not_present;
-        log.debug("have cmos rtc: {}", .{x64.info.have_cmos_rtc});
-    }
-
-    log.debug("capturing MADT information", .{});
-    {
-        x64.info.have_pic = madt.flags.PCAT_COMPAT;
-        log.debug("have pic: {}", .{x64.info.have_pic});
-    }
-
-    log.debug("capturing APIC information", .{});
-    try x64.apic.init.captureApicInformation(fadt, madt, options.x2apic_enabled);
-
-    log.debug("capturing IOAPIC information", .{});
-    try x64.ioapic.init.captureMADTInformation(madt);
 }
 
 /// Configure any global system features.

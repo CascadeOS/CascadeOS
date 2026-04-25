@@ -162,7 +162,6 @@ pub const functions: arch.Functions = .{
         .prepareBootstrapExecutor = x64.init.prepareBootstrapExecutor,
         .prepareExecutor = x64.init.prepareExecutor,
         .initExecutor = x64.init.initExecutor,
-        .captureEarlySystemInformation = x64.init.captureEarlySystemInformation,
         .captureSystemInformation = x64.init.captureSystemInformation,
         .configureGlobalSystemFeatures = x64.init.configureGlobalSystemFeatures,
         .configurePerExecutorSystemFeatures = x64.init.configurePerExecutorSystemFeatures,

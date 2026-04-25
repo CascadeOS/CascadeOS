@@ -844,15 +844,17 @@ pub const init = struct {
         current_functions.init.initExecutor(executor);
     }
 
-    /// Capture any system information that can be without using mmio.
-    ///
-    /// For example, on x64 this should capture CPUID but not APIC or ACPI information.
-    pub fn captureEarlySystemInformation() callconv(core.inline_in_non_debug) void {
-        getFunction(
-            current_functions.init,
-            "captureEarlySystemInformation",
-        )();
-    }
+    pub const CaptureSystemInformationStage = enum {
+        /// Capture any system information that can be without using MMIO.
+        ///
+        /// For example, on x64 this should capture CPUID but not APIC or ACPI information.
+        early,
+
+        /// Capture any system information that needs mmio.
+        ///
+        /// For example, on x64 this should capture APIC and ACPI information.
+        full,
+    };
 
     pub const CaptureSystemInformationOptions = current_decls.init.CaptureSystemInformationOptions;
 
@@ -860,12 +862,13 @@ pub const init = struct {
     ///
     /// For example, on x64 this should capture APIC and ACPI information.
     pub fn captureSystemInformation(
+        stage: CaptureSystemInformationStage,
         options: CaptureSystemInformationOptions,
     ) callconv(core.inline_in_non_debug) anyerror!void {
         return getFunction(
             current_functions.init,
             "captureSystemInformation",
-        )(options);
+        )(stage, options);
     }
 
     /// Configure any global system features.
@@ -879,9 +882,9 @@ pub const init = struct {
     /// Configure any per-executor system features.
     ///
     /// This function is called in a few different contexts and must leave the system in a reasonable state for each of them:
-    ///  - By the bootstrap executor after calling `captureEarlySystemInformation`
-    ///  - By the bootstrap executor after calling `captureSystemInformation`
-    ///  - By every executor after `captureSystemInformation` has been called
+    ///  - By the bootstrap executor after calling `captureSystemInformation(.early)`
+    ///  - By the bootstrap executor after calling `captureSystemInformation(.full)`
+    ///  - By every executor after `captureSystemInformation(.full)` has been called
     pub fn configurePerExecutorSystemFeatures() callconv(core.inline_in_non_debug) void {
         getFunction(
             current_functions.init,
@@ -1258,15 +1261,9 @@ pub const Functions = struct {
 
         initExecutor: fn (executor: *cascade.Executor) void, // non-null as the bootstrap executor needs to call this early
 
-        /// Capture any system information that can be without using mmio.
-        ///
-        /// For example, on x64 this should capture CPUID but not APIC or ACPI information.
-        captureEarlySystemInformation: ?fn () void = null,
-
-        /// Capture any system information that needs mmio.
-        ///
-        /// For example, on x64 this should capture APIC and ACPI information.
+        /// Capture system information.
         captureSystemInformation: ?fn (
+            stage: init.CaptureSystemInformationStage,
             options: current_decls.init.CaptureSystemInformationOptions,
         ) anyerror!void = null,
 
