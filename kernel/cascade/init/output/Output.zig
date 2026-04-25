@@ -31,56 +31,65 @@ pub const lock = &globals.lock;
 
 const cascade_starting_message: []const u8 = "starting CascadeOS " ++ cascade.config.cascade_version ++ "\n";
 
-/// Called before the memory system is initialized so anything that needs heap allocation or the special heap cannot be initialized yet.
-pub fn registerOutputsNoMemorySystem() void {
-    globals.serial_output = getSerialOutput(false);
-    if (globals.serial_output) |serial_output| serial_output.writeFn(serial_output.state, cascade_starting_message);
+pub const RegisterOutputsStage = enum {
+    /// Before the memory system is initialized so anything that needs heap allocation or the special heap cannot be initialized yet.
+    early,
 
-    globals.graphical_output = framebuffer.tryGetFramebufferOutput(false);
-    if (globals.graphical_output) |*graphical_output| graphical_output.writeFn(graphical_output.state, cascade_starting_message);
+    /// After the memory system is initialized.
+    ///
+    /// Only attempts to initialize a serial or graphical output if an output of each type has not already been initialized.
+    full,
+};
 
-    if (log.levelEnabled(.debug)) {
-        if (globals.graphical_output) |*output| log.debug(
-            "before memory system - selected graphical output: {s}",
-            .{output.name.constSlice()},
-        );
+pub fn registerOutputs(stage: RegisterOutputsStage) void {
+    const memory_system_available = switch (stage) {
+        .early => false,
+        .full => true,
+    };
 
-        if (globals.serial_output) |*output| log.debug(
-            "before memory system - selected serial output: {s}",
-            .{output.name.constSlice()},
-        );
-    }
-}
-
-/// Called after the memory system is initialized.
-///
-/// Only attempts to initialize a serial or graphical output if an output of each type has not already been initialized.
-pub fn registerOutputsWithMemorySystem() void {
     if (globals.serial_output == null) {
-        globals.serial_output = getSerialOutput(true);
+        globals.serial_output = getSerialOutput(memory_system_available);
         if (globals.serial_output) |serial_output| serial_output.writeFn(serial_output.state, cascade_starting_message);
     }
 
     if (globals.graphical_output == null) {
-        globals.graphical_output = framebuffer.tryGetFramebufferOutput(true);
+        globals.graphical_output = framebuffer.tryGetFramebufferOutput(memory_system_available);
         if (globals.graphical_output) |*graphical_output| graphical_output.writeFn(graphical_output.state, cascade_starting_message);
     }
 
     if (log.levelEnabled(.debug)) {
-        const graphical_output: ?*const Output = if (globals.graphical_output) |*output| output else null;
-        const serial_output: ?*const Output = if (globals.serial_output) |*output| output else null;
+        switch (stage) {
+            .early => {
+                if (globals.graphical_output) |*output| log.debug(
+                    "before memory system - selected graphical output: {s}",
+                    .{output.name.constSlice()},
+                );
 
-        if (graphical_output != null or serial_output != null) {
-            if (graphical_output) |output|
-                log.debug("selected graphical output: {s}", .{output.name.constSlice()})
-            else
-                log.debug("no graphical output selected", .{});
+                if (globals.serial_output) |*output| log.debug(
+                    "before memory system - selected serial output: {s}",
+                    .{output.name.constSlice()},
+                );
+            },
+            .full => {
+                const graphical_output: ?*const Output = if (globals.graphical_output) |*output| output else null;
+                const serial_output: ?*const Output = if (globals.serial_output) |*output| output else null;
 
-            if (serial_output) |output|
-                log.debug("selected serial output: {s}", .{output.name.constSlice()})
-            else
-                log.debug("no serial output selected", .{});
-        } else log.debug("no output selected", .{});
+                if (graphical_output != null or serial_output != null) {
+                    if (graphical_output) |output|
+                        log.debug("selected graphical output: {s}", .{output.name.constSlice()})
+                    else
+                        log.debug("no graphical output selected", .{});
+
+                    if (serial_output) |output|
+                        log.debug("selected serial output: {s}", .{output.name.constSlice()})
+                    else
+                        log.debug("no serial output selected", .{});
+                } else {
+                    // there is no actual point in logging here as there is no output to log to
+                    log.debug("no output selected", .{});
+                }
+            },
+        }
     }
 }
 

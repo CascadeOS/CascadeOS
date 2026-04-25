@@ -22,7 +22,7 @@ pub fn initStage1() !noreturn {
 
     try constructAndLoadBootstrapExecutorAndTask();
 
-    // now that we have a executor and task we can panic in a meaningful way
+    // now that we have an executor and task we can panic in a meaningful way
     cascade.debug.setPanicMode(.single_executor_init_panic);
 
     cascade.mem.PhysicalPage.init.initializeBootstrapAllocator();
@@ -30,7 +30,7 @@ pub fn initStage1() !noreturn {
     // initialize ACPI tables early to allow discovery of debug output mechanisms
     try cascade.acpi.init.earlyInitialize();
 
-    Output.registerOutputsNoMemorySystem();
+    Output.registerOutputs(.early);
 
     cascade.mem.init.logEarlyMemoryLayout();
 
@@ -48,7 +48,8 @@ pub fn initStage1() !noreturn {
     log.debug("initializing memory system", .{});
     try cascade.mem.init.initializeMemorySystem();
 
-    Output.registerOutputsWithMemorySystem();
+    // now the memory system is initialized we can attempt to register outputs again
+    Output.registerOutputs(.full);
 
     log.debug("capturing system information", .{});
     try arch.init.captureSystemInformation(switch (arch.current_arch) {
