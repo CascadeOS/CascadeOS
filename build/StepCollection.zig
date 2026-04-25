@@ -85,7 +85,7 @@ pub fn create(b: *std.Build, all_architectures: []const CascadeTarget.Architectu
 
     // Kernels
     const all_kernels_build_step = b.step(
-        "kernels",
+        "kernel",
         "Build all the kernels",
     );
     all_test_step.dependOn(all_kernels_build_step);
@@ -100,10 +100,10 @@ pub fn create(b: *std.Build, all_architectures: []const CascadeTarget.Architectu
 
     // Images
     const all_images_build_step = b.step(
-        "images",
+        "image",
         "Build all the images",
     );
-    // TODO: building multiple disk images when running tests is is a bad idea
+    // TODO: building multiple disk images when running tests in CI is is a bad idea
     // all_test_step.dependOn(all_images_build_step);
 
     const image_build_steps_per_architecture = try buildPerArchitectureSteps(
@@ -116,13 +116,13 @@ pub fn create(b: *std.Build, all_architectures: []const CascadeTarget.Architectu
 
     // Libraries
     const all_library_step = b.step(
-        "libraries",
+        "lib",
         "Build and run all the library tests",
     );
     all_test_step.dependOn(all_library_step);
 
     const all_library_host_test_step = b.step(
-        "libraries_host",
+        "lib_host",
         "Attempt to run all the library tests targeting the host os",
     );
     all_library_step.dependOn(all_library_host_test_step);
@@ -131,19 +131,19 @@ pub fn create(b: *std.Build, all_architectures: []const CascadeTarget.Architectu
         b,
         all_architectures,
         all_library_host_test_step,
-        "libraries_host_{t}",
+        "lib_host_{t}",
         "Attempt to run all the library tests for {t} targeting the host os",
     );
 
     // Applications
     const all_application_test_step = b.step(
-        "applications",
+        "app",
         "Build and run all the application tests",
     );
     all_test_step.dependOn(all_application_test_step);
 
     const all_application_host_test_step = b.step(
-        "applications_host",
+        "app_host",
         "Attempt to run all the application tests targeting the host os",
     );
     all_application_test_step.dependOn(all_application_host_test_step);
@@ -152,12 +152,12 @@ pub fn create(b: *std.Build, all_architectures: []const CascadeTarget.Architectu
         b,
         all_architectures,
         all_application_host_test_step,
-        "applications_host_{t}",
+        "app_host_{t}",
         "Attempt to run all the application tests for {t} targeting the host os",
     );
 
     const all_application_cascade_build_step = b.step(
-        "applications_build_cascade",
+        "app_build_cascade",
         "Build all the applications for CascadeOS",
     );
     all_test_step.dependOn(all_application_cascade_build_step);
@@ -166,25 +166,25 @@ pub fn create(b: *std.Build, all_architectures: []const CascadeTarget.Architectu
         b,
         all_architectures,
         all_application_cascade_build_step,
-        "applications_build_cascade_{t}",
+        "app_build_cascade_{t}",
         "Build all the applications for {t} targeting CascadeOS",
     );
 
     // Tools
     const all_tools_step = b.step(
-        "tools",
+        "tool",
         "Build all the tools and run all of their tests",
     );
     all_test_step.dependOn(all_tools_step);
 
     const all_tools_build_step = b.step(
-        "tools_build",
+        "tool_build",
         "Build all the tools",
     );
     all_tools_step.dependOn(all_tools_build_step);
 
     const all_tools_test_step = b.step(
-        "tools_test",
+        "tool_test",
         "Run all of the tools tests",
     );
     all_tools_step.dependOn(all_tools_test_step);
