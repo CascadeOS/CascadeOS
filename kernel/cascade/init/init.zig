@@ -28,13 +28,13 @@ pub fn initStage1() !noreturn {
     cascade.mem.PhysicalPage.init.initializeBootstrapAllocator();
 
     // initialize ACPI tables early to allow discovery of debug output mechanisms
-    try cascade.acpi.init.earlyInitialize();
+    const acpi_tables = try cascade.acpi.init.earlyInitialize();
 
     Output.registerOutputs(.early);
 
     // no that we have basic output we can log the early memory layout and ACPI tables
     early_memory_layout.log();
-    try cascade.acpi.init.logAcpiTables();
+    try acpi_tables.log();
 
     log.debug("initializing early interrupts", .{});
     arch.interrupts.init.initializeEarlyInterrupts();

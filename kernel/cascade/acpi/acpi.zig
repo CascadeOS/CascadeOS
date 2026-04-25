@@ -39,12 +39,12 @@ pub const init = struct {
     /// Initializes ACPI table access early.
     ///
     /// NOP if ACPI is not present.
-    pub fn earlyInitialize() !void {
+    pub fn earlyInitialize() !AcpiTablesHandle {
         const static = struct {
             var buffer: [arch.paging.standard_page_size.value]u8 align(@sizeOf(usize)) = undefined;
         };
 
-        const rsdp = switch (boot.rsdp() orelse return) {
+        const rsdp = switch (boot.rsdp() orelse return .{}) {
             .physical => |phys_addr| phys_addr.toDirectMap().toPtr(*const tables.RSDP),
             .virtual => |virt_addr| virt_addr.toPtr(*const tables.RSDP),
         };
@@ -53,27 +53,31 @@ pub const init = struct {
 
         try uacpi.setupEarlyTableAccess(&static.buffer);
         init_globals.acpi_present = true;
+
+        return .{};
     }
 
-    pub fn logAcpiTables() !void {
-        if (!init_log.levelEnabled(.debug) or !init_globals.acpi_present) return;
+    pub const AcpiTablesHandle = struct {
+        pub fn log(_: AcpiTablesHandle) !void {
+            if (!init_log.levelEnabled(.debug) or !init_globals.acpi_present) return;
 
-        const sdt_header = globals.rsdp.sdtAddress().toDirectMap().toPtr(*const tables.SharedHeader);
+            const sdt_header = globals.rsdp.sdtAddress().toDirectMap().toPtr(*const tables.SharedHeader);
 
-        if (!sdt_header.isValid()) return error.InvalidSDT;
+            if (!sdt_header.isValid()) return error.InvalidSDT;
 
-        var iter = tableIterator(sdt_header);
+            var iter = tableIterator(sdt_header);
 
-        init_log.debug("ACPI tables:", .{});
+            init_log.debug("ACPI tables:", .{});
 
-        while (iter.next()) |table| {
-            if (table.isValid()) {
-                init_log.debug("  {s}", .{table.signatureAsString()});
-            } else {
-                init_log.debug("  {s} - INVALID", .{table.signatureAsString()});
+            while (iter.next()) |table| {
+                if (table.isValid()) {
+                    init_log.debug("  {s}", .{table.signatureAsString()});
+                } else {
+                    init_log.debug("  {s} - INVALID", .{table.signatureAsString()});
+                }
             }
         }
-    }
+    };
 
     /// Initialize the ACPI subsystem.
     ///
