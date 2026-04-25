@@ -242,17 +242,17 @@ pub const SyscallFrame = extern struct {
     }
 
     pub inline fn syscall(syscall_frame: *const SyscallFrame) ?user_cascade.Syscall {
-        return std.enums.fromInt(user_cascade.Syscall, syscall_frame.rdi);
+        return std.enums.fromInt(user_cascade.Syscall, syscall_frame.rax);
     }
 
     pub inline fn arg(syscall_frame: *const SyscallFrame, comptime argument: arch.user.SyscallFrame.Arg) usize {
         return switch (argument) {
-            .one => syscall_frame.rsi,
-            .two => syscall_frame.rdx,
-            .three => syscall_frame.rax,
-            .four => syscall_frame.r8,
-            .five => syscall_frame.r9,
-            .six => syscall_frame.rbx,
+            .one => syscall_frame.rdi,
+            .two => syscall_frame.rsi,
+            .three => syscall_frame.rdx,
+            .four => syscall_frame.rbx,
+            .five => syscall_frame.r8,
+            .six => syscall_frame.r9,
             .seven => syscall_frame.r10,
             .eight => syscall_frame.r12,
             .nine => syscall_frame.r13,
@@ -278,13 +278,13 @@ pub const SyscallFrame = extern struct {
             try writer.print("invalid syscall:   {d},\n", .{value.rdi});
 
         try writer.splatByteAll(' ', new_indent);
-        try writer.print("arg1/rsi:  0x{x:0>16}, arg2/rdx:  0x{x:0>16},\n", .{ value.arg(.one), value.arg(.two) });
+        try writer.print("arg1/rdi:  0x{x:0>16}, arg2/rsi:  0x{x:0>16},\n", .{ value.arg(.one), value.arg(.two) });
 
         try writer.splatByteAll(' ', new_indent);
-        try writer.print("arg3/rax:  0x{x:0>16}, arg4/r8:   0x{x:0>16},\n", .{ value.arg(.three), value.arg(.four) });
+        try writer.print("arg3/rdx:  0x{x:0>16}, arg4/rbx:   0x{x:0>16},\n", .{ value.arg(.three), value.arg(.four) });
 
         try writer.splatByteAll(' ', new_indent);
-        try writer.print("arg5/r9:   0x{x:0>16}, arg6/rbx:  0x{x:0>16},\n", .{ value.arg(.five), value.arg(.six) });
+        try writer.print("arg5/r8:   0x{x:0>16}, arg6/r9:  0x{x:0>16},\n", .{ value.arg(.five), value.arg(.six) });
 
         try writer.splatByteAll(' ', new_indent);
         try writer.print("arg7/r10:  0x{x:0>16}, arg8/r12:  0x{x:0>16},\n", .{ value.arg(.seven), value.arg(.eight) });
