@@ -15,7 +15,7 @@ const log = cascade.debug.log.scoped(.init);
 ///
 /// Only the bootstrap executor executes this function, using the bootloader provided stack.
 pub fn initStage1() !noreturn {
-    cascade.time.init.tryCaptureStandardWallclockStartTime();
+    cascade.time.init.captureStartTime();
 
     // we need basic memory layout information to be able to panic
     cascade.mem.init.determineEarlyMemoryLayout();

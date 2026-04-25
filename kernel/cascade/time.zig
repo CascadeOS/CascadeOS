@@ -60,7 +60,7 @@ pub const init = struct {
     /// Attempts to capture the wallclock time at the start of the system using the most likely time source.
     ///
     /// For example on x86_64 this is the TSC.
-    pub fn tryCaptureStandardWallclockStartTime() void {
+    pub fn captureStartTime() void {
         globals.kernel_start_time = .{ .kernel_start = arch.init.getStandardWallclockStartTime() };
     }
 
