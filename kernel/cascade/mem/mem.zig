@@ -672,7 +672,7 @@ pub const init = struct {
     const init_log = cascade.debug.log.scoped(.mem_init);
 
     /// Determine the kernels various offsets and the direct map early in the boot process.
-    pub fn determineEarlyMemoryLayout() void {
+    pub fn determineEarlyMemoryLayout() EarlyMemoryLayoutHandle {
         // TODO: do we actually need this to panic? we could just set these to sensible (non-undefined) values
 
         const base_address = boot.kernelBaseAddress() orelse @panic("no kernel base address");
@@ -704,18 +704,22 @@ pub const init = struct {
             boot.directMapAddress() orelse @panic("direct map address not provided"),
             direct_map_size,
         );
+
+        return .{};
     }
 
-    pub fn logEarlyMemoryLayout() void {
-        if (!init_log.levelEnabled(.debug)) return;
+    pub const EarlyMemoryLayoutHandle = struct {
+        pub fn log(_: EarlyMemoryLayoutHandle) void {
+            if (!init_log.levelEnabled(.debug)) return;
 
-        init_log.debug("kernel memory offsets:", .{});
+            init_log.debug("kernel memory offsets:", .{});
 
-        init_log.debug("  virtual base address:       {f}", .{globals.virtual_base_address});
-        init_log.debug("  virtual offset:             0x{x:0>16}", .{globals.kernel_virtual_offset.value});
-        init_log.debug("  physical to virtual:        0x{x:0>16}", .{init_globals.kernel_physical_to_virtual_offset.value});
-        init_log.debug("  direct map:                 {f}", .{globals.direct_map});
-    }
+            init_log.debug("  virtual base address:       {f}", .{globals.virtual_base_address});
+            init_log.debug("  virtual offset:             0x{x:0>16}", .{globals.kernel_virtual_offset.value});
+            init_log.debug("  physical to virtual:        0x{x:0>16}", .{init_globals.kernel_physical_to_virtual_offset.value});
+            init_log.debug("  direct map:                 {f}", .{globals.direct_map});
+        }
+    };
 
     pub fn initializeMemorySystem() !void {
         if (init_log.levelEnabled(.debug)) {

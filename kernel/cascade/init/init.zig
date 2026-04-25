@@ -18,7 +18,7 @@ pub fn initStage1() !noreturn {
     cascade.time.init.captureStartTime();
 
     // we need basic memory layout information to be able to panic
-    cascade.mem.init.determineEarlyMemoryLayout();
+    const early_memory_layout = cascade.mem.init.determineEarlyMemoryLayout();
 
     try loadBootstrapExecutorAndTask();
 
@@ -32,8 +32,8 @@ pub fn initStage1() !noreturn {
 
     Output.registerOutputs(.early);
 
-    cascade.mem.init.logEarlyMemoryLayout();
-
+    // no that we have basic output we can log the early memory layout and ACPI tables
+    early_memory_layout.log();
     try cascade.acpi.init.logAcpiTables();
 
     log.debug("initializing early interrupts", .{});
