@@ -110,7 +110,7 @@ pub fn unhandledException(
             "unhandled kernel exception: {t}",
             .{arch_interrupt_frame.vector_number.interrupt},
         ),
-        .user => @panic("NOT IMPLEMENTED: unhandled exception in user mode"),
+        .user => std.debug.panic("NOT IMPLEMENTED: unhandled exception in user mode\n{f}", .{interrupt_frame}),
     }
 }
 
