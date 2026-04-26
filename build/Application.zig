@@ -117,6 +117,9 @@ fn resolveApp(
                 host_target,
                 dependencies,
             );
+            if (application_description.configuration) |configuration| {
+                try configuration(b, host_target, host_module);
+            }
 
             const host_exe = b.addExecutable(.{
                 .name = application_description.name,
@@ -175,6 +178,9 @@ fn resolveApp(
                     host_target,
                     dependencies,
                 );
+                if (application_description.configuration) |configuration| {
+                    try configuration(b, host_target, host_test_module);
+                }
 
                 const host_test_exe = b.addTest(.{
                     .name = application_description.name,
@@ -237,6 +243,9 @@ fn resolveApp(
                 cascade_target,
                 dependencies,
             );
+            if (application_description.configuration) |configuration| {
+                try configuration(b, cascade_target, cascade_module);
+            }
 
             const cascade_exe = b.addExecutable(.{
                 .name = application_description.name,
