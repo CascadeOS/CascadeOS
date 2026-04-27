@@ -2,6 +2,8 @@
 # SPDX-FileCopyrightText: CascadeOS Contributors
 
 name: CI
+permissions:
+  contents: read
 
 on:
   push:

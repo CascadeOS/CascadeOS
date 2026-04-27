@@ -2,6 +2,8 @@
 # SPDX-FileCopyrightText: CascadeOS Contributors
 
 name: REUSE Compliance Check
+permissions:
+  contents: read
 
 on:
   push:
