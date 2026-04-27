@@ -3,7 +3,7 @@
 
 name: CI
 permissions:
-  contents: none
+  contents: read
 
 on:
   push:
