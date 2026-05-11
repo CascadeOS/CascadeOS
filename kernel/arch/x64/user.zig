@@ -204,31 +204,18 @@ pub fn syscallEntry() callconv(.naked) noreturn {
 }
 
 pub const SyscallFrame = extern struct {
-    /// arg11
     r15: u64,
-    /// arg10
     r14: u64,
-    /// arg9
     r13: u64,
-    /// arg8
     r12: u64,
-    /// arg7
     r10: u64,
-    /// arg5
     r9: u64,
-    /// arg4
     r8: u64,
-    /// syscall number
     rdi: u64,
-    /// arg1
     rsi: u64,
-    /// arg12
     rbp: u64,
-    /// arg2
     rdx: u64,
-    /// arg6
     rbx: u64,
-    /// arg3
     rax: u64,
 
     /// r11
