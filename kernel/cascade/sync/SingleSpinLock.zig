@@ -15,6 +15,8 @@ const core = @import("core");
 
 const SingleSpinLock = @This();
 
+_: void align(std.atomic.cache_line) = {},
+
 holding_executor: std.atomic.Value(?*const cascade.Executor) align(std.atomic.cache_line) = .init(null),
 
 pub fn lock(single_spin_lock: *SingleSpinLock) void {
