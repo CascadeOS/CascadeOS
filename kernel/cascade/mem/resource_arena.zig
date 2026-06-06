@@ -125,10 +125,10 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                     var caches_created: usize = 0;
 
                     const pages_to_allocate = arch.paging.standard_page_size.amountToCover(
-                        core.Size.of(RawCache).multiplyScalar(count),
+                        core.Size.of([QUANTUM_CACHES_PER_PAGE]RawCache).multiplyScalar(count),
                     );
 
-                    for (0..pages_to_allocate) |_| {
+                    outer: for (0..pages_to_allocate) |_| {
                         const page = cascade.mem.PhysicalPage.allocator.allocate() catch
                             @panic("heap quantum cache allocation failed");
                         pages.prepend(page);
@@ -149,9 +149,11 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
 
                             arena.quantum_caches.caches.append(cache) catch unreachable;
 
-                            if (caches_created == count) break;
+                            if (caches_created == count) break :outer;
                         }
                     }
+
+                    std.debug.assert(caches_created == count);
 
                     arena.quantum_caches.allocation = pages;
                     arena.quantum_caches.max_cached_size = count * options.quantum;
