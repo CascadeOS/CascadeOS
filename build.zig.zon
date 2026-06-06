@@ -16,8 +16,8 @@
         },
 
         .edk2 = .{
-            .url = "https://github.com/rust-osdev/ovmf-prebuilt/releases/download/edk2-stable202602-r1/edk2-stable202602-r1-bin.tar.xz",
-            .hash = "N-V-__8AAMDxxwxp8UiIRV4nhhm0cc_J35Cw5TxKQye7IKNQ",
+            .url = "https://github.com/rust-osdev/ovmf-prebuilt/releases/download/edk2-stable202605-r1/edk2-stable202605-r1-bin.tar.xz",
+            .hash = "N-V-__8AAAA7yAyUqa50PddDh8dD3fVJb8Q8W9ZuaSgDBlJn",
         },
 
         .flanterm = .{
