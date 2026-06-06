@@ -196,14 +196,16 @@ pub const Handle = struct {
     /// It is the callers responsibility to ensure the task can be unblocked when necessary and to set the task's state to `.blocked` in the
     /// provided `DeferredAction`.
     ///
-    /// A new scheduler handle will be returned, this must be unlocked by the caller instead of the scheduler handle that was passed in.
+    /// The scheduler handle will be mutated upon return as the task may be executing on a different executor than it was when calling this
+    /// function.
     pub fn block(
-        scheduler_handle: Handle,
+        scheduler_handle: *Handle,
         deferred_action: DeferredAction,
-    ) Handle {
+    ) void {
         scheduler_handle.dropWithDeferredAction(deferred_action, .yes);
-        // we return a new scheduler handle here as the task may be on a different executor now
-        return .{ .scheduler = &cascade.Task.Current.get().knownExecutor().scheduler };
+
+        // the task may be on a different executor now
+        scheduler_handle.* = .{ .scheduler = &cascade.Task.Current.get().knownExecutor().scheduler };
     }
 
     const TaskResume = enum {

@@ -57,7 +57,7 @@ pub fn park(parker: *Parker) void {
         return;
     }
 
-    scheduler_handle = scheduler_handle.block(
+    scheduler_handle.block(
         .{
             .action = struct {
                 fn action(old_task: *cascade.Task, arg: usize) void {
