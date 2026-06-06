@@ -6,6 +6,7 @@ const std = @import("std");
 const arch = @import("arch");
 const cascade = @import("cascade");
 const core = @import("core");
+const user_cascade = @import("user_cascade");
 
 pub const elf = @import("elf.zig");
 pub const Process = @import("Process.zig");
@@ -16,7 +17,7 @@ const log = cascade.debug.log.scoped(.user);
 /// Called on syscall.
 ///
 /// Interrupts are disabled on entry.
-pub fn onSyscall(syscall_frame: arch.user.SyscallFrame) void {
+pub fn onSyscall(syscall_frame: arch.user.SyscallFrame) isize {
     if (core.is_debug) {
         const current_task: cascade.Task.Current = .get();
         std.debug.assert(current_task.task.interrupt_disable_count.load(.acquire) == 0);

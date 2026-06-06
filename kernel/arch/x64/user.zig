@@ -102,7 +102,7 @@ export fn syscallDispatch(syscall_frame: *SyscallFrame) callconv(.c) void {
         per_thread.extended_state.load();
     }
 
-    cascade.user.onSyscall(.{ .arch_specific = syscall_frame });
+    syscall_frame.setReturnValue(cascade.user.onSyscall(.{ .arch_specific = syscall_frame }));
 
     x64.instructions.disableInterrupts();
 }
@@ -247,6 +247,10 @@ pub const SyscallFrame = extern struct {
             .eleven => syscall_frame.r15,
             .twelve => syscall_frame.rbp,
         };
+    }
+
+    pub inline fn setReturnValue(syscall_frame: *SyscallFrame, value: isize) void {
+        syscall_frame.rax = @bitCast(value);
     }
 
     pub fn print(
