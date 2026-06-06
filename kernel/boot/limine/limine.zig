@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: CascadeOS Contributors
 // SPDX-FileCopyrightText: 2022-2026 Mintsuki and contributors (https://github.com/Limine-Bootloader/limine-protocol/blob/trunk/LICENSE)
 
-//! This module contains the definitions of the Limine protocol as of 6f3fafe337c30f94e7c2f5c4a21498346c5604bf.
+//! This module contains the definitions of the Limine protocol as of 5b9d13e557590d8eab93fa7449bdd1d7ed72ba8c.
 //!
-//! [PROTOCOL DOC](https://github.com/Limine-Bootloader/limine-protocol/blob/6f3fafe337c30f94e7c2f5c4a21498346c5604bf/PROTOCOL.md)
+//! [PROTOCOL DOC](https://github.com/Limine-Bootloader/limine-protocol/blob/5b9d13e557590d8eab93fa7449bdd1d7ed72ba8c/PROTOCOL.md)
 
 const std = @import("std");
 
@@ -1100,12 +1100,23 @@ pub const Module = extern struct {
         }
     };
 
-    /// Internal Limine modules are guaranteed to be loaded before user-specified (configuration) modules,
-    /// and thus they are guaranteed to appear before user-specified modules in the modules array in the response.
+    /// Internal Limine modules are guaranteed to be loaded before user-specified (configuration) modules, and thus they are guaranteed to
+    /// appear before user-specified modules in the modules array in the response.
+    ///
+    /// When Secure Boot is active, every loaded file must have an associated blake2b hash, and internal modules are no exception: a `path`
+    /// lacking a `#<hash>` suffix will cause the bootloader to panic, regardless of the `LIMINE_INTERNAL_MODULE_REQUIRED` flag.
+    ///
+    /// There is no separate hash field on `struct limine_internal_module`; the hash must be appended to the `path` string.
+    ///
+    /// Executables intended to be bootable under Secure Boot must therefore embed the precomputed hash of each internal module in the path
+    /// they hand to the bootloader.
     pub const InternalModule = extern struct {
         /// Path to the module to load.
         ///
         /// This path is relative to the location of the executable.
+        ///
+        /// The path may be suffixed with `#` followed by a 128-character hexadecimal blake2b hash of the file contents, in which case the
+        /// bootloader will verify the hash before honouring the module.
         path: [*:0]const u8,
 
         /// String associated with the given module.
@@ -1126,9 +1137,7 @@ pub const Module = extern struct {
             /// If `true` then fail if the requested module is not found.
             required: bool = false,
 
-            /// Deprecated. Bootloader may not support it and panic instead (from Limine 8.x onwards).
-            ///
-            /// Alternatively, the module is GZ-compressed and should be decompressed by the bootloader.
+            /// The module is GZ-compressed and should be decompressed by the bootloader.
             ///
             /// This is honoured if the response is revision 2 or greater.
             compressed: bool = false,
@@ -1207,6 +1216,44 @@ pub const EFISystemTable = extern struct {
                 else => .{ .virtual = response._address.virtual },
             };
         }
+    };
+};
+
+/// TPM Event Log Feature
+///
+/// The bootloader captures the firmware event log via `EFI_TCG2_PROTOCOL.GetEventLog()` while boot services are alive and copies it into
+/// memory that survives `ExitBootServices()`.
+///
+/// The event stream covers all measurements made before handoff, including those performed by the bootloader itself.
+///
+/// If a TPM is not available, or the firmware does not implement `EFI_TCG2_PROTOCOL`, or the event log retrieval fails, no response will be
+/// provided.
+pub const TPMEventLog = extern struct {
+    id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x98e094fc7e76e979, 0xee8d8775c54e1d1f },
+    revision: u64 = 0,
+
+    response: ?*const Response = null,
+
+    pub const Response = extern struct {
+        revision: u64,
+
+        /// Format of the event log.
+        format: Format,
+
+        /// Size in bytes of the raw event data at `address`.
+        size: core.Size,
+
+        /// Address (HHDM, in bootloader reclaimable memory) of the captured TCG event log.
+        ///
+        /// The buffer holds the raw event stream as defined by the indicated `format`, with no additional framing.
+        address: cascade.KernelVirtualAddress,
+
+        pub const Format = enum(u64) {
+            tcg_1_2 = 1,
+            tcg_2 = 2,
+
+            _,
+        };
     };
 };
 
@@ -1398,13 +1445,11 @@ pub const BootloaderPerformance = extern struct {
 /// hand-off. This is intended for security-conscious executables that wish to preserve DMA protection set up by firmware.
 ///
 /// If this feature is not requested, the bootloader reserves the right to disable any active IOMMUs before handing control to the
-/// executable, for compatibility with executables that do not support these.
-///
-/// Note: Not passing this request does not imply that the bootloader is mandated to disable the IOMMUs, though newly implemented
-/// bootloaders are strongly recommended to, and should, disable them.
+/// executable. This is especially of note for base revisions 5 and greater, where the bootloader is mandated to disable VT-d and AMD-Vi
+/// IOMMUs, unless this feature is requested.
 ///
 /// Note: On non-x86 platforms, no response will be provided.
-pub const x86_64_KeepIOMMU = extern struct {
+pub const KeepIOMMU = extern struct {
     id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x8ebaabe51f490179, 0x2aa86a59ffb4ab0f },
     revision: u64 = 0,
 

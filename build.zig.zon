@@ -26,8 +26,8 @@
         },
 
         .limine = .{
-            .url = "git+https://github.com/Limine-Bootloader/Limine.git?ref=v11.3.1-binary#3c16d4c3bb2bb54ecc8b37b71760fdb20a193caa",
-            .hash = "N-V-__8AAEgRTQD5aYigsigI4K1eUsxm1QWk9c_i0FGjMEr2",
+            .url = "https://github.com/Limine-Bootloader/Limine/releases/download/v12.3.2/limine-binary.tar.xz",
+            .hash = "N-V-__8AAD2-UwDdEuTWV8TVUAMAfVbMLoEPH904Lh_LJ1SO",
         },
 
         .sbi = .{
