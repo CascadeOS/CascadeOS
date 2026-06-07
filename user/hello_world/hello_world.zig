@@ -10,5 +10,5 @@ pub fn main() void {
 // TODO: we only want this decl when building for cascade, this is not currently possible - needs seperate root files atm
 pub const _start = void;
 comptime {
-    cascade.exportEntry();
+    if (@import("cascade_flag").is_cascade) cascade.exportEntry();
 }

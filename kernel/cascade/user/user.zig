@@ -35,7 +35,7 @@ pub fn onSyscall(syscall_frame: arch.user.SyscallFrame) isize {
     log.verbose("received syscall: {t}", .{syscall});
 
     switch (syscall) {
-        .exit_current_thread => {
+        .thread_exit_current => {
             const scheduler_handle: cascade.Task.Scheduler.Handle = .get();
             scheduler_handle.terminate();
             unreachable;

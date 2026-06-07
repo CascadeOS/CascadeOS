@@ -1,11 +1,11 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: 0BSD
 // SPDX-FileCopyrightText: CascadeOS Contributors
 
 const std = @import("std");
 const builtin = @import("builtin");
 const root = @import("root");
 
-const cascade = @import("cascade");
+const cascade = @import("cascade.zig");
 
 /// Exports the cascade entry point, must be called at comptime, a pub `_start` decl must also be declared in the root file:
 ///
@@ -16,7 +16,7 @@ const cascade = @import("cascade");
 /// }
 /// ```
 pub fn exportEntry() void {
-    comptime if (@import("cascade_flag").is_cascade) @export(&_cascade_entry, .{ .name = "_start" });
+    comptime @export(&_cascade_entry, .{ .name = "_start" });
 }
 
 fn _cascade_entry() callconv(.naked) noreturn {
@@ -110,7 +110,7 @@ fn callMainAndExit(entry_stack_pointer: [*]usize) callconv(.c) noreturn {
     _ = return_value; // TODO: don't just throw this away
 
     // TODO: exit the process rather than just the current thread
-    cascade.thread.exitCurrent();
+    cascade.Thread.exitCurrent();
 }
 
 inline fn callMain(args: std.process.Args.Vector, environ: std.process.Environ.Block) u8 {

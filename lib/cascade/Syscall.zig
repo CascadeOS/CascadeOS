@@ -1,10 +1,10 @@
-// SPDX-License-Identifier: BSD-3-Clause
+// SPDX-License-Identifier: 0BSD
 // SPDX-FileCopyrightText: CascadeOS Contributors
 
 const builtin = @import("builtin");
 
 pub const Syscall = enum(usize) {
-    exit_current_thread = 0,
+    thread_exit_current = 0,
 
     pub inline fn call0(
         syscall: Syscall,
