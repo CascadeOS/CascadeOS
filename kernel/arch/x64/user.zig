@@ -95,16 +95,26 @@ const EnterUserspaceFrame = extern struct {
 };
 
 export fn syscallDispatch(syscall_frame: *SyscallFrame) callconv(.c) void {
-    x64.instructions.disableSSEUsage();
-    defer {
-        const per_thread: *PerThread = .from(.from(cascade.Task.Current.get().task));
-        x64.instructions.enableSSEUsage();
-        per_thread.extended_state.load();
-    }
+    errdefer comptime unreachable;
 
-    syscall_frame.setReturnValue(cascade.user.onSyscall(.{ .arch_specific = syscall_frame }));
+    x64.instructions.disableSSEUsage();
+
+    const current_task: cascade.Task.Current = .get();
+    current_task.task.interrupt_disable_count.store(1, .monotonic);
+
+    syscall_frame.setReturnValue(
+        cascade.user.onSyscall(
+            current_task,
+            .{ .arch_specific = syscall_frame },
+        ),
+    );
 
     x64.instructions.disableInterrupts();
+    current_task.task.interrupt_disable_count.store(0, .monotonic);
+
+    const per_thread: *PerThread = .from(.from(current_task.task));
+    x64.instructions.enableSSEUsage();
+    per_thread.extended_state.load();
 }
 
 pub fn syscallEntry() callconv(.naked) noreturn {

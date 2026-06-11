@@ -16,16 +16,13 @@ const log = cascade.debug.log.scoped(.user);
 
 /// Called on syscall.
 ///
-/// Interrupts are disabled on entry.
-pub fn onSyscall(syscall_frame: arch.user.SyscallFrame) isize {
-    if (core.is_debug) {
-        const current_task: cascade.Task.Current = .get();
-        std.debug.assert(current_task.task.interrupt_disable_count.load(.acquire) == 0);
-        std.debug.assert(current_task.task.enable_access_to_user_memory_count.load(.acquire) == 0);
-        std.debug.assert(!arch.interrupts.areEnabled());
-    }
-
-    arch.interrupts.enable();
+/// The current task's `interrupt_disable_count` is set to 1 and interrupts are disabled.
+pub fn onSyscall(
+    current_task: cascade.Task.Current,
+    syscall_frame: arch.user.SyscallFrame,
+) i64 {
+    // enable interrupts
+    current_task.decrementInterruptDisable();
 
     const syscall = syscall_frame.syscall() orelse {
         // TODO: return an error to userspace
