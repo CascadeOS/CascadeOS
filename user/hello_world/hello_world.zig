@@ -4,7 +4,8 @@
 const cascade = @import("cascade");
 
 pub fn main() void {
-    // TODO: actually print "hello world"...
+    // TODO: support normal `std.debug.print`
+    cascade.debugPrint("hello world\n");
 }
 
 // TODO: we only want this decl when building for cascade, this is not currently possible - needs seperate root files atm
