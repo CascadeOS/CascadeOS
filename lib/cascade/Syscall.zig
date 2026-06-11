@@ -3,17 +3,17 @@
 
 const builtin = @import("builtin");
 
-pub const Syscall = enum(usize) {
+pub const Syscall = enum(u64) {
     thread_exit_current = 0,
 
     pub inline fn call0(
         syscall: Syscall,
-    ) isize {
+    ) i64 {
         return switch (builtin.cpu.arch) {
             .aarch64 => @panic("TODO"),
             .riscv64 => @panic("TODO"),
             .x86_64 => asm volatile ("syscall"
-                : [ret] "={rax}" (-> isize),
+                : [ret] "={rax}" (-> i64),
                 : [syscall] "{rax}" (syscall),
                 : .{ .rcx = true, .r11 = true, .memory = true }),
             else => |t| @compileError("unsupported architecture " ++ @tagName(t)),
@@ -22,13 +22,13 @@ pub const Syscall = enum(usize) {
 
     pub inline fn call1(
         syscall: Syscall,
-        arg1: usize,
-    ) isize {
+        arg1: u64,
+    ) i64 {
         return switch (builtin.cpu.arch) {
             .aarch64 => @panic("TODO"),
             .riscv64 => @panic("TODO"),
             .x86_64 => asm volatile ("syscall"
-                : [ret] "={rax}" (-> isize),
+                : [ret] "={rax}" (-> i64),
                 : [syscall] "{rax}" (syscall),
                   [arg1] "{rdi}" (arg1),
                 : .{ .rcx = true, .r11 = true, .memory = true }),
@@ -38,14 +38,14 @@ pub const Syscall = enum(usize) {
 
     pub inline fn call2(
         syscall: Syscall,
-        arg1: usize,
-        arg2: usize,
-    ) isize {
+        arg1: u64,
+        arg2: u64,
+    ) i64 {
         return switch (builtin.cpu.arch) {
             .aarch64 => @panic("TODO"),
             .riscv64 => @panic("TODO"),
             .x86_64 => asm volatile ("syscall"
-                : [ret] "={rax}" (-> isize),
+                : [ret] "={rax}" (-> i64),
                 : [syscall] "{rax}" (syscall),
                   [arg1] "{rdi}" (arg1),
                   [arg2] "{rsi}" (arg2),
@@ -56,15 +56,15 @@ pub const Syscall = enum(usize) {
 
     pub inline fn call3(
         syscall: Syscall,
-        arg1: usize,
-        arg2: usize,
-        arg3: usize,
-    ) isize {
+        arg1: u64,
+        arg2: u64,
+        arg3: u64,
+    ) i64 {
         return switch (builtin.cpu.arch) {
             .aarch64 => @panic("TODO"),
             .riscv64 => @panic("TODO"),
             .x86_64 => asm volatile ("syscall"
-                : [ret] "={rax}" (-> isize),
+                : [ret] "={rax}" (-> i64),
                 : [syscall] "{rax}" (syscall),
                   [arg1] "{rdi}" (arg1),
                   [arg2] "{rsi}" (arg2),
@@ -76,16 +76,16 @@ pub const Syscall = enum(usize) {
 
     pub inline fn call4(
         syscall: Syscall,
-        arg1: usize,
-        arg2: usize,
-        arg3: usize,
-        arg4: usize,
-    ) isize {
+        arg1: u64,
+        arg2: u64,
+        arg3: u64,
+        arg4: u64,
+    ) i64 {
         return switch (builtin.cpu.arch) {
             .aarch64 => @panic("TODO"),
             .riscv64 => @panic("TODO"),
             .x86_64 => asm volatile ("syscall"
-                : [ret] "={rax}" (-> isize),
+                : [ret] "={rax}" (-> i64),
                 : [syscall] "{rax}" (syscall),
                   [arg1] "{rdi}" (arg1),
                   [arg2] "{rsi}" (arg2),
@@ -98,17 +98,17 @@ pub const Syscall = enum(usize) {
 
     pub inline fn call5(
         syscall: Syscall,
-        arg1: usize,
-        arg2: usize,
-        arg3: usize,
-        arg4: usize,
-        arg5: usize,
-    ) isize {
+        arg1: u64,
+        arg2: u64,
+        arg3: u64,
+        arg4: u64,
+        arg5: u64,
+    ) i64 {
         return switch (builtin.cpu.arch) {
             .aarch64 => @panic("TODO"),
             .riscv64 => @panic("TODO"),
             .x86_64 => asm volatile ("syscall"
-                : [ret] "={rax}" (-> isize),
+                : [ret] "={rax}" (-> i64),
                 : [syscall] "{rax}" (syscall),
                   [arg1] "{rdi}" (arg1),
                   [arg2] "{rsi}" (arg2),
@@ -122,18 +122,18 @@ pub const Syscall = enum(usize) {
 
     pub inline fn call6(
         syscall: Syscall,
-        arg1: usize,
-        arg2: usize,
-        arg3: usize,
-        arg4: usize,
-        arg5: usize,
-        arg6: usize,
-    ) isize {
+        arg1: u64,
+        arg2: u64,
+        arg3: u64,
+        arg4: u64,
+        arg5: u64,
+        arg6: u64,
+    ) i64 {
         return switch (builtin.cpu.arch) {
             .aarch64 => @panic("TODO"),
             .riscv64 => @panic("TODO"),
             .x86_64 => asm volatile ("syscall"
-                : [ret] "={rax}" (-> isize),
+                : [ret] "={rax}" (-> i64),
                 : [syscall] "{rax}" (syscall),
                   [arg1] "{rdi}" (arg1),
                   [arg2] "{rsi}" (arg2),
@@ -148,19 +148,19 @@ pub const Syscall = enum(usize) {
 
     pub inline fn call7(
         syscall: Syscall,
-        arg1: usize,
-        arg2: usize,
-        arg3: usize,
-        arg4: usize,
-        arg5: usize,
-        arg6: usize,
-        arg7: usize,
-    ) isize {
+        arg1: u64,
+        arg2: u64,
+        arg3: u64,
+        arg4: u64,
+        arg5: u64,
+        arg6: u64,
+        arg7: u64,
+    ) i64 {
         return switch (builtin.cpu.arch) {
             .aarch64 => @panic("TODO"),
             .riscv64 => @panic("TODO"),
             .x86_64 => asm volatile ("syscall"
-                : [ret] "={rax}" (-> isize),
+                : [ret] "={rax}" (-> i64),
                 : [syscall] "{rax}" (syscall),
                   [arg1] "{rdi}" (arg1),
                   [arg2] "{rsi}" (arg2),
@@ -176,20 +176,20 @@ pub const Syscall = enum(usize) {
 
     pub inline fn call8(
         syscall: Syscall,
-        arg1: usize,
-        arg2: usize,
-        arg3: usize,
-        arg4: usize,
-        arg5: usize,
-        arg6: usize,
-        arg7: usize,
-        arg8: usize,
-    ) isize {
+        arg1: u64,
+        arg2: u64,
+        arg3: u64,
+        arg4: u64,
+        arg5: u64,
+        arg6: u64,
+        arg7: u64,
+        arg8: u64,
+    ) i64 {
         return switch (builtin.cpu.arch) {
             .aarch64 => @panic("TODO"),
             .riscv64 => @panic("TODO"),
             .x86_64 => asm volatile ("syscall"
-                : [ret] "={rax}" (-> isize),
+                : [ret] "={rax}" (-> i64),
                 : [syscall] "{rax}" (syscall),
                   [arg1] "{rdi}" (arg1),
                   [arg2] "{rsi}" (arg2),
@@ -206,21 +206,21 @@ pub const Syscall = enum(usize) {
 
     pub inline fn call9(
         syscall: Syscall,
-        arg1: usize,
-        arg2: usize,
-        arg3: usize,
-        arg4: usize,
-        arg5: usize,
-        arg6: usize,
-        arg7: usize,
-        arg8: usize,
-        arg9: usize,
-    ) isize {
+        arg1: u64,
+        arg2: u64,
+        arg3: u64,
+        arg4: u64,
+        arg5: u64,
+        arg6: u64,
+        arg7: u64,
+        arg8: u64,
+        arg9: u64,
+    ) i64 {
         return switch (builtin.cpu.arch) {
             .aarch64 => @panic("TODO"),
             .riscv64 => @panic("TODO"),
             .x86_64 => asm volatile ("syscall"
-                : [ret] "={rax}" (-> isize),
+                : [ret] "={rax}" (-> i64),
                 : [syscall] "{rax}" (syscall),
                   [arg1] "{rdi}" (arg1),
                   [arg2] "{rsi}" (arg2),
@@ -238,22 +238,22 @@ pub const Syscall = enum(usize) {
 
     pub inline fn call10(
         syscall: Syscall,
-        arg1: usize,
-        arg2: usize,
-        arg3: usize,
-        arg4: usize,
-        arg5: usize,
-        arg6: usize,
-        arg7: usize,
-        arg8: usize,
-        arg9: usize,
-        arg10: usize,
-    ) isize {
+        arg1: u64,
+        arg2: u64,
+        arg3: u64,
+        arg4: u64,
+        arg5: u64,
+        arg6: u64,
+        arg7: u64,
+        arg8: u64,
+        arg9: u64,
+        arg10: u64,
+    ) i64 {
         return switch (builtin.cpu.arch) {
             .aarch64 => @panic("TODO"),
             .riscv64 => @panic("TODO"),
             .x86_64 => asm volatile ("syscall"
-                : [ret] "={rax}" (-> isize),
+                : [ret] "={rax}" (-> i64),
                 : [syscall] "{rax}" (syscall),
                   [arg1] "{rdi}" (arg1),
                   [arg2] "{rsi}" (arg2),
@@ -272,23 +272,23 @@ pub const Syscall = enum(usize) {
 
     pub inline fn call11(
         syscall: Syscall,
-        arg1: usize,
-        arg2: usize,
-        arg3: usize,
-        arg4: usize,
-        arg5: usize,
-        arg6: usize,
-        arg7: usize,
-        arg8: usize,
-        arg9: usize,
-        arg10: usize,
-        arg11: usize,
-    ) isize {
+        arg1: u64,
+        arg2: u64,
+        arg3: u64,
+        arg4: u64,
+        arg5: u64,
+        arg6: u64,
+        arg7: u64,
+        arg8: u64,
+        arg9: u64,
+        arg10: u64,
+        arg11: u64,
+    ) i64 {
         return switch (builtin.cpu.arch) {
             .aarch64 => @panic("TODO"),
             .riscv64 => @panic("TODO"),
             .x86_64 => asm volatile ("syscall"
-                : [ret] "={rax}" (-> isize),
+                : [ret] "={rax}" (-> i64),
                 : [syscall] "{rax}" (syscall),
                   [arg1] "{rdi}" (arg1),
                   [arg2] "{rsi}" (arg2),
@@ -308,24 +308,24 @@ pub const Syscall = enum(usize) {
 
     pub inline fn call12(
         syscall: Syscall,
-        arg1: usize,
-        arg2: usize,
-        arg3: usize,
-        arg4: usize,
-        arg5: usize,
-        arg6: usize,
-        arg7: usize,
-        arg8: usize,
-        arg9: usize,
-        arg10: usize,
-        arg11: usize,
-        arg12: usize,
-    ) isize {
+        arg1: u64,
+        arg2: u64,
+        arg3: u64,
+        arg4: u64,
+        arg5: u64,
+        arg6: u64,
+        arg7: u64,
+        arg8: u64,
+        arg9: u64,
+        arg10: u64,
+        arg11: u64,
+        arg12: u64,
+    ) i64 {
         return switch (builtin.cpu.arch) {
             .aarch64 => @panic("TODO"),
             .riscv64 => @panic("TODO"),
             .x86_64 => asm volatile ("syscall"
-                : [ret] "={rax}" (-> isize),
+                : [ret] "={rax}" (-> i64),
                 : [syscall] "{rax}" (syscall),
                   [arg1] "{rdi}" (arg1),
                   [arg2] "{rsi}" (arg2),

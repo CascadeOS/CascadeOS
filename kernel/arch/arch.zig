@@ -639,7 +639,7 @@ pub const user = struct {
             twelve,
         };
 
-        pub fn arg(syscall_frame: SyscallFrame, comptime argument: Arg) callconv(core.inline_in_non_debug) usize {
+        pub fn arg(syscall_frame: SyscallFrame, comptime argument: Arg) callconv(core.inline_in_non_debug) u64 {
             return getFunction(
                 current_functions.user,
                 "argFromSyscallFrame",
@@ -1145,7 +1145,7 @@ pub const Functions = struct {
         argFromSyscallFrame: ?fn (
             syscall_frame: *const current_decls.user.SyscallFrame,
             comptime argument: user.SyscallFrame.Arg,
-        ) callconv(.@"inline") usize = null,
+        ) callconv(.@"inline") u64 = null,
 
         init: struct {
             /// Perform any per-achitecture initialization needed for userspace processes/threads.

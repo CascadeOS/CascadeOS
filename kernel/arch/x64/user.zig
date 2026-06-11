@@ -232,7 +232,7 @@ pub const SyscallFrame = extern struct {
         return std.enums.fromInt(user_cascade.Syscall, syscall_frame.rax);
     }
 
-    pub inline fn arg(syscall_frame: *const SyscallFrame, comptime argument: arch.user.SyscallFrame.Arg) usize {
+    pub inline fn arg(syscall_frame: *const SyscallFrame, comptime argument: arch.user.SyscallFrame.Arg) u64 {
         return switch (argument) {
             .one => syscall_frame.rdi,
             .two => syscall_frame.rsi,
@@ -249,7 +249,7 @@ pub const SyscallFrame = extern struct {
         };
     }
 
-    pub inline fn setReturnValue(syscall_frame: *SyscallFrame, value: isize) void {
+    pub inline fn setReturnValue(syscall_frame: *SyscallFrame, value: i64) void {
         syscall_frame.rax = @bitCast(value);
     }
 
@@ -352,8 +352,8 @@ pub const PerThread = struct {
     }
 
     pub const ExtendedState = struct {
-        fs_base: usize = undefined,
-        gs_base: usize = undefined,
+        fs_base: u64 = undefined,
+        gs_base: u64 = undefined,
         xsave_area: []align(64) u8,
 
         /// Where is the extended state currently stored
