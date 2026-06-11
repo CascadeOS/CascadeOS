@@ -16,6 +16,30 @@ pub const Syscall = enum(u64) {
     /// never
     thread_exit_current = 0,
 
+    /// Output a debug message.
+    ///
+    /// This is not intended to be used by normal userspace programs and instead is intended for logs from system libraries like libc.
+    ///
+    /// The message is assumed to be UTF-8 encoded.
+    ///
+    /// If the message does not end with a newline, one will be appended.
+    ///
+    /// No guarantees are made about the destination of the message, the implementation may choose to discard it or send it to any number of
+    /// destinations.
+    ///
+    /// Any errors encountered while writing the message are ignored and may cause the message to be truncated.
+    ///
+    /// ### Arguments
+    /// - `arg1`: length of the message
+    /// - `arg2`: pointer to the message
+    ///
+    /// ### Errors
+    /// none
+    ///
+    /// ### Return
+    /// undefined
+    debug_print = 1,
+
     pub inline fn call0(
         syscall: Syscall,
     ) i64 {

@@ -37,6 +37,54 @@ pub fn onSyscall(
             scheduler_handle.terminate();
             unreachable;
         },
+        .debug_print => {
+            const range = syscall_frame.getUserRange(.two, .one) orelse return 0;
+            const slice = range.byteSlice();
+
+            if (slice.len == 0) {
+                @branchHint(.cold);
+                return 0;
+            }
+
+            const writer = cascade.init.Output.terminal.writer;
+
+            // TODO: remove usage of `init.Output` as this is intended to be disabled by the time userspace is running...
+            cascade.init.Output.lock.lock();
+            defer cascade.init.Output.lock.unlock();
+
+            ret: {
+                const process: *const Process = .from(current_task.task);
+
+                writer.print("{f}: ", .{process}) catch {
+                    @branchHint(.cold);
+                    break :ret;
+                };
+
+                const ends_with_newline = blk: {
+                    current_task.incrementEnableAccessToUserMemory();
+                    defer current_task.decrementEnableAccessToUserMemory();
+
+                    // TODO: implement safe access to user memory so page faults can be handled correctly
+                    writer.writeAll(range.byteSlice()) catch {
+                        @branchHint(.cold);
+                        break :blk false;
+                    };
+
+                    break :blk slice[slice.len - 1] == '\n';
+                };
+
+                if (!ends_with_newline) writer.writeByte('\n') catch {
+                    @branchHint(.cold);
+                    break :ret;
+                };
+            }
+
+            writer.flush() catch {
+                @branchHint(.cold);
+            };
+
+            return 0;
+        },
     }
 }
 
