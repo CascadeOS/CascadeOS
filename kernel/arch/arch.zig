@@ -646,6 +646,23 @@ pub const user = struct {
             )(syscall_frame.arch_specific, argument);
         }
 
+        /// Get a user virtual range from ptr and len syscall arguments.
+        ///
+        /// Returns null if the range is not entirely in user memory.
+        ///
+        /// Does not check that the range is within the current task's address space.
+        pub fn getUserRange(syscall_frame: SyscallFrame, comptime ptr_arg: Arg, comptime len_arg: Arg) ?cascade.UserVirtualRange {
+            const range: cascade.VirtualRange = .from(
+                .from(syscall_frame.arg(ptr_arg)),
+                .from(syscall_frame.arg(len_arg), .byte),
+            );
+
+            switch (range.tagged()) {
+                .user => |user_range| return user_range,
+                .kernel, .invalid => return null,
+            }
+        }
+
         pub inline fn format(
             syscall_frame: SyscallFrame,
             writer: *std.Io.Writer,
