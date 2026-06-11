@@ -4,6 +4,16 @@
 const builtin = @import("builtin");
 
 pub const Syscall = enum(u64) {
+    /// Exit the current thread.
+    ///
+    /// ### Arguments
+    /// none
+    ///
+    /// ### Errors
+    /// none
+    ///
+    /// ### Return
+    /// never
     thread_exit_current = 0,
 
     pub inline fn call0(

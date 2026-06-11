@@ -6,6 +6,9 @@ const cascade = @import("cascade.zig");
 pub const Thread = enum(u64) {
     _,
 
+    /// Exit the current thread.
+    ///
+    /// This function never returns.
     pub fn exitCurrent() noreturn {
         _ = cascade.Syscall.call0(.thread_exit_current);
         unreachable;
