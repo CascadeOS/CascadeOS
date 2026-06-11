@@ -533,13 +533,18 @@ pub const LoadableRegion = struct {
                     .add(.from(program_header.memory_size, .byte))
                     .alignForward(arch.paging.standard_page_size_alignment);
 
-                const virtual_range: cascade.VirtualRange = .from(address, range_size);
-                if (core.is_debug) std.debug.assert(virtual_range.pageAligned());
+                const virtual_range = blk: {
+                    const virtual_range: cascade.VirtualRange = .from(address, range_size);
+                    if (core.is_debug) std.debug.assert(virtual_range.pageAligned());
 
-                if (virtual_range.getType() != .user) {
-                    log.warn("program header has invalid user virtual address range: {f}", .{program_header});
-                    return error.ProgramHeaderInvalidVirtualAddress;
-                }
+                    switch (virtual_range.tagged()) {
+                        .user => |user| break :blk user,
+                        else => {
+                            log.warn("program header has invalid user virtual address range: {f}", .{program_header});
+                            return error.ProgramHeaderInvalidVirtualAddress;
+                        },
+                    }
+                };
 
                 const new_protection = blk: {
                     var prot: cascade.mem.MapType.Protection = .{};
@@ -557,7 +562,7 @@ pub const LoadableRegion = struct {
                 };
 
                 return .{
-                    .virtual_range = virtual_range.toUser(),
+                    .virtual_range = virtual_range,
                     .destination_offset = offset_due_to_alignment.value,
                     .source_base = program_header.offset,
                     .source_length = program_header.file_size,

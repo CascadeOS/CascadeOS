@@ -336,8 +336,10 @@ fn loadHelloWorld() !void {
 
     const entry_point = blk: {
         const possible_entry_point: cascade.VirtualAddress = .from(header.entry);
-        if (possible_entry_point.getType() != .user) return error.InvalidEntryPoint;
-        break :blk possible_entry_point.toUser();
+        switch (possible_entry_point.tagged()) {
+            .user => |user| break :blk user,
+            else => return error.InvalidEntryPoint,
+        }
     };
 
     const program_header_table: []const u8 = blk: {

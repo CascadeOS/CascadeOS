@@ -306,7 +306,7 @@ fn onKernelPageFault(
     page_fault_details: PageFaultDetails,
     interrupt_frame: arch.interrupts.InterruptFrame,
 ) void {
-    switch (page_fault_details.faulting_address.getType()) {
+    switch (page_fault_details.faulting_address.tagged()) {
         .user => {
             const process: *cascade.user.Process = blk: {
                 const current_task: cascade.Task.Current = .get();
@@ -342,8 +342,8 @@ fn onKernelPageFault(
                     .{ err, page_fault_details },
                 );
         },
-        .kernel => {
-            const region_type = globals.regions.containingAddress(page_fault_details.faulting_address.toKernel()) orelse {
+        .kernel => |address| {
+            const region_type = globals.regions.containingAddress(address) orelse {
                 @branchHint(.cold);
 
                 cascade.debug.interruptSourcePanic(

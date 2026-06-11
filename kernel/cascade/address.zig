@@ -23,18 +23,18 @@ pub const VirtualAddress = extern union {
         return .{ .value = value };
     }
 
-    pub const Type = enum {
-        kernel,
-        user,
+    pub const Tagged = union(enum) {
+        kernel: KernelVirtualAddress,
+        user: UserVirtualAddress,
         invalid,
     };
 
     /// Returns the type of memory this address points to.
-    pub fn getType(address: VirtualAddress) Type {
+    pub fn tagged(address: VirtualAddress) Tagged {
         if (arch.paging.kernel_memory_range.containsAddress(address))
-            return .kernel
+            return .{ .kernel = .{ .value = address.value } }
         else if (arch.user.user_memory_range.containsAddress(address))
-            return .user
+            return .{ .user = .{ .value = address.value } }
         else {
             @branchHint(.cold);
             return .invalid;
@@ -134,7 +134,7 @@ pub const KernelVirtualAddress = extern struct {
 
     /// Shifts an address to account for any applied virtual offset applied to the kernel (KASLR).
     ///
-    /// The resulting address might no longer be a vaild kernel address, use `VirtualAddress.getType` to check.
+    /// The resulting address might no longer be a vaild kernel address, use `VirtualAddress.tagged` to check.
     pub inline fn applyKernelOffset(address: KernelVirtualAddress) VirtualAddress {
         return address.toVirtualAddress().moveBackward(cascade.mem.globals.kernel_virtual_offset);
     }
@@ -191,9 +191,8 @@ pub const UserVirtualAddress = extern struct {
     /// Creates a pointer from a user virtual address.
     ///
     /// **REQUIREMENTS**:
-    /// - The current task must have enabled access to user memory.
+    /// - The current task must have enabled access to user memory to read or write to this pointer.
     pub inline fn ptr(address: UserVirtualAddress, comptime PtrT: type) PtrT {
-        if (core.is_debug) std.debug.assert(cascade.Task.Current.get().task.enable_access_to_user_memory_count.load(.acquire) != 0);
         return @ptrFromInt(address.value);
     }
 
@@ -309,14 +308,30 @@ pub const VirtualRange = struct {
         return .{ .address = address, .size = size };
     }
 
+    pub const Tagged = union(enum) {
+        kernel: KernelVirtualRange,
+        user: UserVirtualRange,
+        invalid,
+    };
+
     /// Returns the type of memory this range is in.
     ///
     /// If the range is not fully contained in either kernel or user memory, returns `.invalid`.
-    pub fn getType(range: VirtualRange) VirtualAddress.Type {
+    pub fn tagged(range: VirtualRange) Tagged {
         if (arch.paging.kernel_memory_range.fullyContains(range))
-            return .kernel
+            return .{
+                .kernel = .{
+                    .address = range.address._kernel,
+                    .size = range.size,
+                },
+            }
         else if (arch.user.user_memory_range.fullyContains(range))
-            return .user
+            return .{
+                .user = .{
+                    .address = range.address._user,
+                    .size = range.size,
+                },
+            }
         else {
             @branchHint(.cold);
             return .invalid;
@@ -449,9 +464,8 @@ pub const UserVirtualRange = struct {
     /// Returns a mutable slice of bytes in this range.
     ///
     /// **REQUIREMENTS**:
-    /// - The current task must have enabled access to user memory.
+    /// - The current task must have enabled access to user memory to read or write to this range.
     pub inline fn byteSlice(range: UserVirtualRange) []u8 {
-        if (core.is_debug) std.debug.assert(cascade.Task.Current.get().task.enable_access_to_user_memory_count.load(.acquire) != 0);
         return range.address.ptr([*]u8)[0..range.size.value];
     }
 
