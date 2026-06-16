@@ -31,7 +31,7 @@ pub fn registerImageSteps(
     options: Options,
     all_architectures: []const CascadeTarget.Architecture,
 ) !Collection {
-    const image_builder_tool = tools.get("image_builder").?;
+    const image_builder_tool = tools.get("image_builder") orelse unreachable;
     const image_builder_compile_step = image_builder_tool.release_safe_exe;
 
     const limine_dep = b.dependency("limine", .{});
@@ -46,7 +46,7 @@ pub fn registerImageSteps(
             .{architecture},
         );
 
-        const kernel = kernels.get(architecture).?;
+        const kernel = kernels.get(architecture) orelse unreachable;
 
         const image_description_step = try ImageDescriptionStep.create(
             b,
@@ -61,7 +61,7 @@ pub fn registerImageSteps(
         const raw_image = image_build_step.addOutputFileArg(image_file_name);
 
         const image = if (architecture == .x64) image: {
-            const limine_install_tool = tools.get("limine_install").?;
+            const limine_install_tool = tools.get("limine_install") orelse unreachable;
 
             const install_limine = b.addRunArtifact(limine_install_tool.release_safe_exe);
 
@@ -224,7 +224,7 @@ const ImageDescriptionStep = struct {
             return;
         } else |outer_err| switch (outer_err) {
             error.FileNotFound => {
-                const sub_dirname = std.fs.path.dirname(sub_path).?;
+                const sub_dirname = std.fs.path.dirname(sub_path) orelse unreachable;
                 image_description_step.b.cache_root.handle.createDirPath(io, sub_dirname) catch |e| {
                     return step.fail("unable to make path '{f}{s}': {t}", .{
                         image_description_step.b.cache_root, sub_dirname, e,
@@ -240,7 +240,7 @@ const ImageDescriptionStep = struct {
                 const tmp_sub_path = "tmp" ++
                     std.fs.path.sep_str ++ std.fmt.hex(rand_int) ++
                     std.fs.path.sep_str ++ basename;
-                const tmp_sub_path_dirname = std.fs.path.dirname(tmp_sub_path).?;
+                const tmp_sub_path_dirname = std.fs.path.dirname(tmp_sub_path) orelse unreachable;
 
                 image_description_step.b.cache_root.handle.createDirPath(io, tmp_sub_path_dirname) catch |err| {
                     return step.fail("unable to make temporary directory '{f}{s}': {t}", .{

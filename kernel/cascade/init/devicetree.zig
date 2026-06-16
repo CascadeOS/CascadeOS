@@ -49,7 +49,7 @@ fn tryGetSerialOutputInner(memory_system_available: bool) !uart.Uart {
     );
 
     while (try iter.next(dt)) |compatible_match| {
-        const func = compatible_lookup.get(compatible_match.compatible).?;
+        const func = compatible_lookup.get(compatible_match.compatible) orelse unreachable;
         if (try func(dt, compatible_match.node.node, memory_system_available)) |output_uart| return output_uart;
     }
 

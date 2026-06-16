@@ -88,7 +88,7 @@ fn callMainAndExit(entry_stack_pointer: [*]usize) callconv(.c) noreturn {
         .linkage = .weak,
     });
     if (opt_init_array_start) |init_array_start| {
-        const init_array_end = opt_init_array_end.?;
+        const init_array_end = opt_init_array_end orelse unreachable;
         const slice = init_array_start[0 .. init_array_end - init_array_start];
         for (slice) |func| func();
     }
@@ -116,7 +116,10 @@ fn callMainAndExit(entry_stack_pointer: [*]usize) callconv(.c) noreturn {
 inline fn callMain(args: std.process.Args.Vector, environ: std.process.Environ.Block) u8 {
     const fn_info = @typeInfo(@TypeOf(root.main)).@"fn";
     if (fn_info.params.len == 0) return wrapMain(root.main());
-    if (fn_info.params[0].type.? == std.process.Init.Minimal) return wrapMain(root.main(.{
+
+    const ZerothParamType = fn_info.params[0].type orelse unreachable;
+
+    if (ZerothParamType == std.process.Init.Minimal) return wrapMain(root.main(.{
         .args = .{ .vector = args },
         .environ = .{ .block = environ },
     }));

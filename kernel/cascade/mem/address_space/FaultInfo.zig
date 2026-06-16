@@ -178,11 +178,13 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo) error{ Restart, OutOfMemory
     const opt_anonymous_map = fault_info.entry.anonymous_map_reference.anonymous_map;
     const opt_object = fault_info.entry.object_reference.object;
 
-    if (core.is_debug) {
-        std.debug.assert(opt_anonymous_map == null or switch (fault_info.anonymous_map_lock_type) {
-            .read => opt_anonymous_map.?.lock.isReadLocked(),
-            .write => opt_anonymous_map.?.lock.isWriteLocked(),
-        });
+    if (core.is_debug) blk: {
+        const anonymous_map = opt_anonymous_map orelse break :blk;
+
+        switch (fault_info.anonymous_map_lock_type) {
+            .read => std.debug.assert(anonymous_map.lock.isReadLocked()),
+            .write => std.debug.assert(anonymous_map.lock.isWriteLocked()),
+        }
     }
 
     const object_page: ObjectPage = if (opt_object) |object| blk: {
@@ -228,7 +230,7 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo) error{ Restart, OutOfMemory
     var physical_page: PhysicalPage.Index = undefined;
 
     if (fault_info.promote_to_anonymous_map) {
-        const anonymous_map = opt_anonymous_map.?;
+        const anonymous_map = opt_anonymous_map orelse unreachable;
 
         // promoting requires a write lock
         if (!fault_info.faultAnonymousMapLockUpgrade(anonymous_map)) {
@@ -242,12 +244,15 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo) error{ Restart, OutOfMemory
             );
             return error.Restart;
         }
-        if (core.is_debug) {
+        if (core.is_debug) blk: {
             std.debug.assert(anonymous_map.lock.isWriteLocked());
-            std.debug.assert(opt_object == null or switch (fault_info.object_lock_type) {
-                .read => opt_object.?.lock.isReadLocked(),
-                .write => opt_object.?.lock.isWriteLocked(),
-            });
+
+            const object = opt_object orelse break :blk;
+
+            switch (fault_info.object_lock_type) {
+                .read => std.debug.assert(object.lock.isReadLocked()),
+                .write => std.debug.assert(object.lock.isWriteLocked()),
+            }
         }
 
         try fault_info.promote(
@@ -273,14 +278,23 @@ pub fn faultObjectOrZeroFill(fault_info: *FaultInfo) error{ Restart, OutOfMemory
     }
 
     if (core.is_debug) {
-        std.debug.assert(opt_anonymous_map == null or switch (fault_info.anonymous_map_lock_type) {
-            .read => opt_anonymous_map.?.lock.isReadLocked(),
-            .write => opt_anonymous_map.?.lock.isWriteLocked(),
-        });
-        std.debug.assert(opt_object == null or switch (fault_info.object_lock_type) {
-            .read => opt_object.?.lock.isReadLocked(),
-            .write => opt_object.?.lock.isWriteLocked(),
-        });
+        blk: {
+            const anonymous_map = opt_anonymous_map orelse break :blk;
+
+            switch (fault_info.anonymous_map_lock_type) {
+                .read => std.debug.assert(anonymous_map.lock.isReadLocked()),
+                .write => std.debug.assert(anonymous_map.lock.isWriteLocked()),
+            }
+        }
+
+        blk: {
+            const object = opt_object orelse break :blk;
+
+            switch (fault_info.object_lock_type) {
+                .read => std.debug.assert(object.lock.isReadLocked()),
+                .write => std.debug.assert(object.lock.isWriteLocked()),
+            }
+        }
     }
 
     {
@@ -359,7 +373,7 @@ fn promote(
 ) error{ Restart, OutOfMemory }!void {
     log.verbose("promoting to an anonymous page", .{});
 
-    const anonymous_map = fault_info.entry.anonymous_map_reference.anonymous_map.?;
+    const anonymous_map = fault_info.entry.anonymous_map_reference.anonymous_map orelse unreachable;
     if (core.is_debug) std.debug.assert(anonymous_map.lock.isWriteLocked());
 
     const opt_object = switch (object_page) {
@@ -367,7 +381,10 @@ fn promote(
         .physical_page => fault_info.entry.object_reference.object,
         .need_io => unreachable,
     };
-    if (core.is_debug) std.debug.assert(opt_object == null or (opt_object.?.lock.isReadLocked() or opt_object.?.lock.isWriteLocked()));
+    if (core.is_debug) blk: {
+        const object = opt_object orelse break :blk;
+        std.debug.assert(object.lock.isReadLocked() or object.lock.isWriteLocked());
+    }
 
     const allocated_physical_page = cascade.mem.PhysicalPage.allocator.allocate() catch {
         @panic("NOT IMPLEMENTED"); // TODO https://github.com/openbsd/src/blob/9222ee7ab44f0e3155b861a0c0a6dd8396d03df3/sys/uvm/uvm_fault.c#L520

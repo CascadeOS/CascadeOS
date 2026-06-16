@@ -267,7 +267,7 @@ pub const Handle = struct {
             }
         };
 
-        const executor = old_task.known_executor.?;
+        const executor = old_task.known_executor orelse unreachable;
         const scheduler_task = &executor.scheduler.task;
         if (core.is_debug) std.debug.assert(scheduler_task.state == .ready);
 
@@ -300,7 +300,7 @@ pub const Handle = struct {
     }
 
     fn switchToTaskFromIdleYield(scheduler_task: *cascade.Task, new_task: *cascade.Task) void {
-        const executor = scheduler_task.known_executor.?;
+        const executor = scheduler_task.known_executor orelse unreachable;
         if (core.is_debug) std.debug.assert(&executor.scheduler.task == scheduler_task);
 
         beforeSwitchTask(scheduler_task, new_task);
@@ -332,7 +332,7 @@ pub const Handle = struct {
         old_task: *cascade.Task,
         new_task: *cascade.Task,
     ) void {
-        const executor = old_task.known_executor.?;
+        const executor = old_task.known_executor orelse unreachable;
 
         beforeSwitchTask(old_task, new_task);
 
@@ -364,7 +364,7 @@ pub const Handle = struct {
             ) noreturn {
                 const scheduler_task = cascade.Task.Current.get().task;
                 if (core.is_debug) std.debug.assert(scheduler_task.is_scheduler_task);
-                const executor = scheduler_task.known_executor.?;
+                const executor = scheduler_task.known_executor orelse unreachable;
 
                 action(inner_old_task, action_arg);
                 if (core.is_debug) {
@@ -384,7 +384,7 @@ pub const Handle = struct {
             }
         };
 
-        const executor = old_task.known_executor.?;
+        const executor = old_task.known_executor orelse unreachable;
 
         beforeSwitchTask(old_task, new_task);
 

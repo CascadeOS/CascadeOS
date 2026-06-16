@@ -737,7 +737,8 @@ pub const init = struct {
         globals.kernel_page_table = buildAndLoadKernelPageTable();
 
         init_log.debug("initializing physical memory", .{});
-        PhysicalPage.init.initializePhysicalMemory(globals.regions.find(.pages).?.range);
+        const pages_region = globals.regions.find(.pages) orelse unreachable;
+        PhysicalPage.init.initializePhysicalMemory(pages_region.range);
 
         init_log.debug("initializing caches", .{});
         try cache.init.initializeCaches();
@@ -750,10 +751,11 @@ pub const init = struct {
         try heap.init.initializeHeaps(&globals.regions);
 
         init_log.debug("initializing kernel address space", .{});
+        const kernel_address_space_region = globals.regions.find(.kernel_address_space) orelse unreachable;
         try globals.kernel_address_space.init(
             .{
                 .name = try .fromSlice("kernel"),
-                .range = globals.regions.find(.kernel_address_space).?.range.toVirtualRange(),
+                .range = kernel_address_space_region.range.toVirtualRange(),
                 .page_table = globals.kernel_page_table,
                 .context = .kernel,
             },

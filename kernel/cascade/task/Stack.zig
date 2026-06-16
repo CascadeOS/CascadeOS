@@ -149,11 +149,11 @@ pub const init = struct {
             },
         );
 
-        const stacks_range = cascade.mem.kernelRegions().find(.kernel_stacks).?.range;
+        const stacks_region = cascade.mem.kernelRegions().find(.kernel_stacks) orelse unreachable;
 
         globals.stack_arena.addSpan(
-            stacks_range.address.value,
-            stacks_range.size.value,
+            stacks_region.range.address.value,
+            stacks_region.range.size.value,
         ) catch |err| {
             std.debug.panic("failed to add stack range to `stack_arena`: {t}", .{err});
         };

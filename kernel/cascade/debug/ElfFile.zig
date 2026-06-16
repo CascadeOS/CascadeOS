@@ -208,10 +208,13 @@ pub fn searchSymtab(ef: *ElfFile, gpa: Allocator, vaddr: u64) error{
             const Sym = if (is_64) elf.Elf64_Sym else elf.Elf32_Sym;
             if (symtab.entry_size != @sizeOf(Sym)) return error.BadSymtab;
             const symbols: []align(1) const Sym = @ptrCast(symtab.bytes);
-            if (ef.symbol_search_table == null) {
-                ef.symbol_search_table = try buildSymbolSearchTable(gpa, ef.endian, Sym, symbols);
-            }
-            const search_table = ef.symbol_search_table.?;
+
+            const search_table = if (ef.symbol_search_table) |search_table| search_table else blk: {
+                const search_table = try buildSymbolSearchTable(gpa, ef.endian, Sym, symbols);
+                ef.symbol_search_table = search_table;
+                break :blk search_table;
+            };
+
             const SearchContext = struct {
                 swap_endian: bool,
                 target: u64,

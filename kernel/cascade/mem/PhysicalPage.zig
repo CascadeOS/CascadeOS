@@ -315,7 +315,7 @@ pub const init = struct {
                 ),
             ).pageAlign();
 
-            const current_pages_range = opt_current_pages_range orelse {
+            const current_pages_range = if (opt_current_pages_range) |*current_pages_range| current_pages_range else {
                 opt_current_pages_range = entry_pages_range;
                 continue;
             };
@@ -324,7 +324,7 @@ pub const init = struct {
                 current_pages_range.after().equal(entry_pages_range.address))
             {
                 std.debug.assert(current_pages_range.address.lessThanOrEqual(entry_pages_range.address));
-                opt_current_pages_range.?.size.addInPlace(current_pages_range.after().difference(entry_pages_range.after()));
+                current_pages_range.size.addInPlace(current_pages_range.after().difference(entry_pages_range.after()));
                 continue;
             }
 

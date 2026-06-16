@@ -124,9 +124,8 @@ pub const init = struct {
     const divide_configuration: LAPIC.DivideConfigurationRegister = .@"2";
 
     fn initializeLapicTimer() void {
-        std.debug.assert(x64.info.lapic_base_tick_duration_fs != null);
-
-        globals.tick_duration_fs = x64.info.lapic_base_tick_duration_fs.? * divide_configuration.toInt();
+        const base_tick_duration_fs = x64.info.lapic_base_tick_duration_fs orelse unreachable;
+        globals.tick_duration_fs = base_tick_duration_fs * divide_configuration.toInt();
         init_log.debug("tick duration (fs) from cpuid: {}", .{globals.tick_duration_fs});
     }
 

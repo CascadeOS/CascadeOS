@@ -39,12 +39,13 @@ pub const init = struct {
                     .simple = struct {
                         fn simple() void {
                             std.debug.assert(shouldUseTsc());
-                            std.debug.assert(x64.info.tsc_tick_duration_fs != null);
 
-                            globals.tick_duration_fs = x64.info.tsc_tick_duration_fs.?;
+                            const tsc_tick_duration_fs = x64.info.tsc_tick_duration_fs orelse @panic("tsc tick duration not captured");
+
+                            globals.tick_duration_fs = tsc_tick_duration_fs;
                             init_log.debug(
                                 "tick duration (fs): {}",
-                                .{globals.tick_duration_fs},
+                                .{tsc_tick_duration_fs},
                             );
                         }
                     }.simple,

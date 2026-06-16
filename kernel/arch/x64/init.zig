@@ -140,8 +140,12 @@ pub fn captureSystemInformation(stage: arch.init.CaptureSystemInformationStage, 
             log.debug("capturing cpuid information", .{});
             x64.info.cpu_id.capture() catch @panic("failed to capture cpuid information");
 
-            if (x64.info.cpu_id.physical_address_size.? > x64.paging.PageTable.maximum_physical_address_bit) {
-                std.debug.panic("unsupported physical address size: {}", .{x64.info.cpu_id.physical_address_size.?});
+            if (x64.info.cpu_id.physical_address_size) |physical_address_size| {
+                if (physical_address_size > x64.paging.PageTable.maximum_physical_address_bit) {
+                    std.debug.panic("unsupported physical address size: {}", .{physical_address_size});
+                }
+            } else {
+                @panic("physical address size not provided by cpuid");
             }
 
             if (!x64.info.cpu_id.mtrr) {
@@ -238,7 +242,7 @@ fn captureXsaveInformation() void {
     // set xcr0 on the bootstrap executor to allow capturing the required size of the XSAVE area
     xcr0.write();
 
-    x64.info.xsave.xsave_area_size = x64.info.cpu_id.xsave.enabledStateSize().?;
+    x64.info.xsave.xsave_area_size = x64.info.cpu_id.xsave.enabledStateSize() orelse unreachable; // XSAVE support is checked above
     log.debug("size of XSAVE area: {f}", .{x64.info.xsave.xsave_area_size});
 }
 

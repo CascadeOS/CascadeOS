@@ -154,24 +154,13 @@ fn constructKernelRootModule(
         .omit_frame_pointer = false,
     });
 
-    // embed the hello world application
-    {
-        const hello_world_application = applications.get("hello_world") orelse @panic("no hello_world application");
+    const arch_component = required_components.get("arch") orelse unreachable;
+    const boot_component = required_components.get("boot") orelse unreachable;
+    const cascade_component = required_components.get("cascade") orelse unreachable;
 
-        const hello_world_exe = hello_world_application.exes.get(.{
-            .architecture = architecture,
-            .context = .cascade,
-        }).?;
-
-        required_components.get("cascade").?.module.addImport(
-            "hello_world",
-            b.createModule(.{ .root_source_file = hello_world_exe.getEmittedBin() }),
-        );
-    }
-
-    kernel_root_module.addImport("arch", required_components.get("arch").?.module);
-    kernel_root_module.addImport("boot", required_components.get("boot").?.module);
-    kernel_root_module.addImport("cascade", required_components.get("cascade").?.module);
+    kernel_root_module.addImport("arch", arch_component.module);
+    kernel_root_module.addImport("boot", boot_component.module);
+    kernel_root_module.addImport("cascade", cascade_component.module);
 
     // apply architecture-specific configuration to the kernel
     switch (architecture) {
@@ -181,6 +170,21 @@ fn constructKernelRootModule(
             kernel_root_module.code_model = .kernel;
             kernel_root_module.red_zone = false;
         },
+    }
+
+    // embed the hello world application
+    {
+        const hello_world_application = applications.get("hello_world") orelse @panic("no hello_world application");
+
+        const hello_world_exe = hello_world_application.exes.get(.{
+            .architecture = architecture,
+            .context = .cascade,
+        }) orelse unreachable;
+
+        cascade_component.module.addImport(
+            "hello_world",
+            b.createModule(.{ .root_source_file = hello_world_exe.getEmittedBin() }),
+        );
     }
 
     return kernel_root_module;

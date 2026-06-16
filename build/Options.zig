@@ -217,7 +217,7 @@ pub fn get(b: *std.Build, cascade_version: std.SemanticVersion, all_architecture
     const root_path = std.fmt.allocPrint(
         b.allocator,
         comptime "{s}" ++ std.fs.path.sep_str,
-        .{b.build_root.path.?},
+        .{b.build_root.path orelse unreachable},
     ) catch unreachable;
 
     const cascade_version_string = try getVersionString(b, cascade_version, root_path);

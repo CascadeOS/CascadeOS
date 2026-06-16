@@ -111,13 +111,14 @@ pub const UsableRangeIterator = struct {
                 return current_range;
             }).pageAlign();
 
-            const current_range = iter.opt_current_range orelse {
+            var current_range = iter.opt_current_range orelse {
                 iter.opt_current_range = entry_range;
                 continue;
             };
 
             if (current_range.after().equal(entry_range.address)) {
-                iter.opt_current_range.?.size.addInPlace(entry_range.size);
+                current_range.size.addInPlace(entry_range.size);
+                iter.opt_current_range = current_range;
                 continue;
             }
 

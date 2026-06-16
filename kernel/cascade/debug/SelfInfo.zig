@@ -107,15 +107,19 @@ pub fn unwindFrame(si: *SelfInfo, _: std.Io, context: *UnwindContext) Error!usiz
 
     const module = try si.getModule(gpa, context.pc);
 
-    if (si.unwind_cache == null) {
-        si.unwind_cache = try gpa.alloc(Dwarf.SelfUnwinder.CacheEntry, 2048);
-        @memset(si.unwind_cache.?, .empty);
-    }
+    const unwind_cache = if (si.unwind_cache) |unwind_cache| unwind_cache else blk: {
+        @branchHint(.unlikely);
+
+        const unwind_cache = try gpa.alloc(Dwarf.SelfUnwinder.CacheEntry, 2048);
+        @memset(unwind_cache, .empty);
+        si.unwind_cache = unwind_cache;
+        break :blk unwind_cache;
+    };
 
     const unwind_sections = try module.getUnwindSections(gpa);
     for (unwind_sections) |*unwind| {
         if (context.computeRules(gpa, unwind, module.load_offset, null)) |entry| {
-            entry.populate(si.unwind_cache.?);
+            entry.populate(unwind_cache);
             return context.next(gpa, &entry);
         } else |err| switch (err) {
             error.MissingDebugInfo => continue,
@@ -155,7 +159,9 @@ comptime {
 fn getModule(si: *SelfInfo, gpa: std.mem.Allocator, address: usize) Error!*Module {
     std.debug.assert(si.lock.isLockedByCurrent());
 
-    if (si.module == null) {
+    const module = if (si.module) |*module| module else blk: {
+        @branchHint(.unlikely);
+
         const load_offset = if (boot.kernelBaseAddress()) |base_address|
             cascade.config.mem.kernel_base_address.difference(base_address.virtual).value
         else
@@ -212,9 +218,8 @@ fn getModule(si: *SelfInfo, gpa: std.mem.Allocator, address: usize) Error!*Modul
             .loaded_elf = null,
             .mapped_elf = kernel_elf_slice,
         };
-    }
-
-    const module = &si.module.?;
+        break :blk &(si.module orelse unreachable);
+    };
 
     for (si.ranges.items) |range| {
         if (address >= range.start and address < range.start + range.len) {
@@ -232,10 +237,12 @@ const Module = struct {
     gnu_eh_frame: ?[]const u8,
 
     /// `null` means unwind information has not yet been loaded.
-    unwind: ?(Error!UnwindSections),
+    unwind: ?UnwindSections,
+    // unwind: ?(Error!UnwindSections),
 
     /// `null` means the ELF file has not yet been loaded.
-    loaded_elf: ?(Error!LoadedElf),
+    loaded_elf: ?LoadedElf,
+    // loaded_elf: ?(Error!LoadedElf),
 
     mapped_elf: []align(std.heap.page_size_min) const u8,
 
@@ -258,10 +265,15 @@ const Module = struct {
 
     /// Assumes we already have the lock.
     fn getUnwindSections(mod: *Module, gpa: std.mem.Allocator) Error![]Dwarf.Unwind {
-        if (mod.unwind == null) mod.unwind = mod.loadUnwindSections(gpa);
-        const us = &(mod.unwind.? catch |err| return err);
-        return us.buf[0..us.len];
+        const unwind_sections = if (mod.unwind) |*unwind| unwind else blk: {
+            @branchHint(.unlikely);
+
+            mod.unwind = try mod.loadUnwindSections(gpa);
+            break :blk &(mod.unwind orelse unreachable);
+        };
+        return unwind_sections.buf[0..unwind_sections.len];
     }
+
     fn loadUnwindSections(mod: *Module, gpa: std.mem.Allocator) Error!UnwindSections {
         var us: UnwindSections = .{
             .buf = undefined,
@@ -316,8 +328,13 @@ const Module = struct {
 
     /// Assumes we already have the lock.
     fn getLoadedElf(mod: *Module, gpa: std.mem.Allocator) Error!*LoadedElf {
-        if (mod.loaded_elf == null) mod.loaded_elf = loadElf(mod, gpa);
-        return if (mod.loaded_elf.?) |*elf| elf else |err| err;
+        if (mod.loaded_elf) |*loaded_elf| {
+            @branchHint(.likely);
+            return loaded_elf;
+        }
+
+        mod.loaded_elf = try loadElf(mod, gpa);
+        return &(mod.loaded_elf orelse unreachable);
     }
 
     fn loadElf(mod: *Module, gpa: std.mem.Allocator) Error!LoadedElf {

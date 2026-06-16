@@ -16,7 +16,7 @@ pub fn customConfiguration(
     // architecture options
     module.addImport(
         "cascade_architecture",
-        options.architecture_specific_kernel_options_modules.get(architecture).?,
+        options.architecture_specific_kernel_options_modules.get(architecture) orelse unreachable,
     );
 
     // sbi

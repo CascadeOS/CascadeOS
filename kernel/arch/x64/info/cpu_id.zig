@@ -2743,13 +2743,14 @@ pub fn determineCrystalFrequency() ?u64 {
 
     // TODO: if `crystal_hz` == 0 and model is Denverton SoCs (linux INTEL_FAM6_ATOM_GOLDMONT_D) then crystal is 25MHz
 
-    if (crystal_hz == 0 and intel_processor_frequency_information != null) {
-        // use the crystal ratio and the CPU speed to determine the crystal frequency
-        const processor_frequency_info = intel_processor_frequency_information.?;
+    if (crystal_hz == 0) {
+        if (intel_processor_frequency_information) |processor_frequency_info| {
+            // use the crystal ratio and the CPU speed to determine the crystal frequency
 
-        crystal_hz =
-            (processor_frequency_info.processor_base_frequency * hz_per_mhz * tsc_and_core_crystal_info.denominator) /
-            tsc_and_core_crystal_info.numerator;
+            crystal_hz =
+                (processor_frequency_info.processor_base_frequency * hz_per_mhz * tsc_and_core_crystal_info.denominator) /
+                tsc_and_core_crystal_info.numerator;
+        }
     }
 
     if (crystal_hz == 0) return null;

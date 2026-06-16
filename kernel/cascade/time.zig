@@ -283,7 +283,7 @@ pub const init = struct {
 
         init_log.debug("using reference counter: {s}", .{time_source.name});
 
-        const reference_counter_impl = time_source.reference_counter.?;
+        const reference_counter_impl = time_source.reference_counter orelse unreachable;
 
         return .{
             ._prepareToWaitForFn = reference_counter_impl.prepareToWaitForFn,
@@ -301,7 +301,7 @@ pub const init = struct {
 
         init_log.debug("using wallclock: {s}", .{time_source.name});
 
-        const wallclock_impl = time_source.wallclock.?;
+        const wallclock_impl = time_source.wallclock orelse unreachable;
 
         if (!wallclock_impl.standard_wallclock_source) {
             init_log.warn(
@@ -324,7 +324,7 @@ pub const init = struct {
 
         init_log.debug("using per-executor periodic: {s}", .{time_source.name});
 
-        return time_source.per_executor_periodic.?;
+        return time_source.per_executor_periodic orelse unreachable;
     }
 
     const TimeSourceQuery = struct {

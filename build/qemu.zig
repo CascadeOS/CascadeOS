@@ -15,7 +15,7 @@ pub fn registerQemuSteps(
     all_architectures: []const CascadeTarget.Architecture,
 ) !void {
     for (all_architectures) |architecture| {
-        const image_step = image_steps.get(architecture).?;
+        const image_step = image_steps.get(architecture) orelse unreachable;
 
         const qemu_step = try createQemuStep(
             b,

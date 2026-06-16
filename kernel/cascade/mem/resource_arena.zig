@@ -190,12 +190,15 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
                 const tag = node.toTag();
 
                 switch (tag.kind) {
-                    .imported_span => arena.source.?.callRelease(
-                        .{
-                            .base = tag.base,
-                            .len = tag.len,
-                        },
-                    ),
+                    .imported_span => {
+                        const source = arena.source orelse unreachable;
+                        source.callRelease(
+                            .{
+                                .base = tag.base,
+                                .len = tag.len,
+                            },
+                        );
+                    },
                     .allocated => any_allocations = true,
                     .span, .free => {},
                 }
@@ -832,7 +835,8 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
         fn popUnusedTag(arena: *@This()) *BoundaryTag {
             if (core.is_debug) std.debug.assert(arena.unused_tags_count > 0);
             arena.unused_tags_count -= 1;
-            const tag = arena.unused_tags.pop().?.toTag();
+            const unused_tag_node = arena.unused_tags.pop() orelse unreachable;
+            const tag = unused_tag_node.toTag();
             if (core.is_debug) std.debug.assert(tag.kind == .free);
             return tag;
         }

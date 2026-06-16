@@ -172,7 +172,7 @@ pub const Reference = struct {
             std.debug.assert(entry.range.containsAddress(faulting_address));
         }
 
-        const anonymous_map = reference.anonymous_map.?;
+        const anonymous_map = reference.anonymous_map orelse unreachable;
 
         const target_index = targetIndex(entry, reference, faulting_address);
         if (core.is_debug) std.debug.assert(target_index < anonymous_map.number_of_pages.count);
@@ -207,7 +207,7 @@ pub const Reference = struct {
 
         log.verbose("adding anonymous page for {f} to anonymous map", .{faulting_address});
 
-        const anonymous_map = reference.anonymous_map.?;
+        const anonymous_map = reference.anonymous_map orelse unreachable;
 
         const target_index = targetIndex(entry, reference, faulting_address);
         if (core.is_debug) std.debug.assert(target_index < anonymous_map.number_of_pages.count);

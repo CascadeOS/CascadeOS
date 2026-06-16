@@ -268,7 +268,7 @@ fn createExecutors() !struct { []cascade.Executor, *cascade.Executor } {
         }
     }
 
-    return .{ executors, opt_bootstrap_executor.? };
+    return .{ executors, opt_bootstrap_executor orelse @panic("unable to determine bootstrap executor") };
 }
 
 fn bootNonBootstrapExecutors() !void {

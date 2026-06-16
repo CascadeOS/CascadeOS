@@ -127,12 +127,17 @@ pub const TypeErasedCall = extern struct {
                         );
                     }
 
-                    for (function_parameters[0..template_parameters.len], template_parameters, 0..) |function_parameter, template_parameter, i| {
-                        if (function_parameter.type.? != template_parameter) {
+                    for (
+                        function_parameters[0..template_parameters.len],
+                        template_parameters,
+                        0..,
+                    ) |function_parameter, TemplateParameterType, i| {
+                        const FunctionParameterType = function_parameter.type orelse unreachable;
+                        if (FunctionParameterType != TemplateParameterType) {
                             @compileError(
                                 std.fmt.comptimePrint(
                                     "function parameter {d} with type '{s}' does not match template parameter with type '{s}'",
-                                    .{ i, @typeName(function_parameter.type.?), @typeName(template_parameter) },
+                                    .{ i, @typeName(FunctionParameterType), @typeName(TemplateParameterType) },
                                 ),
                             );
                         }
@@ -315,7 +320,7 @@ fn typeErasedFn(comptime function: anytype) struct { TypeErasedCall.TypeErasedFn
     const fn_info = @typeInfo(@TypeOf(function)).@"fn";
 
     const return_type: TypeErasedCall.ReturnType = comptime blk: {
-        const ReturnType = fn_info.return_type.?;
+        const ReturnType = fn_info.return_type orelse unreachable;
 
         if (ReturnType == void) break :blk .void;
         if (ReturnType == noreturn) break :blk .noreturn;
@@ -349,10 +354,10 @@ fn typeErasedFn(comptime function: anytype) struct { TypeErasedCall.TypeErasedFn
             fn typeErased1Args(arg0: usize, _: usize, _: usize, _: usize, _: usize) callconv(.c) void {
                 return switch (comptime return_type) {
                     .void, .noreturn => function(
-                        argFromUsize(function_parameters[0].type.?, arg0),
+                        argFromUsize(function_parameters[0].type orelse unreachable, arg0),
                     ),
                     .void_error_union, .noreturn_error_union => function(
-                        argFromUsize(function_parameters[0].type.?, arg0),
+                        argFromUsize(function_parameters[0].type orelse unreachable, arg0),
                     ) catch |err| std.debug.panic(
                         "unhandled error: {t}",
                         .{err},
@@ -364,12 +369,12 @@ fn typeErasedFn(comptime function: anytype) struct { TypeErasedCall.TypeErasedFn
             fn typeErased2Args(arg0: usize, arg1: usize, _: usize, _: usize, _: usize) callconv(.c) void {
                 return switch (comptime return_type) {
                     .void, .noreturn => function(
-                        argFromUsize(function_parameters[0].type.?, arg0),
-                        argFromUsize(function_parameters[1].type.?, arg1),
+                        argFromUsize(function_parameters[0].type orelse unreachable, arg0),
+                        argFromUsize(function_parameters[1].type orelse unreachable, arg1),
                     ),
                     .void_error_union, .noreturn_error_union => function(
-                        argFromUsize(function_parameters[0].type.?, arg0),
-                        argFromUsize(function_parameters[1].type.?, arg1),
+                        argFromUsize(function_parameters[0].type orelse unreachable, arg0),
+                        argFromUsize(function_parameters[1].type orelse unreachable, arg1),
                     ) catch |err| std.debug.panic(
                         "unhandled error: {t}",
                         .{err},
@@ -381,14 +386,14 @@ fn typeErasedFn(comptime function: anytype) struct { TypeErasedCall.TypeErasedFn
             fn typeErased3Ags(arg0: usize, arg1: usize, arg2: usize, _: usize, _: usize) callconv(.c) void {
                 return switch (comptime return_type) {
                     .void, .noreturn => function(
-                        argFromUsize(function_parameters[0].type.?, arg0),
-                        argFromUsize(function_parameters[1].type.?, arg1),
-                        argFromUsize(function_parameters[2].type.?, arg2),
+                        argFromUsize(function_parameters[0].type orelse unreachable, arg0),
+                        argFromUsize(function_parameters[1].type orelse unreachable, arg1),
+                        argFromUsize(function_parameters[2].type orelse unreachable, arg2),
                     ),
                     .void_error_union, .noreturn_error_union => function(
-                        argFromUsize(function_parameters[0].type.?, arg0),
-                        argFromUsize(function_parameters[1].type.?, arg1),
-                        argFromUsize(function_parameters[2].type.?, arg2),
+                        argFromUsize(function_parameters[0].type orelse unreachable, arg0),
+                        argFromUsize(function_parameters[1].type orelse unreachable, arg1),
+                        argFromUsize(function_parameters[2].type orelse unreachable, arg2),
                     ) catch |err| std.debug.panic(
                         "unhandled error: {t}",
                         .{err},
@@ -400,16 +405,16 @@ fn typeErasedFn(comptime function: anytype) struct { TypeErasedCall.TypeErasedFn
             fn typeErased4Args(arg0: usize, arg1: usize, arg2: usize, arg3: usize, _: usize) callconv(.c) void {
                 return switch (comptime return_type) {
                     .void, .noreturn => function(
-                        argFromUsize(function_parameters[0].type.?, arg0),
-                        argFromUsize(function_parameters[1].type.?, arg1),
-                        argFromUsize(function_parameters[2].type.?, arg2),
-                        argFromUsize(function_parameters[3].type.?, arg3),
+                        argFromUsize(function_parameters[0].type orelse unreachable, arg0),
+                        argFromUsize(function_parameters[1].type orelse unreachable, arg1),
+                        argFromUsize(function_parameters[2].type orelse unreachable, arg2),
+                        argFromUsize(function_parameters[3].type orelse unreachable, arg3),
                     ),
                     .void_error_union, .noreturn_error_union => function(
-                        argFromUsize(function_parameters[0].type.?, arg0),
-                        argFromUsize(function_parameters[1].type.?, arg1),
-                        argFromUsize(function_parameters[2].type.?, arg2),
-                        argFromUsize(function_parameters[3].type.?, arg3),
+                        argFromUsize(function_parameters[0].type orelse unreachable, arg0),
+                        argFromUsize(function_parameters[1].type orelse unreachable, arg1),
+                        argFromUsize(function_parameters[2].type orelse unreachable, arg2),
+                        argFromUsize(function_parameters[3].type orelse unreachable, arg3),
                     ) catch |err| std.debug.panic(
                         "unhandled error: {t}",
                         .{err},
@@ -421,18 +426,18 @@ fn typeErasedFn(comptime function: anytype) struct { TypeErasedCall.TypeErasedFn
             fn typeErased5Args(arg0: usize, arg1: usize, arg2: usize, arg3: usize, arg4: usize) callconv(.c) void {
                 return switch (comptime return_type) {
                     .void, .noreturn => function(
-                        argFromUsize(function_parameters[0].type.?, arg0),
-                        argFromUsize(function_parameters[1].type.?, arg1),
-                        argFromUsize(function_parameters[2].type.?, arg2),
-                        argFromUsize(function_parameters[3].type.?, arg3),
-                        argFromUsize(function_parameters[4].type.?, arg4),
+                        argFromUsize(function_parameters[0].type orelse unreachable, arg0),
+                        argFromUsize(function_parameters[1].type orelse unreachable, arg1),
+                        argFromUsize(function_parameters[2].type orelse unreachable, arg2),
+                        argFromUsize(function_parameters[3].type orelse unreachable, arg3),
+                        argFromUsize(function_parameters[4].type orelse unreachable, arg4),
                     ),
                     .void_error_union, .noreturn_error_union => function(
-                        argFromUsize(function_parameters[0].type.?, arg0),
-                        argFromUsize(function_parameters[1].type.?, arg1),
-                        argFromUsize(function_parameters[2].type.?, arg2),
-                        argFromUsize(function_parameters[3].type.?, arg3),
-                        argFromUsize(function_parameters[4].type.?, arg4),
+                        argFromUsize(function_parameters[0].type orelse unreachable, arg0),
+                        argFromUsize(function_parameters[1].type orelse unreachable, arg1),
+                        argFromUsize(function_parameters[2].type orelse unreachable, arg2),
+                        argFromUsize(function_parameters[3].type orelse unreachable, arg3),
+                        argFromUsize(function_parameters[4].type orelse unreachable, arg4),
                     ) catch |err| std.debug.panic(
                         "unhandled error: {t}",
                         .{err},

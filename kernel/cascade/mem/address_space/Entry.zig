@@ -173,7 +173,7 @@ pub fn merge(first_entry: *Entry, second_entry: *const Entry) void {
             break :object;
         };
 
-        const second_entry_object = second_entry.object_reference.object.?;
+        const second_entry_object = second_entry.object_reference.object orelse unreachable;
         if (core.is_debug) std.debug.assert(object == second_entry_object);
 
         object.lock.writeLock();

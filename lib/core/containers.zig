@@ -373,11 +373,11 @@ pub fn BoundedArrayAligned(
 
         /// Remove the element at index `i`, shift elements after index
         /// `i` forward, and return the removed element.
-        /// Asserts the slice has at least one item.
+        /// Assumes the slice has at least one item.
         /// This operation is O(N).
         pub fn orderedRemove(self: *Self, i: usize) T {
             const newlen = self.len - 1;
-            if (newlen == i) return self.pop().?;
+            if (newlen == i) return self.pop() orelse unreachable;
             const old_item = self.get(i);
             for (self.slice()[i..newlen], 0..) |*b, j| b.* = self.get(i + 1 + j);
             self.set(newlen, undefined);
@@ -389,9 +389,9 @@ pub fn BoundedArrayAligned(
         /// The empty slot is filled from the end of the slice.
         /// This operation is O(1).
         pub fn swapRemove(self: *Self, i: usize) T {
-            if (self.len - 1 == i) return self.pop().?;
+            if (self.len - 1 == i) return self.pop() orelse unreachable;
             const old_item = self.get(i);
-            self.set(i, self.pop().?);
+            self.set(i, self.pop() orelse unreachable);
             return old_item;
         }
 

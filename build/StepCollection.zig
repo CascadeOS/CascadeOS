@@ -47,32 +47,38 @@ pub fn registerKernel(
     architecture: CascadeTarget.Architecture,
     install_kernel: *Step,
 ) void {
-    step_collection.kernel_build_steps_per_architecture.get(architecture).?.dependOn(install_kernel);
+    const kernel_step = step_collection.kernel_build_steps_per_architecture.get(architecture) orelse unreachable;
+    kernel_step.dependOn(install_kernel);
 }
 
 /// Registers an image build step for an architecture.
 pub fn registerImage(step_collection: StepCollection, architecture: CascadeTarget.Architecture, step: *Step) void {
-    step_collection.image_build_steps_per_architecture.get(architecture).?.dependOn(step);
+    const image_step = step_collection.image_build_steps_per_architecture.get(architecture) orelse unreachable;
+    image_step.dependOn(step);
 }
 
 /// Registers a Cascade library build step for an architecture.
 pub fn registerCascadeLibrary(step_collection: StepCollection, architecture: CascadeTarget.Architecture, install_step: *Step) void {
-    step_collection.cascade_library_build_steps_per_architecture.get(architecture).?.dependOn(install_step);
+    const cascade_library_step = step_collection.cascade_library_build_steps_per_architecture.get(architecture) orelse unreachable;
+    cascade_library_step.dependOn(install_step);
 }
 
 /// Registers non-Cascade library build and run steps for an architecture.
 pub fn registerNonCascadeLibrary(step_collection: StepCollection, architecture: CascadeTarget.Architecture, run_step: *Step) void {
-    step_collection.non_cascade_library_test_steps_per_architecture.get(architecture).?.dependOn(run_step);
+    const non_cascade_library_step = step_collection.non_cascade_library_test_steps_per_architecture.get(architecture) orelse unreachable;
+    non_cascade_library_step.dependOn(run_step);
 }
 
 /// Registers Cascade application build steps for an architecture.
 pub fn registerCascadeApplication(step_collection: StepCollection, architecture: CascadeTarget.Architecture, build_step: *Step) void {
-    step_collection.cascade_application_build_steps_per_architecture.get(architecture).?.dependOn(build_step);
+    const cascade_application_step = step_collection.cascade_application_build_steps_per_architecture.get(architecture) orelse unreachable;
+    cascade_application_step.dependOn(build_step);
 }
 
 /// Registers non-Cascade application build and run steps for an architecture.
 pub fn registerNonCascadeApplication(step_collection: StepCollection, architecture: CascadeTarget.Architecture, run_step: *Step) void {
-    step_collection.non_cascade_application_test_steps_per_architecture.get(architecture).?.dependOn(run_step);
+    const non_cascade_application_step = step_collection.non_cascade_application_test_steps_per_architecture.get(architecture) orelse unreachable;
+    non_cascade_application_step.dependOn(run_step);
 }
 
 pub fn create(b: *std.Build, all_architectures: []const CascadeTarget.Architecture) !StepCollection {

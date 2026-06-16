@@ -15,9 +15,9 @@ task: *cascade.Task,
 
 /// Returns the executor that the current task is running on if it is known.
 ///
-/// Asserts that the `known_executor` field is non-null.
+/// Assumes that the `known_executor` field is non-null.
 pub inline fn knownExecutor(current_task: Current) *cascade.Executor {
-    return current_task.task.known_executor.?;
+    return current_task.task.known_executor orelse unreachable;
 }
 
 pub inline fn get() Current {

@@ -583,7 +583,7 @@ pub fn changeProtection(
         if (validate_change_protection.update_page_table) {
             const new_map_type: cascade.mem.MapType = .{
                 .type = address_space.context,
-                .protection = request.protection.?,
+                .protection = request.protection orelse unreachable,
             };
 
             var change_protection_batch: cascade.mem.ChangeProtectionBatch = .{};
