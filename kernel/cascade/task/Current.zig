@@ -59,22 +59,28 @@ pub fn decrementMigrationDisable(current_task: Current) void {
     if (previous == 1) current_task.setKnownExecutor();
 }
 
-pub fn incrementEnableAccessToUserMemory(current_task: Current) void {
+/// Enable access to user memory.
+///
+/// The caller must ensure that access to user memory is not currently enabled.
+pub fn enableAccessToUserMemory(current_task: Current) void {
     if (core.is_debug) std.debug.assert(current_task.task.type == .user);
 
-    const previous = current_task.task.enable_access_to_user_memory_count.fetchAdd(1, .acq_rel);
-    if (core.is_debug) std.debug.assert(previous < std.math.maxInt(u32));
+    const previous = current_task.task.access_user_memory.swap(true, .monotonic);
+    std.debug.assert(!previous);
 
-    if (previous == 0) arch.paging.enableAccessToUserMemory();
+    arch.paging.enableAccessToUserMemory();
 }
 
-pub fn decrementEnableAccessToUserMemory(current_task: Current) void {
+/// Disable access to user memory.
+///
+/// The caller must ensure that access to user memory is currently enabled.
+pub fn disableAccessToUserMemory(current_task: Current) void {
     if (core.is_debug) std.debug.assert(current_task.task.type == .user);
 
-    const previous = current_task.task.enable_access_to_user_memory_count.fetchSub(1, .acq_rel);
-    if (core.is_debug) std.debug.assert(previous > 0);
+    const previous = current_task.task.access_user_memory.swap(false, .monotonic);
+    std.debug.assert(previous);
 
-    if (previous == 1) arch.paging.disableAccessToUserMemory();
+    arch.paging.disableAccessToUserMemory();
 }
 
 /// Maybe preempt the current task.
@@ -104,10 +110,9 @@ pub fn onInterruptEntry() StateBeforeInterrupt {
     const task = arch.scheduling.getCurrentTask();
 
     const before_interrupt_interrupt_disable_count = task.interrupt_disable_count.fetchAdd(1, .acq_rel);
+    const before_interrupt_access_user_memory = task.access_user_memory.swap(false, .acq_rel);
 
-    const before_interrupt_enable_access_to_user_memory_count = task.enable_access_to_user_memory_count.swap(0, .acq_rel);
-
-    if (before_interrupt_enable_access_to_user_memory_count != 0) {
+    if (before_interrupt_access_user_memory) {
         @branchHint(.unlikely);
         arch.paging.disableAccessToUserMemory();
     }
@@ -116,7 +121,7 @@ pub fn onInterruptEntry() StateBeforeInterrupt {
 
     return .{
         .interrupt_disable_count = before_interrupt_interrupt_disable_count,
-        .enable_access_to_user_memory_count = before_interrupt_enable_access_to_user_memory_count,
+        .access_user_memory = before_interrupt_access_user_memory,
     };
 }
 
@@ -125,23 +130,23 @@ pub fn onInterruptEntry() StateBeforeInterrupt {
 /// Stored seperately from the task to allow nested interrupts.
 pub const StateBeforeInterrupt = struct {
     interrupt_disable_count: u32,
-    enable_access_to_user_memory_count: u32,
+    access_user_memory: bool,
 
     pub fn onInterruptExit(state_before_interrupt: StateBeforeInterrupt) void {
         const current_task: Current = .get();
 
         current_task.task.interrupt_disable_count.store(state_before_interrupt.interrupt_disable_count, .release);
 
-        const before_interrupt_enable_access_to_user_memory_count = state_before_interrupt.enable_access_to_user_memory_count;
-        const current_enable_access_to_user_memory_count = current_task.task.enable_access_to_user_memory_count.swap(
-            before_interrupt_enable_access_to_user_memory_count,
+        const before_interrupt_access_user_memory = state_before_interrupt.access_user_memory;
+        const current_access_user_memory = current_task.task.access_user_memory.swap(
+            before_interrupt_access_user_memory,
             .release,
         );
 
-        if (current_enable_access_to_user_memory_count != before_interrupt_enable_access_to_user_memory_count) {
+        if (current_access_user_memory != before_interrupt_access_user_memory) {
             @branchHint(.unlikely);
 
-            if (before_interrupt_enable_access_to_user_memory_count == 0) {
+            if (before_interrupt_access_user_memory) {
                 arch.paging.disableAccessToUserMemory();
             } else {
                 arch.paging.enableAccessToUserMemory();

@@ -61,8 +61,8 @@ pub fn onSyscall(
                 };
 
                 const ends_with_newline = blk: {
-                    current_task.incrementEnableAccessToUserMemory();
-                    defer current_task.decrementEnableAccessToUserMemory();
+                    current_task.enableAccessToUserMemory();
+                    defer current_task.disableAccessToUserMemory();
 
                     // TODO: implement safe access to user memory so page faults can be handled correctly
                     writer.writeAll(range.byteSlice()) catch {

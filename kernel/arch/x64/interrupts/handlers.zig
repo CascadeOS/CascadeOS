@@ -49,7 +49,7 @@ pub fn pageFaultHandler(
         else
             .{
                 .kernel = .{
-                    .access_to_user_memory_enabled = state_before_interrupt.enable_access_to_user_memory_count != 0,
+                    .access_user_memory_enabled = state_before_interrupt.access_user_memory,
                 },
             },
     }, interrupt_frame);

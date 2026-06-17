@@ -325,7 +325,7 @@ fn onKernelPageFault(
                 };
             };
 
-            if (!page_fault_details.faulting_context.kernel.access_to_user_memory_enabled) {
+            if (!page_fault_details.faulting_context.kernel.access_user_memory_enabled) {
                 @branchHint(.cold);
 
                 cascade.debug.interruptSourcePanic(
@@ -403,7 +403,7 @@ pub const PageFaultDetails = struct {
 
     pub const FaultingContext = union(cascade.Context.Type) {
         kernel: struct {
-            access_to_user_memory_enabled: bool,
+            access_user_memory_enabled: bool,
         },
         user,
     };

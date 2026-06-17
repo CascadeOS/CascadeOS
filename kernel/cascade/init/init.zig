@@ -365,8 +365,8 @@ fn loadHelloWorld() !void {
 
     // copy the regions from the elf into the address space
     {
-        current_task.incrementEnableAccessToUserMemory();
-        defer current_task.decrementEnableAccessToUserMemory();
+        current_task.enableAccessToUserMemory();
+        defer current_task.disableAccessToUserMemory();
 
         var iter = header.loadableRegionIterator(program_header_table);
 

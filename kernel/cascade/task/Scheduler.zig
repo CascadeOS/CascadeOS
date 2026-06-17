@@ -423,33 +423,33 @@ pub const Handle = struct {
     ) void {
         const transition: cascade.Task.Transition = .from(old_task, new_task);
 
-        const old_task_enable_access_to_user_memory_count = transition.old_task.enable_access_to_user_memory_count.load(.acquire);
-        const new_task_enable_access_to_user_memory_count = transition.new_task.enable_access_to_user_memory_count.load(.acquire);
+        const old_task_access_user_memory = transition.old_task.access_user_memory.load(.acquire);
+        const new_task_access_user_memory = transition.new_task.access_user_memory.load(.acquire);
 
         switch (transition.type) {
             .kernel_to_kernel => {
                 if (core.is_debug) {
-                    std.debug.assert(old_task_enable_access_to_user_memory_count == 0);
-                    std.debug.assert(new_task_enable_access_to_user_memory_count == 0);
+                    std.debug.assert(!old_task_access_user_memory);
+                    std.debug.assert(!new_task_access_user_memory);
                 }
             },
             .kernel_to_user => {
-                if (core.is_debug) std.debug.assert(old_task_enable_access_to_user_memory_count == 0);
+                if (core.is_debug) std.debug.assert(!old_task_access_user_memory);
 
                 const new_process: *cascade.user.Process = .from(transition.new_task);
                 new_process.address_space.page_table.load();
 
-                if (new_task_enable_access_to_user_memory_count != 0) {
+                if (new_task_access_user_memory) {
                     @branchHint(.unlikely); // we expect this to be 0 most of the time
                     arch.paging.enableAccessToUserMemory();
                 }
             },
             .user_to_kernel => {
-                if (core.is_debug) std.debug.assert(new_task_enable_access_to_user_memory_count == 0);
+                if (core.is_debug) std.debug.assert(!new_task_access_user_memory);
 
                 cascade.mem.kernelPageTable().load();
 
-                if (old_task_enable_access_to_user_memory_count != 0) {
+                if (old_task_access_user_memory) {
                     @branchHint(.unlikely); // we expect this to be 0 most of the time
                     arch.paging.disableAccessToUserMemory();
                 }
@@ -459,12 +459,10 @@ pub const Handle = struct {
                 const new_process: *cascade.user.Process = .from(transition.new_task);
                 if (old_process != new_process) new_process.address_space.page_table.load();
 
-                if (old_task_enable_access_to_user_memory_count !=
-                    new_task_enable_access_to_user_memory_count)
-                {
+                if (old_task_access_user_memory != new_task_access_user_memory) {
                     @branchHint(.unlikely); // we expect both to be 0 most of the time
 
-                    if (new_task_enable_access_to_user_memory_count == 0) {
+                    if (new_task_access_user_memory) {
                         arch.paging.disableAccessToUserMemory();
                     } else {
                         arch.paging.enableAccessToUserMemory();

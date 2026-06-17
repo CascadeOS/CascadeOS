@@ -60,8 +60,8 @@ interrupt_disable_count: std.atomic.Value(u32) = .init(1), // tasks always start
 /// Tracks the depth of nested migration disables.
 migration_disable_count: std.atomic.Value(u32),
 
-/// Tracks nested enables of access to user memory.
-enable_access_to_user_memory_count: std.atomic.Value(u32) = .init(0),
+/// Whether the task is currently accessing user memory.
+access_user_memory: std.atomic.Value(bool) = .init(false),
 
 spinlocks_held: u32,
 scheduler_locked: bool,
