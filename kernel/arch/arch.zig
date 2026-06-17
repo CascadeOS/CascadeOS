@@ -171,6 +171,14 @@ pub const interrupts = struct {
             )(self.arch_specific);
         }
 
+        /// Sets the instruction pointer that should be used when returning from the interrupt.
+        pub fn setInstructionPointer(self: InterruptFrame, instruction_pointer: cascade.VirtualAddress) void {
+            return getFunction(
+                current_functions.interrupts,
+                "setInstructionPointer",
+            )(self.arch_specific, instruction_pointer);
+        }
+
         pub inline fn format(
             interrupt_frame: InterruptFrame,
             writer: *std.Io.Writer,
@@ -987,6 +995,12 @@ pub const Functions = struct {
 
         /// Returns the instruction pointer of the context this interrupt was triggered from.
         instructionPointer: ?fn (interrupt_frame: *const current_decls.interrupts.InterruptFrame) cascade.VirtualAddress = null,
+
+        /// Sets the instruction pointer that should be used when returning from the interrupt.
+        setInstructionPointer: ?fn (
+            interrupt_frame: *current_decls.interrupts.InterruptFrame,
+            instruction_pointer: cascade.VirtualAddress,
+        ) void = null,
 
         init: struct {
             /// Ensure that any exceptions/faults that occur during early initialization are handled.

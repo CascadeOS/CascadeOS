@@ -33,6 +33,11 @@ pub const functions: arch.Functions = .{
                 return interrupt_frame.rip;
             }
         }.instructionPointer,
+        .setInstructionPointer = struct {
+            fn setInstructionPointer(interrupt_frame: *x64.interrupts.InterruptFrame, address: cascade.VirtualAddress) void {
+                interrupt_frame.rip = address;
+            }
+        }.setInstructionPointer,
 
         .init = .{
             .initializeEarlyInterrupts = x64.interrupts.init.initializeEarlyInterrupts,
