@@ -370,6 +370,7 @@ pub const VirtualRange = struct {
     pub const fullyContains: fn (range: @This(), other: @This()) bool = Mixin.fullyContains;
     pub const containsAddress: fn (range: @This(), address: Address) bool = Mixin.containsAddress;
     pub const containsAddressOrder: fn (range: @This(), address: Address) std.math.Order = Mixin.containsAddressOrder;
+    pub const subslice: fn (range: @This(), offset: core.Size, size: core.Size) @This() = Mixin.subslice;
     pub const format: fn (range: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void = Mixin.format;
 
     const Address = VirtualAddress;
@@ -434,6 +435,7 @@ pub const KernelVirtualRange = struct {
     pub const fullyContains: fn (range: @This(), other: @This()) bool = Mixin.fullyContains;
     pub const containsAddress: fn (range: @This(), address: Address) bool = Mixin.containsAddress;
     pub const containsAddressOrder: fn (range: @This(), address: Address) std.math.Order = Mixin.containsAddressOrder;
+    pub const subslice: fn (range: @This(), offset: core.Size, size: core.Size) @This() = Mixin.subslice;
     pub const format: fn (range: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void = Mixin.format;
 
     const Address = KernelVirtualAddress;
@@ -477,6 +479,7 @@ pub const UserVirtualRange = struct {
     pub const fullyContains: fn (range: @This(), other: @This()) bool = Mixin.fullyContains;
     pub const containsAddress: fn (range: @This(), address: Address) bool = Mixin.containsAddress;
     pub const containsAddressOrder: fn (range: @This(), address: Address) std.math.Order = Mixin.containsAddressOrder;
+    pub const subslice: fn (range: @This(), offset: core.Size, size: core.Size) @This() = Mixin.subslice;
     pub const format: fn (range: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void = Mixin.format;
 
     const Address = UserVirtualAddress;
@@ -526,6 +529,7 @@ pub const PhysicalRange = struct {
     pub const fullyContains: fn (range: @This(), other: @This()) bool = Mixin.fullyContains;
     pub const containsAddress: fn (range: @This(), address: Address) bool = Mixin.containsAddress;
     pub const containsAddressOrder: fn (range: @This(), address: Address) std.math.Order = Mixin.containsAddressOrder;
+    pub const subslice: fn (range: @This(), offset: core.Size, size: core.Size) @This() = Mixin.subslice;
     pub const format: fn (range: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void = Mixin.format;
 
     const Address = PhysicalAddress;
@@ -669,14 +673,14 @@ fn RangeMixin(comptime Range: type) type {
         /// Returns whether the range is page aligned.
         ///
         /// Both the address and size must be page aligned for this to return true.
-        pub inline fn pageAligned(range: Range) bool {
+        inline fn pageAligned(range: Range) bool {
             return range.address.pageAligned() and range.size.aligned(arch.paging.standard_page_size_alignment);
         }
 
         /// Returns the range with the address and size page aligned.
         ///
         /// The address is aligned backward and the size is aligned forward.
-        pub inline fn pageAlign(range: Range) Range {
+        inline fn pageAlign(range: Range) Range {
             const new_address = range.address.pageAlignBackward();
             return .{
                 .address = new_address,
@@ -718,6 +722,18 @@ fn RangeMixin(comptime Range: type) type {
             if (range.address.greaterThan(address)) return .lt;
             if (after(range).lessThanOrEqual(address)) return .gt;
             return .eq;
+        }
+
+        /// Performs the same slicing operation as `slice[offset..][0..size]`.
+        ///
+        /// Caller must ensure that `offset + size <= slice.len`.
+        fn subslice(range: Range, offset: core.Size, size: core.Size) Range {
+            if (core.is_debug) std.debug.assert(offset.add(size).lessThanOrEqual(range.size));
+
+            return .{
+                .address = range.address.moveForward(offset),
+                .size = size,
+            };
         }
 
         fn format(range: Range, writer: *std.Io.Writer) !void {
