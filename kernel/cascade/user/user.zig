@@ -38,50 +38,66 @@ pub fn onSyscall(
             unreachable;
         },
         .debug_print => {
-            const range = syscall_frame.getUserRange(.two, .one) orelse return 0;
-            const slice = range.byteSlice();
+            const full_source = (syscall_frame.getUserRange(.two, .one) orelse return 0).toVirtualRange();
 
-            if (slice.len == 0) {
-                @branchHint(.cold);
-                return 0;
-            }
+            if (full_source.size.equal(.zero)) return 0;
 
             const writer = cascade.init.Output.terminal.writer;
+            if (core.is_debug) std.debug.assert(writer.buffer.len != 0); // assumed by below loop to be non-zero
+
+            const full_destination = cascade.KernelVirtualRange.fromSlice(u8, writer.buffer).toVirtualRange();
+            var bytes_copied: core.Size = .zero;
 
             // TODO: remove usage of `init.Output` as this is intended to be disabled by the time userspace is running...
+            //       and printing logs during page faults that occur during the safe memcpy will deadlock
             cascade.init.Output.lock.lock();
-            defer cascade.init.Output.lock.unlock();
+            defer {
+                writer.end = 0;
+                cascade.init.Output.lock.unlock();
+            }
+            if (core.is_debug) std.debug.assert(writer.end == 0);
 
-            ret: {
-                const process: *const Process = .from(current_task.task);
+            const process: *const Process = .from(current_task.task);
+            writer.print("{f}: ", .{process}) catch {
+                @branchHint(.cold);
+                return 0;
+            };
 
-                writer.print("{f}: ", .{process}) catch {
+            var last_copy = false;
+
+            while (!last_copy) {
+                const bytes_to_copy: core.Size = .from(
+                    @min(full_source.size.subtract(bytes_copied).value, writer.buffer.len - writer.end),
+                    .byte,
+                );
+
+                if (!cascade.mem.safe.memcpy(.{
+                    .destination = full_destination.subslice(
+                        .from(writer.end, .byte),
+                        bytes_to_copy,
+                    ),
+                    .source = full_source.subslice(bytes_copied, bytes_to_copy),
+                })) {
                     @branchHint(.cold);
-                    break :ret;
+                    return 0;
+                }
+
+                bytes_copied.addInPlace(bytes_to_copy);
+                last_copy = bytes_copied.greaterThanOrEqual(full_source.size);
+
+                writer.end += bytes_to_copy.value;
+                defer writer.end = 0;
+
+                if (last_copy and writer.buffer[writer.end - 1] != '\n') writer.writeByte('\n') catch {
+                    @branchHint(.cold);
+                    return 0;
                 };
 
-                const ends_with_newline = blk: {
-                    current_task.enableAccessToUserMemory();
-                    defer current_task.disableAccessToUserMemory();
-
-                    // TODO: implement safe access to user memory so page faults can be handled correctly
-                    writer.writeAll(range.byteSlice()) catch {
-                        @branchHint(.cold);
-                        break :blk false;
-                    };
-
-                    break :blk slice[slice.len - 1] == '\n';
-                };
-
-                if (!ends_with_newline) writer.writeByte('\n') catch {
+                writer.flush() catch {
                     @branchHint(.cold);
-                    break :ret;
+                    return 0;
                 };
             }
-
-            writer.flush() catch {
-                @branchHint(.cold);
-            };
 
             return 0;
         },

@@ -308,8 +308,12 @@ pub const safe = struct {
             .target = undefined,
         };
 
-        std.debug.assert(current_task.task.safe_result_slot.swap(&slot, .monotonic) == null);
-        defer std.debug.assert(current_task.task.safe_result_slot.swap(null, .monotonic) == &slot);
+        std.debug.assert(
+            current_task.task.safe_result_slot.swap(&slot, .monotonic) == null,
+        );
+        defer std.debug.assert(
+            current_task.task.safe_result_slot.swap(null, .monotonic) == &slot,
+        );
 
         arch.paging.safeMemcpy(args.destination, args.source, &slot.target);
 
