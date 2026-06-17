@@ -186,16 +186,18 @@ fn getModule(si: *SelfInfo, gpa: std.mem.Allocator, address: usize) Error!*Modul
         while (program_headers.next()) |program_header| {
             switch (program_header.type) {
                 .load => try ranges.append(gpa, .{
-                    .start = program_header.virtual_address + load_offset,
-                    .len = program_header.memory_size,
+                    .start = program_header.virtual_address.value + load_offset,
+                    .len = program_header.memory_size.value,
                 }),
                 .gnu_eh_frame => {
-                    const segment_ptr: [*]const u8 = @ptrFromInt(load_offset + program_header.virtual_address);
-                    gnu_eh_frame = segment_ptr[0..program_header.memory_size];
+                    const segment_ptr: [*]const u8 = @ptrFromInt(load_offset + program_header.virtual_address.value);
+                    gnu_eh_frame = segment_ptr[0..program_header.memory_size.value];
                 },
                 .note => {
-                    std.debug.assert(program_header.file_size == program_header.memory_size);
-                    var r: std.Io.Reader = .fixed(kernel_elf_slice[program_header.offset..][0..program_header.file_size]);
+                    std.debug.assert(program_header.file_size.equal(program_header.memory_size));
+                    var r: std.Io.Reader = .fixed(
+                        kernel_elf_slice[program_header.offset.value..][0..program_header.file_size.value],
+                    );
                     const name_size = r.takeInt(u32, native_endian) catch continue;
                     const desc_size = r.takeInt(u32, native_endian) catch continue;
                     const note_type = r.takeInt(u32, native_endian) catch continue;

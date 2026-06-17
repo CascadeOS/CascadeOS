@@ -327,6 +327,7 @@ const StageBarrier = struct {
 
 fn loadHelloWorld() !void {
     const hello_world_elf = @embedFile("hello_world");
+    const source_range = cascade.KernelVirtualRange.fromSlice(u8, hello_world_elf).toVirtualRange();
 
     const current_task: cascade.Task.Current = .get();
     const thread: *cascade.user.Thread = .from(current_task.task);
@@ -365,20 +366,21 @@ fn loadHelloWorld() !void {
 
     // copy the regions from the elf into the address space
     {
-        current_task.enableAccessToUserMemory();
-        defer current_task.disableAccessToUserMemory();
-
         var iter = header.loadableRegionIterator(program_header_table);
 
         while (try iter.next()) |loadable_region| {
-            if (loadable_region.source_length == 0) continue;
-
-            const mapped_slice = loadable_region.virtual_range.byteSlice();
-
-            @memcpy(
-                mapped_slice[loadable_region.destination_offset..][0..loadable_region.source_length],
-                hello_world_elf[loadable_region.source_base..][0..loadable_region.source_length],
-            );
+            if (!cascade.mem.safe.memcpy(.{
+                .destination = loadable_region.virtual_range.subslice(
+                    loadable_region.destination_offset,
+                    loadable_region.source_length,
+                ).toVirtualRange(),
+                .source = source_range.subslice(
+                    loadable_region.source_base,
+                    loadable_region.source_length,
+                ),
+            })) {
+                return error.FailedToLoadHelloWorld;
+            }
         }
     }
 

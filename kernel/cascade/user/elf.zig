@@ -246,22 +246,22 @@ pub const ProgramHeader = struct {
     flags: Flags,
 
     /// The offset from the beginning of the file at which the first byte of the segment resides.
-    offset: u64,
+    offset: core.Size,
 
     /// The number of bytes in the file image of the segment; it may be zero.
-    file_size: u64,
+    file_size: core.Size,
 
     /// The virtual address at which the first byte of the segment resides in memory.
-    virtual_address: u64,
+    virtual_address: cascade.VirtualAddress,
 
     /// On systems for which physical addressing is relevant, this member is reserved for the segment’s physical address.
     ///
     /// Because System V ignores physical addressing for application programs, this member has unspecified contents for
     /// executable files and shared objects.
-    physical_address: u64,
+    physical_address: cascade.PhysicalAddress,
 
     /// The number of bytes in the memory image of the segment; it may be zero.
-    memory_size: u64,
+    memory_size: core.Size,
 
     /// Loadable process segments must have congruent values for `virtual_address` and `offset`, modulo the page size.
     ///
@@ -295,11 +295,11 @@ pub const ProgramHeader = struct {
                 return .{
                     .type = @enumFromInt(raw_header.p_type),
                     .flags = @bitCast(raw_header.p_flags),
-                    .offset = raw_header.p_offset,
-                    .virtual_address = raw_header.p_vaddr,
-                    .physical_address = raw_header.p_paddr,
-                    .file_size = raw_header.p_filesz,
-                    .memory_size = raw_header.p_memsz,
+                    .offset = .from(raw_header.p_offset, .byte),
+                    .virtual_address = .from(raw_header.p_vaddr),
+                    .physical_address = .from(raw_header.p_paddr),
+                    .file_size = .from(raw_header.p_filesz, .byte),
+                    .memory_size = .from(raw_header.p_memsz, .byte),
                     .alignment = raw_header.p_align,
                 };
             } else {
@@ -311,11 +311,11 @@ pub const ProgramHeader = struct {
                 return .{
                     .type = @enumFromInt(raw_header.p_type),
                     .flags = @bitCast(raw_header.p_flags),
-                    .offset = raw_header.p_offset,
-                    .virtual_address = raw_header.p_vaddr,
-                    .physical_address = raw_header.p_paddr,
-                    .file_size = raw_header.p_filesz,
-                    .memory_size = raw_header.p_memsz,
+                    .offset = .from(raw_header.p_offset, .byte),
+                    .virtual_address = .from(raw_header.p_vaddr),
+                    .physical_address = .from(raw_header.p_paddr),
+                    .file_size = .from(raw_header.p_filesz, .byte),
+                    .memory_size = .from(raw_header.p_memsz, .byte),
                     .alignment = raw_header.p_align,
                 };
             }
@@ -447,19 +447,19 @@ pub const ProgramHeader = struct {
         try writer.writeAll(",\n");
 
         try writer.splatByteAll(' ', new_indent);
-        try writer.print("offset: 0x{x},\n", .{program_header.offset});
+        try writer.print("offset: {f},\n", .{program_header.offset});
 
         try writer.splatByteAll(' ', new_indent);
-        try writer.print("file_size: 0x{x},\n", .{program_header.file_size});
+        try writer.print("file_size: {f},\n", .{program_header.file_size});
 
         try writer.splatByteAll(' ', new_indent);
-        try writer.print("virtual_address: 0x{x},\n", .{program_header.virtual_address});
+        try writer.print("virtual_address: {f},\n", .{program_header.virtual_address});
 
         try writer.splatByteAll(' ', new_indent);
-        try writer.print("physical_address: 0x{x},\n", .{program_header.physical_address});
+        try writer.print("physical_address: {f},\n", .{program_header.physical_address});
 
         try writer.splatByteAll(' ', new_indent);
-        try writer.print("memory_size: 0x{x},\n", .{program_header.memory_size});
+        try writer.print("memory_size: {f},\n", .{program_header.memory_size});
 
         try writer.splatByteAll(' ', new_indent);
         try writer.print("alignment: 0x{x},\n", .{program_header.alignment});
@@ -505,15 +505,15 @@ pub const LoadableRegion = struct {
     protection: cascade.mem.MapType.Protection,
 
     /// The offset into the source data to copy from.
-    source_base: usize,
+    source_base: core.Size,
 
     /// The number of bytes to copy from the source data.
     ///
     /// May be zero.
-    source_length: usize,
+    source_length: core.Size,
 
     /// The offset into the virtual range to copy the data to.
-    destination_offset: usize,
+    destination_offset: core.Size,
 
     pub const Iterator = struct {
         program_header_iterator: ProgramHeader.Iterator,
@@ -521,16 +521,16 @@ pub const LoadableRegion = struct {
         pub fn next(it: *Iterator) !?LoadableRegion {
             while (it.program_header_iterator.next()) |program_header| {
                 if (program_header.type != .load) continue;
-                if (program_header.memory_size == 0) continue; // can this even happen with a loadable segment?
+                if (program_header.memory_size.equal(.zero)) continue; // can this even happen with a loadable segment?
 
                 const address, const offset_due_to_alignment = blk: {
-                    const unaligned_address: cascade.VirtualAddress = .from(program_header.virtual_address);
+                    const unaligned_address: cascade.VirtualAddress = program_header.virtual_address;
                     const aligned_address = unaligned_address.pageAlignBackward();
                     break :blk .{ aligned_address, aligned_address.difference(unaligned_address) };
                 };
 
                 const range_size: core.Size = offset_due_to_alignment
-                    .add(.from(program_header.memory_size, .byte))
+                    .add(program_header.memory_size)
                     .alignForward(arch.paging.standard_page_size_alignment);
 
                 const virtual_range = blk: {
@@ -563,7 +563,7 @@ pub const LoadableRegion = struct {
 
                 return .{
                     .virtual_range = virtual_range,
-                    .destination_offset = offset_due_to_alignment.value,
+                    .destination_offset = offset_due_to_alignment,
                     .source_base = program_header.offset,
                     .source_length = program_header.file_size,
                     .protection = new_protection,
