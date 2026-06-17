@@ -297,11 +297,19 @@ pub const safe = struct {
 
         if (user_range_involved) {
             if (core.is_debug) std.debug.assert(current_task.task.type == .user);
-            current_task.enableAccessToUserMemory();
+            std.debug.assert(
+                !current_task.task.access_user_memory.swap(true, .monotonic),
+            );
+            arch.paging.enableAccessToUserMemory();
         } else {
             std.debug.assert(!current_task.task.access_user_memory.load(.monotonic));
         }
-        defer if (user_range_involved) current_task.disableAccessToUserMemory();
+        defer if (user_range_involved) {
+            std.debug.assert(
+                current_task.task.access_user_memory.swap(false, .monotonic),
+            );
+            arch.paging.disableAccessToUserMemory();
+        };
 
         var slot: ResultSlot = .{
             .result = true,

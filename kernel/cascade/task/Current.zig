@@ -59,30 +59,6 @@ pub fn decrementMigrationDisable(current_task: Current) void {
     if (previous == 1) current_task.setKnownExecutor();
 }
 
-/// Enable access to user memory.
-///
-/// The caller must ensure that access to user memory is not currently enabled.
-pub fn enableAccessToUserMemory(current_task: Current) void {
-    if (core.is_debug) std.debug.assert(current_task.task.type == .user);
-
-    const previous = current_task.task.access_user_memory.swap(true, .monotonic);
-    std.debug.assert(!previous);
-
-    arch.paging.enableAccessToUserMemory();
-}
-
-/// Disable access to user memory.
-///
-/// The caller must ensure that access to user memory is currently enabled.
-pub fn disableAccessToUserMemory(current_task: Current) void {
-    if (core.is_debug) std.debug.assert(current_task.task.type == .user);
-
-    const previous = current_task.task.access_user_memory.swap(false, .monotonic);
-    std.debug.assert(previous);
-
-    arch.paging.disableAccessToUserMemory();
-}
-
 /// Maybe preempt the current task.
 ///
 /// The scheduler lock must *not* be held.
