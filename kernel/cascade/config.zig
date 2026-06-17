@@ -18,7 +18,7 @@ pub const debug = struct {
 pub const executor = struct {
     pub const maximum_number_of_executors = 64;
 
-    pub const interrupt_source_panic_buffer_size = arch.paging.standard_page_size;
+    pub const interrupt_source_panic_buffer_size = arch.mem.standard_page_size;
 };
 
 pub const mem = struct {
@@ -34,7 +34,7 @@ pub const mem = struct {
     pub const virtual_ranges_to_batch = 16;
 
     /// When batching, virtual ranges are merged together if the seperation between them is less than or equal to this value.
-    pub const virtual_range_batching_merge_distance = arch.paging.standard_page_size.multiplyScalar(4);
+    pub const virtual_range_batching_merge_distance = arch.mem.standard_page_size.multiplyScalar(4);
 };
 
 pub const scheduler = struct {
@@ -43,7 +43,7 @@ pub const scheduler = struct {
 
 pub const task = struct {
     /// The size of the usable region of a kernel stack.
-    pub const kernel_stack_size = arch.paging.standard_page_size.multiplyScalar(32); // TODO: why does it need to be this big? - maybe debug only?
+    pub const kernel_stack_size = arch.mem.standard_page_size.multiplyScalar(32); // TODO: why does it need to be this big? - maybe debug only?
 
     pub const task_name_length = 64;
 };

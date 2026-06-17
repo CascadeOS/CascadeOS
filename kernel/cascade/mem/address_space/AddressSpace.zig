@@ -37,7 +37,7 @@ range: cascade.VirtualRange,
 
 context: cascade.Context,
 
-page_table: arch.paging.PageTable,
+page_table: arch.mem.PageTable,
 
 /// Protects the `page_table` field.
 page_table_lock: cascade.sync.Mutex = .{},
@@ -62,7 +62,7 @@ pub const InitOptions = struct {
 
     range: cascade.VirtualRange,
 
-    page_table: arch.paging.PageTable,
+    page_table: arch.mem.PageTable,
 
     context: cascade.Context,
 };
@@ -234,7 +234,7 @@ pub fn map(
         return error.ZeroSize;
     }
 
-    if (!options.size.aligned(arch.paging.standard_page_size_alignment)) {
+    if (!options.size.aligned(arch.mem.standard_page_size_alignment)) {
         @branchHint(.cold);
         return error.SizeNotMultipleOfAPage;
     }

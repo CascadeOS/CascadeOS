@@ -46,8 +46,8 @@ pub const functions: arch.Functions = .{
         },
     },
 
-    .paging = .{
-        .createPageTable = x64.paging.PageTable.create,
+    .mem = .{
+        .createPageTable = x64.mem.PageTable.create,
 
         .loadPageTable = struct {
             fn loadPageTable(physical_page: cascade.mem.PhysicalPage.Index) void {
@@ -55,19 +55,19 @@ pub const functions: arch.Functions = .{
             }
         }.loadPageTable,
 
-        .copyTopLevelIntoPageTable = x64.paging.PageTable.copyTopLevelIntoPageTable,
-        .mapSinglePage = x64.paging.PageTable.map4KiB,
-        .unmap = x64.paging.PageTable.unmap,
-        .changeProtection = x64.paging.PageTable.changeProtection,
-        .flushCache = x64.paging.flushCache,
+        .copyTopLevelIntoPageTable = x64.mem.PageTable.copyTopLevelIntoPageTable,
+        .mapSinglePage = x64.mem.PageTable.map4KiB,
+        .unmap = x64.mem.PageTable.unmap,
+        .changeProtection = x64.mem.PageTable.changeProtection,
+        .flushCache = x64.mem.flushCache,
         .enableAccessToUserMemory = x64.instructions.enableAccessToUserMemory,
         .disableAccessToUserMemory = x64.instructions.disableAccessToUserMemory,
-        .safeMemcpy = x64.paging.safeMemcpy,
+        .safeMemcpy = x64.mem.safeMemcpy,
 
         .init = .{
-            .sizeOfTopLevelEntry = x64.paging.PageTable.sizeOfTopLevelEntry,
-            .fillTopLevel = x64.paging.PageTable.init.fillTopLevel,
-            .mapToPhysicalRangeAllPageSizes = x64.paging.PageTable.init.mapToPhysicalRangeAllPageSizes,
+            .sizeOfTopLevelEntry = x64.mem.PageTable.sizeOfTopLevelEntry,
+            .fillTopLevel = x64.mem.PageTable.init.fillTopLevel,
+            .mapToPhysicalRangeAllPageSizes = x64.mem.PageTable.init.mapToPhysicalRangeAllPageSizes,
         },
     },
 
@@ -176,7 +176,7 @@ pub const functions: arch.Functions = .{
     },
 };
 
-const size_of_address_space_half = core.Size.from(128, .tib).subtract(x64.paging.PageTable.small_page_size);
+const size_of_address_space_half = core.Size.from(128, .tib).subtract(x64.mem.PageTable.small_page_size);
 
 pub const decls: arch.Decls = .{
     .PerExecutor = x64.PerExecutor,
@@ -186,14 +186,14 @@ pub const decls: arch.Decls = .{
         .InterruptFrame = x64.interrupts.InterruptFrame,
     },
 
-    .paging = .{
-        .standard_page_size = x64.paging.PageTable.small_page_size,
-        .largest_page_size = x64.paging.PageTable.large_page_size,
+    .mem = .{
+        .standard_page_size = x64.mem.PageTable.small_page_size,
+        .largest_page_size = x64.mem.PageTable.large_page_size,
         .kernel_memory_range = .from(
             cascade.VirtualAddress.from(0xffff800000000000),
             size_of_address_space_half,
         ),
-        .PageTable = x64.paging.PageTable,
+        .PageTable = x64.mem.PageTable,
     },
 
     .scheduling = .{
@@ -209,7 +209,7 @@ pub const decls: arch.Decls = .{
         .PerThread = x64.user.PerThread,
         .SyscallFrame = x64.user.SyscallFrame,
         .user_memory_range = .from(
-            cascade.VirtualAddress.zero.moveForward(x64.paging.PageTable.small_page_size),
+            cascade.VirtualAddress.zero.moveForward(x64.mem.PageTable.small_page_size),
             size_of_address_space_half,
         ),
     },

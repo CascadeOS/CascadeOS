@@ -27,7 +27,7 @@ pub fn pageFaultHandler(
     const faulting_address = x64.registers.Cr2.readAddress();
 
     const arch_interrupt_frame: *const x64.interrupts.InterruptFrame = .from(interrupt_frame);
-    const error_code: x64.paging.PageFaultErrorCode = .fromErrorCode(arch_interrupt_frame.error_code);
+    const error_code: x64.mem.PageFaultErrorCode = .fromErrorCode(arch_interrupt_frame.error_code);
 
     cascade.mem.onPageFault(.{
         .faulting_address = faulting_address,
@@ -63,7 +63,7 @@ pub fn earlyPageFaultHandler(
     const faulting_address = x64.registers.Cr2.readAddress();
 
     const arch_interrupt_frame: *const x64.interrupts.InterruptFrame = .from(interrupt_frame);
-    const error_code: x64.paging.PageFaultErrorCode = .fromErrorCode(arch_interrupt_frame.error_code);
+    const error_code: x64.mem.PageFaultErrorCode = .fromErrorCode(arch_interrupt_frame.error_code);
 
     switch (arch_interrupt_frame.context()) {
         .kernel => cascade.debug.interruptSourcePanic(

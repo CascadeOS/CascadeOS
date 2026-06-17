@@ -260,7 +260,7 @@ const globals = struct {
                         cascade.mem.PhysicalPage.allocator.deallocate(page_list);
                     }
 
-                    const page_table: arch.paging.PageTable = .create(page);
+                    const page_table: arch.mem.PageTable = .create(page);
                     cascade.mem.kernelPageTable().copyTopLevelInto(page_table);
 
                     process.address_space.init(.{

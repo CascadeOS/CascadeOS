@@ -71,8 +71,8 @@ pub const PageTable = extern struct {
 
     /// Copies the top level of `page_table` into `target_page_table`.
     pub fn copyTopLevelIntoPageTable(
-        page_table: *x64.paging.PageTable,
-        target_page_table: *x64.paging.PageTable,
+        page_table: *x64.mem.PageTable,
+        target_page_table: *x64.mem.PageTable,
     ) void {
         if (core.is_debug) std.debug.assert(page_table != target_page_table);
         @memcpy(target_page_table.entries(), page_table.entriesConst());
@@ -1116,7 +1116,7 @@ pub const PageTable = extern struct {
             range: cascade.VirtualRange,
             physical_page_allocator: cascade.mem.PhysicalPage.Allocator,
         ) !void {
-            const size_of_top_level_entry = arch.paging.init.sizeOfTopLevelEntry();
+            const size_of_top_level_entry = arch.mem.init.sizeOfTopLevelEntry();
             if (core.is_debug) {
                 std.debug.assert(range.size.equal(size_of_top_level_entry));
                 std.debug.assert(range.address.aligned(size_of_top_level_entry.toAlignment()));

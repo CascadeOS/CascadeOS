@@ -43,7 +43,7 @@ anonymous_page_chunks: AnonPageChunkMap = .{},
 // shared: bool, // TODO: properly support shared anonymous maps
 
 pub fn create(size: core.Size) error{OutOfMemory}!*AnonMap {
-    if (core.is_debug) std.debug.assert(size.aligned(arch.paging.standard_page_size_alignment));
+    if (core.is_debug) std.debug.assert(size.aligned(arch.mem.standard_page_size_alignment));
 
     const anonymous_map = globals.anonymous_map_cache.allocate() catch return error.OutOfMemory;
 
@@ -165,7 +165,7 @@ pub const Reference = struct {
     pub fn lookup(reference: Reference, entry: *const Entry, faulting_address: cascade.VirtualAddress) ?*AnonPage {
         if (core.is_debug) {
             std.debug.assert(reference.anonymous_map != null);
-            std.debug.assert(reference.start_offset.aligned(arch.paging.standard_page_size_alignment));
+            std.debug.assert(reference.start_offset.aligned(arch.mem.standard_page_size_alignment));
             std.debug.assert(entry.anonymous_map_reference.anonymous_map == reference.anonymous_map);
             std.debug.assert(entry.anonymous_map_reference.start_offset.equal(reference.start_offset));
             std.debug.assert(faulting_address.pageAligned());
@@ -234,8 +234,8 @@ pub const Reference = struct {
         if (core.is_debug) std.debug.assert(entry.range.containsAddress(faulting_address));
 
         return @intCast(
-            entry.range.address.difference(faulting_address).divide(arch.paging.standard_page_size) +
-                reference.start_offset.divide(arch.paging.standard_page_size),
+            entry.range.address.difference(faulting_address).divide(arch.mem.standard_page_size) +
+                reference.start_offset.divide(arch.mem.standard_page_size),
         );
     }
 
@@ -282,7 +282,7 @@ pub const PageCount = extern struct {
     }
 
     pub fn increaseBySize(page_count: *PageCount, size: core.Size) void {
-        page_count.count += @intCast(size.divide(arch.paging.standard_page_size));
+        page_count.count += @intCast(size.divide(arch.mem.standard_page_size));
     }
 
     pub fn equal(page_count: PageCount, other: PageCount) bool {
@@ -291,12 +291,12 @@ pub const PageCount = extern struct {
 
     pub fn fromSize(size: core.Size) PageCount {
         return .{
-            .count = @intCast(size.divide(arch.paging.standard_page_size)),
+            .count = @intCast(size.divide(arch.mem.standard_page_size)),
         };
     }
 
     pub fn toSize(page_count: PageCount) core.Size {
-        return arch.paging.standard_page_size.multiplyScalar(page_count.count);
+        return arch.mem.standard_page_size.multiplyScalar(page_count.count);
     }
 };
 

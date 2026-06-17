@@ -325,7 +325,7 @@ pub const init = struct {
             try globals.heap_address_space_arena.init(
                 .{
                     .name = try .fromSlice("heap_address_space"),
-                    .quantum = arch.paging.standard_page_size.value,
+                    .quantum = arch.mem.standard_page_size.value,
                 },
             );
 
@@ -333,7 +333,7 @@ pub const init = struct {
             try globals.heap_page_arena.init(
                 .{
                     .name = try .fromSlice("heap_page"),
-                    .quantum = arch.paging.standard_page_size.value,
+                    .quantum = arch.mem.standard_page_size.value,
                     .source = globals.heap_address_space_arena.createSource(.{
                         .custom_import = allocator_impl.heapPageArenaImport,
                         .custom_release = allocator_impl.heapPageArenaRelease,
@@ -366,7 +366,7 @@ pub const init = struct {
             try globals.special_heap_address_space_arena.init(
                 .{
                     .name = try .fromSlice("special_heap_address_space"),
-                    .quantum = arch.paging.standard_page_size.value,
+                    .quantum = arch.mem.standard_page_size.value,
                 },
             );
 

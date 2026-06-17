@@ -90,7 +90,7 @@ pub fn onInterruptEntry() StateBeforeInterrupt {
 
     if (before_interrupt_access_user_memory) {
         @branchHint(.unlikely);
-        arch.paging.disableAccessToUserMemory();
+        arch.mem.disableAccessToUserMemory();
     }
 
     task.known_executor = task.state.running;
@@ -123,9 +123,9 @@ pub const StateBeforeInterrupt = struct {
             @branchHint(.unlikely);
 
             if (before_interrupt_access_user_memory) {
-                arch.paging.disableAccessToUserMemory();
+                arch.mem.disableAccessToUserMemory();
             } else {
-                arch.paging.enableAccessToUserMemory();
+                arch.mem.enableAccessToUserMemory();
             }
         }
 

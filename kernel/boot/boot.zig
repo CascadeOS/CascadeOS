@@ -22,7 +22,7 @@ pub const KernelBaseAddress = struct {
 };
 
 /// Returns the kernel's ELF executable file provided by the bootloader, if any.
-pub fn kernelExecutableFile() ?[]align(arch.paging.standard_page_size_alignment.toByteUnits()) const u8 {
+pub fn kernelExecutableFile() ?[]align(arch.mem.standard_page_size_alignment.toByteUnits()) const u8 {
     return switch (bootloader_api) {
         .limine => limine_interface.kernelExecutableFile(),
         .unknown => null,

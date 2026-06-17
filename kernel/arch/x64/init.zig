@@ -141,7 +141,7 @@ pub fn captureSystemInformation(stage: arch.init.CaptureSystemInformationStage, 
             x64.info.cpu_id.capture() catch @panic("failed to capture cpuid information");
 
             if (x64.info.cpu_id.physical_address_size) |physical_address_size| {
-                if (physical_address_size > x64.paging.PageTable.maximum_physical_address_bit) {
+                if (physical_address_size > x64.mem.PageTable.maximum_physical_address_bit) {
                     std.debug.panic("unsupported physical address size: {}", .{physical_address_size});
                 }
             } else {

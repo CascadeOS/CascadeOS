@@ -20,7 +20,7 @@ pub const functions: arch.Functions = .{
         .init = .{},
     },
 
-    .paging = .{
+    .mem = .{
         .init = .{},
     },
 
@@ -94,7 +94,7 @@ pub const decls: arch.Decls = .{
         .InterruptFrame = extern struct {},
     },
 
-    .paging = .{
+    .mem = .{
         // TODO: most of these values are copied from the x64, so all of them need to be checked
         .standard_page_size = standard_page_size,
         .largest_page_size = .from(1, .gib),

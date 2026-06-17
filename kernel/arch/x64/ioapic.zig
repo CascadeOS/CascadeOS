@@ -103,7 +103,7 @@ const SourceOverride = struct {
 
 const globals = struct {
     var io_apics: core.containers.BoundedArray(IOAPIC, x64.config.maximum_number_of_io_apics) = .{};
-    var source_overrides: [x64.paging.PageTable.number_of_entries]?SourceOverride = @splat(null);
+    var source_overrides: [x64.mem.PageTable.number_of_entries]?SourceOverride = @splat(null);
 };
 
 pub const init = struct {

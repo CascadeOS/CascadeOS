@@ -77,7 +77,7 @@ fn flush(flush_request: *FlushRequest) void {
     }
 
     for (flush_request.batch.ranges.constSlice()) |range| {
-        arch.paging.flushCache(range);
+        arch.mem.flushCache(range);
     }
 }
 

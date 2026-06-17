@@ -217,13 +217,13 @@ pub const interrupts = struct {
     };
 };
 
-pub const paging = struct {
+pub const mem = struct {
     /// The standard page size for the architecture.
-    pub const standard_page_size: core.Size = current_decls.paging.standard_page_size;
+    pub const standard_page_size: core.Size = current_decls.mem.standard_page_size;
     pub const standard_page_size_alignment: std.mem.Alignment = standard_page_size.toAlignment();
 
     /// The largest page size supported by the architecture.
-    pub const largest_page_size: core.Size = current_decls.paging.largest_page_size;
+    pub const largest_page_size: core.Size = current_decls.mem.largest_page_size;
     pub const largest_page_size_alignment: std.mem.Alignment = largest_page_size.toAlignment();
 
     /// The range of the address space that is considered kernel memory.
@@ -231,7 +231,7 @@ pub const paging = struct {
     /// Usually the higher half of the address space.
     ///
     /// This must not include either the zero, undefined nor max addresses.
-    pub const kernel_memory_range: cascade.VirtualRange = current_decls.paging.kernel_memory_range;
+    pub const kernel_memory_range: cascade.VirtualRange = current_decls.mem.kernel_memory_range;
 
     comptime {
         std.debug.assert(!kernel_memory_range.containsAddress(.zero));
@@ -241,7 +241,7 @@ pub const paging = struct {
 
     pub const PageTable = struct {
         physical_page: cascade.mem.PhysicalPage.Index,
-        arch_specific: *current_decls.paging.PageTable,
+        arch_specific: *current_decls.mem.PageTable,
 
         /// Create a page table in the given physical page.
         ///
@@ -251,7 +251,7 @@ pub const paging = struct {
             return .{
                 .physical_page = physical_page,
                 .arch_specific = getFunction(
-                    current_functions.paging,
+                    current_functions.mem,
                     "createPageTable",
                 )(physical_page),
             };
@@ -259,7 +259,7 @@ pub const paging = struct {
 
         pub fn load(page_table: PageTable) callconv(core.inline_in_non_debug) void {
             getFunction(
-                current_functions.paging,
+                current_functions.mem,
                 "loadPageTable",
             )(page_table.physical_page);
         }
@@ -270,7 +270,7 @@ pub const paging = struct {
             target_page_table: PageTable,
         ) callconv(core.inline_in_non_debug) void {
             getFunction(
-                current_functions.paging,
+                current_functions.mem,
                 "copyTopLevelIntoPageTable",
             )(page_table.arch_specific, target_page_table.arch_specific);
         }
@@ -293,7 +293,7 @@ pub const paging = struct {
             physical_page_allocator: cascade.mem.PhysicalPage.Allocator,
         ) callconv(core.inline_in_non_debug) cascade.mem.MapError!void {
             return getFunction(
-                current_functions.paging,
+                current_functions.mem,
                 "mapSinglePage",
             )(
                 page_table.arch_specific,
@@ -320,7 +320,7 @@ pub const paging = struct {
             deallocate_page_list: *cascade.mem.PhysicalPage.List,
         ) callconv(core.inline_in_non_debug) void {
             getFunction(
-                current_functions.paging,
+                current_functions.mem,
                 "unmap",
             )(
                 page_table.arch_specific,
@@ -348,7 +348,7 @@ pub const paging = struct {
             flush_batch: *cascade.mem.VirtualRangeBatch,
         ) callconv(core.inline_in_non_debug) void {
             getFunction(
-                current_functions.paging,
+                current_functions.mem,
                 "changeProtection",
             )(page_table.arch_specific, virtual_range, previous_map_type, new_map_type, flush_batch);
         }
@@ -360,7 +360,7 @@ pub const paging = struct {
     ///   - the `virtual_range` address and size must be aligned to the standard page size
     pub fn flushCache(virtual_range: cascade.VirtualRange) callconv(core.inline_in_non_debug) void {
         getFunction(
-            current_functions.paging,
+            current_functions.mem,
             "flushCache",
         )(virtual_range);
     }
@@ -371,7 +371,7 @@ pub const paging = struct {
     /// memory.
     pub fn enableAccessToUserMemory() callconv(core.inline_in_non_debug) void {
         getFunction(
-            current_functions.paging,
+            current_functions.mem,
             "enableAccessToUserMemory",
         )();
     }
@@ -382,7 +382,7 @@ pub const paging = struct {
     /// memory.
     pub fn disableAccessToUserMemory() callconv(core.inline_in_non_debug) void {
         getFunction(
-            current_functions.paging,
+            current_functions.mem,
             "disableAccessToUserMemory",
         )();
     }
@@ -396,7 +396,7 @@ pub const paging = struct {
         target: *cascade.KernelVirtualAddress,
     ) callconv(core.inline_in_non_debug) void {
         getFunction(
-            current_functions.paging,
+            current_functions.mem,
             "safeMemcpy",
         )(destination, source, target);
     }
@@ -405,7 +405,7 @@ pub const paging = struct {
         /// The total size of the virtual address space that one entry in the top level of the page table covers.
         pub fn sizeOfTopLevelEntry() callconv(core.inline_in_non_debug) core.Size {
             return getFunction(
-                current_functions.paging.init,
+                current_functions.mem.init,
                 "sizeOfTopLevelEntry",
             )();
         }
@@ -423,7 +423,7 @@ pub const paging = struct {
             physical_page_allocator: cascade.mem.PhysicalPage.Allocator,
         ) callconv(core.inline_in_non_debug) anyerror!void {
             return getFunction(
-                current_functions.paging.init,
+                current_functions.mem.init,
                 "fillTopLevel",
             )(page_table.arch_specific, range, physical_page_allocator);
         }
@@ -450,7 +450,7 @@ pub const paging = struct {
         ) callconv(core.inline_in_non_debug) anyerror!void {
             if (core.is_debug) std.debug.assert(!map_type.protection.equal(.none));
             return getFunction(
-                current_functions.paging.init,
+                current_functions.mem.init,
                 "mapToPhysicalRangeAllPageSizes",
             )(page_table.arch_specific, virtual_range, physical_range, map_type, physical_page_allocator);
         }
@@ -1031,19 +1031,19 @@ pub const Functions = struct {
         },
     },
 
-    paging: struct {
+    mem: struct {
         /// Create a page table in the given physical page.
         ///
         /// **REQUIREMENTS**:
         /// - The provided physical page must be accessible in the direct map.
-        createPageTable: ?fn (physical_page: cascade.mem.PhysicalPage.Index) *current_decls.paging.PageTable = null,
+        createPageTable: ?fn (physical_page: cascade.mem.PhysicalPage.Index) *current_decls.mem.PageTable = null,
 
         loadPageTable: ?fn (physical_page: cascade.mem.PhysicalPage.Index) void = null,
 
         /// Copies the top level of `page_table` into `target_page_table`.
         copyTopLevelIntoPageTable: ?fn (
-            page_table: *current_decls.paging.PageTable,
-            target_page_table: *current_decls.paging.PageTable,
+            page_table: *current_decls.mem.PageTable,
+            target_page_table: *current_decls.mem.PageTable,
         ) void = null,
 
         /// Maps `virtual_address` to `physical_page` with mapping type `map_type`.
@@ -1057,7 +1057,7 @@ pub const Functions = struct {
         ///  - only supports the standard page size for the architecture
         ///  - does not flush the TLB
         mapSinglePage: ?fn (
-            page_table: *current_decls.paging.PageTable,
+            page_table: *current_decls.mem.PageTable,
             virtual_address: cascade.VirtualAddress,
             physical_page: cascade.mem.PhysicalPage.Index,
             map_type: cascade.mem.MapType,
@@ -1072,7 +1072,7 @@ pub const Functions = struct {
         /// This function:
         ///  - does not flush the TLB
         unmap: ?fn (
-            page_table: *current_decls.paging.PageTable,
+            page_table: *current_decls.mem.PageTable,
             virtual_range: cascade.VirtualRange,
             backing_page_decision: core.CleanupDecision,
             top_level_decision: core.CleanupDecision,
@@ -1089,7 +1089,7 @@ pub const Functions = struct {
         /// This function:
         ///  - does not flush the TLB
         changeProtection: ?fn (
-            page_table: *current_decls.paging.PageTable,
+            page_table: *current_decls.mem.PageTable,
             virtual_range: cascade.VirtualRange,
             previous_map_type: cascade.mem.MapType,
             new_map_type: cascade.mem.MapType,
@@ -1135,7 +1135,7 @@ pub const Functions = struct {
             ///  - does not flush the TLB
             ///  - does not rollback on error
             fillTopLevel: ?fn (
-                page_table: *current_decls.paging.PageTable,
+                page_table: *current_decls.mem.PageTable,
                 range: cascade.VirtualRange,
                 physical_page_allocator: cascade.mem.PhysicalPage.Allocator,
             ) anyerror!void = null,
@@ -1154,7 +1154,7 @@ pub const Functions = struct {
             ///  - does not flush the TLB
             ///  - does not rollback on error
             mapToPhysicalRangeAllPageSizes: ?fn (
-                page_table: *current_decls.paging.PageTable,
+                page_table: *current_decls.mem.PageTable,
                 virtual_range: cascade.VirtualRange,
                 physical_range: cascade.PhysicalRange,
                 map_type: cascade.mem.MapType,
@@ -1353,7 +1353,7 @@ pub const Decls = struct {
         InterruptFrame: type,
     },
 
-    paging: struct {
+    mem: struct {
         /// The standard page size for the architecture.
         standard_page_size: core.Size,
 

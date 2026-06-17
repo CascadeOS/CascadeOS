@@ -531,7 +531,7 @@ pub const LoadableRegion = struct {
 
                 const range_size: core.Size = offset_due_to_alignment
                     .add(program_header.memory_size)
-                    .alignForward(arch.paging.standard_page_size_alignment);
+                    .alignForward(arch.mem.standard_page_size_alignment);
 
                 const virtual_range = blk: {
                     const virtual_range: cascade.VirtualRange = .from(address, range_size);

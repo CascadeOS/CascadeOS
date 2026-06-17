@@ -19,7 +19,7 @@ pub fn kernelBaseAddress() ?boot.KernelBaseAddress {
     };
 }
 
-pub fn kernelExecutableFile() ?[]align(arch.paging.standard_page_size_alignment.toByteUnits()) const u8 {
+pub fn kernelExecutableFile() ?[]align(arch.mem.standard_page_size_alignment.toByteUnits()) const u8 {
     const resp = requests.executable_file.response orelse return &.{};
     return @alignCast(resp.executable_file.getContents());
 }

@@ -23,16 +23,16 @@ pub const Index = enum(u32) {
 
     /// Returns the physical page that contains the given physical address.
     pub inline fn fromAddress(physical_address: cascade.PhysicalAddress) Index {
-        return @enumFromInt(physical_address.value / arch.paging.standard_page_size.value);
+        return @enumFromInt(physical_address.value / arch.mem.standard_page_size.value);
     }
 
     /// Returns the base address of the given physical page.
     pub inline fn baseAddress(index: Index) cascade.PhysicalAddress {
-        return .from(@intFromEnum(index) * arch.paging.standard_page_size.value);
+        return .from(@intFromEnum(index) * arch.mem.standard_page_size.value);
     }
 
     pub inline fn range(index: Index) cascade.PhysicalRange {
-        return .from(index.baseAddress(), arch.paging.standard_page_size);
+        return .from(index.baseAddress(), arch.mem.standard_page_size);
     }
 };
 
@@ -55,14 +55,14 @@ fn allocate() Allocator.AllocateError!Index {
     const index = globals.free_page_list.popFirst() orelse return error.PagesExhausted;
 
     _ = globals.free_memory.fetchSub(
-        arch.paging.standard_page_size.value,
+        arch.mem.standard_page_size.value,
         .release,
     );
 
     if (core.is_debug) {
         const virtual_range: cascade.KernelVirtualRange = .from(
             index.baseAddress().toDirectMap(),
-            arch.paging.standard_page_size,
+            arch.mem.standard_page_size,
         );
 
         @memset(virtual_range.byteSlice(), undefined);
@@ -78,7 +78,7 @@ fn deallocate(list: List) void {
     }
 
     _ = globals.free_memory.fetchAdd(
-        arch.paging.standard_page_size.multiplyScalar(list.count).value,
+        arch.mem.standard_page_size.multiplyScalar(list.count).value,
         .release,
     );
 
@@ -287,14 +287,14 @@ pub const init = struct {
             init_globals.bootstrap_physical_regions.append(.{
                 .start_physical_page = .fromAddress(entry.range.address),
                 .first_free_page_index = 0,
-                .page_count = @intCast(entry.range.size.divide(arch.paging.standard_page_size)),
+                .page_count = @intCast(entry.range.size.divide(arch.mem.standard_page_size)),
             }) catch @panic("exceeded max number of physical regions");
         }
     }
 
     /// Maps the pages array sparsely, only backing regions corresponding to usable physical memory.
     pub fn mapPagesArray(
-        kernel_page_table: arch.paging.PageTable,
+        kernel_page_table: arch.mem.PageTable,
         pages_array_range: cascade.KernelVirtualRange,
     ) !void {
         const pages_array_base = pages_array_range.address;
@@ -404,7 +404,7 @@ pub const init = struct {
             const in_use_pages = bootstrap_region.first_free_page_index;
             const free_pages = bootstrap_region.page_count - in_use_pages;
 
-            free_memory.addInPlace(arch.paging.standard_page_size.multiplyScalar(free_pages));
+            free_memory.addInPlace(arch.mem.standard_page_size.multiplyScalar(free_pages));
 
             if (init_log.levelEnabled(.debug)) {
                 if (in_use_pages == 0) {
@@ -412,7 +412,7 @@ pub const init = struct {
                         "pulled {} ({f}) free pages out of bootstrap page allocator region",
                         .{
                             free_pages,
-                            arch.paging.standard_page_size.multiplyScalar(free_pages),
+                            arch.mem.standard_page_size.multiplyScalar(free_pages),
                         },
                     );
                 } else if (in_use_pages == bootstrap_region.page_count) {
@@ -420,7 +420,7 @@ pub const init = struct {
                         "pulled {} ({f}) in use pages out of bootstrap page allocator region",
                         .{
                             in_use_pages,
-                            arch.paging.standard_page_size.multiplyScalar(in_use_pages),
+                            arch.mem.standard_page_size.multiplyScalar(in_use_pages),
                         },
                     );
                 } else {
@@ -428,9 +428,9 @@ pub const init = struct {
                         "pulled {} ({f}) free pages and {} ({f}) in use pages out of bootstrap page allocator region",
                         .{
                             free_pages,
-                            arch.paging.standard_page_size.multiplyScalar(free_pages),
+                            arch.mem.standard_page_size.multiplyScalar(free_pages),
                             in_use_pages,
-                            arch.paging.standard_page_size.multiplyScalar(in_use_pages),
+                            arch.mem.standard_page_size.multiplyScalar(in_use_pages),
                         },
                     );
                 }

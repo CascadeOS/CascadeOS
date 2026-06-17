@@ -20,7 +20,7 @@ pub inline fn kernelRegions() *KernelMemoryRegion.List {
     return &globals.regions;
 }
 
-pub inline fn kernelPageTable() arch.paging.PageTable {
+pub inline fn kernelPageTable() arch.mem.PageTable {
     return globals.kernel_page_table;
 }
 
@@ -31,11 +31,11 @@ pub inline fn kernelAddressSpace() *AddressSpace {
 /// Maps a single page to a physical page.
 ///
 /// **REQUIREMENTS**:
-/// - `virtual_address` must be aligned to `arch.paging.standard_page_size`
+/// - `virtual_address` must be aligned to `arch.mem.standard_page_size`
 /// - `virtual_address` must not already be mapped
 /// - `map_type.protection` must not be `.none`
 pub fn mapSinglePage(
-    page_table: arch.paging.PageTable,
+    page_table: arch.mem.PageTable,
     virtual_address: cascade.VirtualAddress,
     physical_page: PhysicalPage.Index,
     map_type: MapType,
@@ -59,12 +59,12 @@ pub fn mapSinglePage(
 /// Physical pages are allocated for each page in the virtual range.
 ///
 /// **REQUIREMENTS**:
-/// - `virtual_range.address` must be aligned to `arch.paging.standard_page_size`
-/// - `virtual_range.size` must be aligned to `arch.paging.standard_page_size`
+/// - `virtual_range.address` must be aligned to `arch.mem.standard_page_size`
+/// - `virtual_range.size` must be aligned to `arch.mem.standard_page_size`
 /// - `virtual_range` must not already be mapped
 /// - `map_type.protection` must not be `.none`
 pub fn mapRangeAndBackWithPhysicalPages(
-    page_table: arch.paging.PageTable,
+    page_table: arch.mem.PageTable,
     virtual_range: cascade.VirtualRange,
     map_type: MapType,
     flush_target: cascade.Context,
@@ -98,7 +98,7 @@ pub fn mapRangeAndBackWithPhysicalPages(
         );
     }
 
-    // TODO: this can be optimized by implementing `arch.paging.mapRangeAndBackWithPhysicalPages`
+    // TODO: this can be optimized by implementing `arch.mem.mapRangeAndBackWithPhysicalPages`
     //       this one is not as obviously good as the other TODO optimizations in this file as every arch will have to do
     //       the same physical page allocation and errdefer deallocation
 
@@ -124,15 +124,15 @@ pub fn mapRangeAndBackWithPhysicalPages(
 /// Maps a virtual address range to a physical range using the standard page size.
 ///
 /// **REQUIREMENTS**:
-/// - `virtual_range.address` must be aligned to `arch.paging.standard_page_size`
-/// - `virtual_range.size` must be aligned to `arch.paging.standard_page_size`
-/// - `physical_range.address` must be aligned to `arch.paging.standard_page_size`
-/// - `physical_range.size` must be aligned to `arch.paging.standard_page_size`
+/// - `virtual_range.address` must be aligned to `arch.mem.standard_page_size`
+/// - `virtual_range.size` must be aligned to `arch.mem.standard_page_size`
+/// - `physical_range.address` must be aligned to `arch.mem.standard_page_size`
+/// - `physical_range.size` must be aligned to `arch.mem.standard_page_size`
 /// - `virtual_range.size` must be equal to `physical_range.size`
 /// - `virtual_range` must not already be mapped
 /// - `map_type.protection` must not be `.none`
 pub fn mapRangeToPhysicalRange(
-    page_table: arch.paging.PageTable,
+    page_table: arch.mem.PageTable,
     virtual_range: cascade.VirtualRange,
     physical_range: cascade.PhysicalRange,
     map_type: MapType,
@@ -167,7 +167,7 @@ pub fn mapRangeToPhysicalRange(
         );
     }
 
-    // TODO: this can be optimized by implementing `arch.paging.PageTable.mapRange`
+    // TODO: this can be optimized by implementing `arch.mem.PageTable.mapRange`
 
     var current_physical_address = physical_range.address;
 
@@ -188,7 +188,7 @@ pub fn mapRangeToPhysicalRange(
 ///
 /// Performs TLB shootdown.
 pub fn unmap(
-    page_table: arch.paging.PageTable,
+    page_table: arch.mem.PageTable,
     unmap_batch: *const VirtualRangeBatch,
     flush_target: cascade.Context,
     backing_page_decision: core.CleanupDecision,
@@ -241,7 +241,7 @@ pub fn unmap(
 ///
 /// Asserts that `new_map_type.protection` is not `.none`.
 pub fn changeProtection(
-    page_table: arch.paging.PageTable,
+    page_table: arch.mem.PageTable,
     change_proection_batch: *const ChangeProtectionBatch,
     flush_target: cascade.Context,
     new_map_type: cascade.mem.MapType,
@@ -300,7 +300,7 @@ pub const safe = struct {
             std.debug.assert(
                 !current_task.task.access_user_memory.swap(true, .monotonic),
             );
-            arch.paging.enableAccessToUserMemory();
+            arch.mem.enableAccessToUserMemory();
         } else {
             std.debug.assert(!current_task.task.access_user_memory.load(.monotonic));
         }
@@ -308,7 +308,7 @@ pub const safe = struct {
             std.debug.assert(
                 current_task.task.access_user_memory.swap(false, .monotonic),
             );
-            arch.paging.disableAccessToUserMemory();
+            arch.mem.disableAccessToUserMemory();
         };
 
         var slot: ResultSlot = .{
@@ -323,7 +323,7 @@ pub const safe = struct {
             current_task.task.safe_result_slot.swap(null, .monotonic) == &slot,
         );
 
-        arch.paging.safeMemcpy(args.destination, args.source, &slot.target);
+        arch.mem.safeMemcpy(args.destination, args.source, &slot.target);
 
         return slot.result;
     }
@@ -594,8 +594,8 @@ pub const VirtualRangeBatch = struct {
     /// **REQUIREMENTS**:
     /// - Each subsequent range must be greater than or equal to the previous range.
     /// - `range.address` must be greater than or equal to the end of the last range in the batch
-    /// - `range.address` must be aligned to `arch.paging.standard_page_size`
-    /// - `range.size` must be aligned to `arch.paging.standard_page_size`
+    /// - `range.address` must be aligned to `arch.mem.standard_page_size`
+    /// - `range.size` must be aligned to `arch.mem.standard_page_size`
     pub fn appendMergeIfFull(batch: *VirtualRangeBatch, range: cascade.VirtualRange) void {
         if (core.is_debug) std.debug.assert(range.pageAligned());
 
@@ -636,8 +636,8 @@ pub const VirtualRangeBatch = struct {
     /// **REQUIREMENTS**:
     /// - Each subsequent range must be greater than or equal to the previous range.
     /// - `range.address` must be greater than or equal to the end of the last range in the batch
-    /// - `range.address` must be aligned to `arch.paging.standard_page_size`
-    /// - `range.size` must be aligned to `arch.paging.standard_page_size`
+    /// - `range.address` must be aligned to `arch.mem.standard_page_size`
+    /// - `range.size` must be aligned to `arch.mem.standard_page_size`
     pub fn append(batch: *VirtualRangeBatch, range: cascade.VirtualRange) bool {
         if (core.is_debug) std.debug.assert(range.pageAligned());
 
@@ -697,8 +697,8 @@ pub const ChangeProtectionBatch = struct {
     ///
     /// **REQUIREMENTS**:
     /// - `range.virtual_range.address` must be greater than or equal to the end of the last range in the batch
-    /// - `range.virtual_range.address` must be aligned to `arch.paging.standard_page_size`
-    /// - `range.virtual_range.size` must be aligned to `arch.paging.standard_page_size`
+    /// - `range.virtual_range.address` must be aligned to `arch.mem.standard_page_size`
+    /// - `range.virtual_range.size` must be aligned to `arch.mem.standard_page_size`
     pub fn append(batch: *ChangeProtectionBatch, range: VirtualRangeWithMapType) bool {
         if (core.is_debug) std.debug.assert(range.virtual_range.pageAligned());
 
@@ -756,7 +756,7 @@ pub const globals = struct {
     /// All other page tables start as a copy of this one.
     ///
     /// Initialized during `init.initializeMemorySystem`.
-    var kernel_page_table: arch.paging.PageTable = undefined;
+    var kernel_page_table: arch.mem.PageTable = undefined;
 
     /// The kernel address space.
     ///
@@ -946,7 +946,7 @@ pub const init = struct {
             const virtual_range: cascade.KernelVirtualRange = .from(
                 start_address,
                 core.Size.from(end_address.value - start_address.value, .byte)
-                    .alignForward(arch.paging.standard_page_size_alignment),
+                    .alignForward(arch.mem.standard_page_size_alignment),
             );
 
             kernel_regions.append(.{
@@ -973,7 +973,7 @@ pub const init = struct {
     }
 
     fn registerHeaps(kernel_regions: *KernelMemoryRegion.List) void {
-        const size_of_top_level = arch.paging.init.sizeOfTopLevelEntry();
+        const size_of_top_level = arch.mem.init.sizeOfTopLevelEntry();
         const size_of_top_level_alignment = size_of_top_level.toAlignment();
 
         const kernel_heap_range = kernel_regions.findFreeRange(
@@ -1037,8 +1037,8 @@ pub const init = struct {
         const pages_range = kernel_regions.findFreeRange(
             core.Size.of(PhysicalPage)
                 .multiplyScalar(page_entries_to_cover)
-                .alignForward(arch.paging.standard_page_size_alignment),
-            arch.paging.standard_page_size_alignment,
+                .alignForward(arch.mem.standard_page_size_alignment),
+            arch.mem.standard_page_size_alignment,
         ) orelse @panic("no space in kernel memory layout for the pages array");
 
         kernel_regions.append(.{
@@ -1047,8 +1047,8 @@ pub const init = struct {
         });
     }
 
-    fn buildAndLoadKernelPageTable() arch.paging.PageTable {
-        const kernel_page_table: arch.paging.PageTable = .create(
+    fn buildAndLoadKernelPageTable() arch.mem.PageTable {
+        const kernel_page_table: arch.mem.PageTable = .create(
             PhysicalPage.init.bootstrap_allocator.allocate() catch unreachable,
         );
 
@@ -1069,7 +1069,7 @@ pub const init = struct {
                         };
                         std.debug.assert(entry.range.pageAligned());
 
-                        arch.paging.init.mapToPhysicalRangeAllPageSizes(
+                        arch.mem.init.mapToPhysicalRangeAllPageSizes(
                             kernel_page_table,
                             cascade.KernelVirtualRange.from(
                                 direct_map_base.moveForward(
@@ -1091,7 +1091,7 @@ pub const init = struct {
                 .writeable_section,
                 .readonly_section,
                 .executable_section,
-                => arch.paging.init.mapToPhysicalRangeAllPageSizes(
+                => arch.mem.init.mapToPhysicalRangeAllPageSizes(
                     kernel_page_table,
                     region.range.toVirtualRange(),
                     .from(
@@ -1111,7 +1111,7 @@ pub const init = struct {
                 .kernel_stacks,
                 .special_heap,
                 .kernel_address_space,
-                => arch.paging.init.fillTopLevel(
+                => arch.mem.init.fillTopLevel(
                     kernel_page_table,
                     region.range.toVirtualRange(),
                     PhysicalPage.init.bootstrap_allocator,

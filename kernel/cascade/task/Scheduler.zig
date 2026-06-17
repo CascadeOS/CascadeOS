@@ -441,7 +441,7 @@ pub const Handle = struct {
 
                 if (new_task_access_user_memory) {
                     @branchHint(.unlikely); // we expect this to be 0 most of the time
-                    arch.paging.enableAccessToUserMemory();
+                    arch.mem.enableAccessToUserMemory();
                 }
             },
             .user_to_kernel => {
@@ -451,7 +451,7 @@ pub const Handle = struct {
 
                 if (old_task_access_user_memory) {
                     @branchHint(.unlikely); // we expect this to be 0 most of the time
-                    arch.paging.disableAccessToUserMemory();
+                    arch.mem.disableAccessToUserMemory();
                 }
             },
             .user_to_user => {
@@ -463,9 +463,9 @@ pub const Handle = struct {
                     @branchHint(.unlikely); // we expect both to be 0 most of the time
 
                     if (new_task_access_user_memory) {
-                        arch.paging.disableAccessToUserMemory();
+                        arch.mem.disableAccessToUserMemory();
                     } else {
-                        arch.paging.enableAccessToUserMemory();
+                        arch.mem.enableAccessToUserMemory();
                     }
                 }
             },
