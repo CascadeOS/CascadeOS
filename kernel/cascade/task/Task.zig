@@ -63,6 +63,9 @@ migration_disable_count: std.atomic.Value(u32),
 /// Whether the task is currently accessing user memory.
 access_user_memory: std.atomic.Value(bool) = .init(false),
 
+/// Non-null during a safe memory copy operation.
+safe_result_slot: std.atomic.Value(?*cascade.mem.safe.ResultSlot) = .init(null),
+
 spinlocks_held: u32,
 scheduler_locked: bool,
 

@@ -25,3 +25,26 @@ pub fn flushCache(virtual_range: cascade.VirtualRange) void {
         current_virtual_address.moveForwardPageInPlace();
     }
 }
+
+/// Copies memory from `source` to `destination`.
+///
+/// Sets `target` to the address any unhandleable page fault should return to after setting the result in the slot.
+pub fn safeMemcpy(
+    destination: cascade.VirtualRange,
+    source: cascade.VirtualRange,
+    target: *cascade.KernelVirtualAddress,
+) void {
+    asm volatile (
+        \\lea 1f(%rip), %rax
+        \\mov %rax, (%[target])
+        \\
+        \\rep movsb
+        \\
+        \\1:
+        :
+        : [target] "r" (target),
+          [source_ptr] "+{rsi}" (source.address.value),
+          [destination_ptr] "+{rdi}" (destination.address.value),
+          [count] "+{rcx}" (source.size.value),
+        : .{ .rax = true, .memory = true });
+}

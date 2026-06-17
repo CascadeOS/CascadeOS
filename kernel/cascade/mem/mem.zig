@@ -282,6 +282,54 @@ pub fn changeProtection(
     }
 }
 
+pub const safe = struct {
+    /// Perform a copy from `args.source` to `args.destination`, if an unhandleable page fault occurs returns `false`.
+    ///
+    /// Copy direction is unspecified so overlapping ranges may cause undefined behaviour.
+    ///
+    /// Caller must ensure the `args.destination` is larger or equal in size to `args.source`.
+    pub fn memcpy(args: Args) bool {
+        std.debug.assert(args.destination.size.greaterThanOrEqual(args.source.size));
+
+        const current_task: cascade.Task.Current = .get();
+
+        const user_range_involved = args.destination.tagged() == .user or args.source.tagged() == .user;
+
+        if (user_range_involved) {
+            if (core.is_debug) std.debug.assert(current_task.task.type == .user);
+            current_task.enableAccessToUserMemory();
+        } else {
+            std.debug.assert(!current_task.task.access_user_memory.load(.monotonic));
+        }
+        defer if (user_range_involved) current_task.disableAccessToUserMemory();
+
+        var slot: ResultSlot = .{
+            .result = true,
+            .target = undefined,
+        };
+
+        std.debug.assert(current_task.task.safe_result_slot.swap(&slot, .monotonic) == null);
+        defer std.debug.assert(current_task.task.safe_result_slot.swap(null, .monotonic) == &slot);
+
+        arch.paging.safeMemcpy(args.destination, args.source, &slot.target);
+
+        return slot.result;
+    }
+
+    pub const ResultSlot = struct {
+        /// If the copy failed due to an unhandleable page fault this will be set to `false`.
+        result: bool,
+
+        /// If a read/write fails this is the address the page fault handler will return to.
+        target: cascade.KernelVirtualAddress,
+    };
+
+    pub const Args = struct {
+        destination: cascade.VirtualRange,
+        source: cascade.VirtualRange,
+    };
+};
+
 /// Executed upon page fault.
 pub fn onPageFault(
     page_fault_details: PageFaultDetails,
@@ -306,17 +354,18 @@ fn onKernelPageFault(
     page_fault_details: PageFaultDetails,
     interrupt_frame: arch.interrupts.InterruptFrame,
 ) void {
+    const current_task: cascade.Task.Current = .get();
+
     switch (page_fault_details.faulting_address.tagged()) {
         .user => {
             const process: *cascade.user.Process = blk: {
-                const current_task: cascade.Task.Current = .get();
-
                 break :blk switch (current_task.task.type) {
                     .kernel => {
                         @branchHint(.cold);
+                        if (core.is_debug) std.debug.assert(!current_task.task.access_user_memory.load(.monotonic));
                         cascade.debug.interruptSourcePanic(
                             interrupt_frame,
-                            "kernel page fault in user memory range\n{f}",
+                            "kernel only task attempted to access user memory\n{f}",
                             .{page_fault_details},
                         );
                         unreachable;
@@ -328,64 +377,122 @@ fn onKernelPageFault(
             if (!page_fault_details.faulting_context.kernel.access_user_memory_enabled) {
                 @branchHint(.cold);
 
+                if (current_task.task.safe_result_slot.load(.monotonic)) |result_slot| {
+                    @branchHint(.likely);
+
+                    result_slot.result = false;
+                    interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
+                    return;
+                }
+
                 cascade.debug.interruptSourcePanic(
                     interrupt_frame,
-                    "kernel accessed user memory\n{f}",
+                    "attempt to access user memory without enabling user memory access\n{f}",
                     .{page_fault_details},
                 );
+                unreachable;
             }
 
-            process.address_space.handlePageFault(page_fault_details) catch |err|
+            process.address_space.handlePageFault(page_fault_details) catch |err| {
+                if (current_task.task.safe_result_slot.load(.monotonic)) |result_slot| {
+                    @branchHint(.likely);
+
+                    result_slot.result = false;
+                    interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
+                    return;
+                }
+
                 cascade.debug.interruptSourcePanic(
                     interrupt_frame,
-                    "kernel page fault in user memory failed: {t}\n{f}",
+                    "kernel triggered unhandleable page fault in user memory: {t}\n{f}",
                     .{ err, page_fault_details },
                 );
+                unreachable;
+            };
         },
         .kernel => |address| {
             const region_type = globals.regions.containingAddress(address) orelse {
                 @branchHint(.cold);
+
+                if (current_task.task.safe_result_slot.load(.monotonic)) |result_slot| {
+                    @branchHint(.likely);
+
+                    result_slot.result = false;
+                    interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
+                    return;
+                }
 
                 cascade.debug.interruptSourcePanic(
                     interrupt_frame,
                     "kernel page fault outside of any kernel region\n{f}",
                     .{page_fault_details},
                 );
+                unreachable;
             };
 
             switch (region_type) {
                 .kernel_address_space => {
                     @branchHint(.likely);
-                    globals.kernel_address_space.handlePageFault(page_fault_details) catch |err| switch (err) {
-                        error.OutOfMemory => std.debug.panic(
-                            "no memory available to handle page fault in kernel address space\n{f}",
-                            .{page_fault_details},
-                        ),
-                        error.Protection, error.NotMapped => |e| cascade.debug.interruptSourcePanic(
-                            interrupt_frame,
-                            "failed to handle page fault in kernel address space: {t}\n{f}",
-                            .{ e, page_fault_details },
-                        ),
+                    globals.kernel_address_space.handlePageFault(page_fault_details) catch |err| {
+                        if (current_task.task.safe_result_slot.load(.monotonic)) |result_slot| {
+                            @branchHint(.likely);
+
+                            result_slot.result = false;
+                            interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
+                            return;
+                        }
+
+                        switch (err) {
+                            error.OutOfMemory => std.debug.panic(
+                                "no memory available to handle page fault in kernel address space\n{f}",
+                                .{page_fault_details},
+                            ),
+                            error.Protection, error.NotMapped => |e| cascade.debug.interruptSourcePanic(
+                                interrupt_frame,
+                                "failed to handle page fault in kernel address space: {t}\n{f}",
+                                .{ e, page_fault_details },
+                            ),
+                        }
+                        unreachable;
                     };
                 },
                 else => |t| {
                     @branchHint(.cold);
+
+                    if (current_task.task.safe_result_slot.load(.monotonic)) |result_slot| {
+                        @branchHint(.likely);
+
+                        result_slot.result = false;
+                        interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
+                        return;
+                    }
+
                     cascade.debug.interruptSourcePanic(
                         interrupt_frame,
                         "kernel page fault in '{t}'\n{f}",
                         .{ t, page_fault_details },
                     );
+                    unreachable;
                 },
             }
         },
         .invalid => {
             @branchHint(.cold);
 
+            if (current_task.task.safe_result_slot.load(.monotonic)) |result_slot| {
+                @branchHint(.likely);
+
+                result_slot.result = false;
+                interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
+                return;
+            }
+
             cascade.debug.interruptSourcePanic(
                 interrupt_frame,
                 "kernel page fault with invalid address\n{f}",
                 .{page_fault_details},
             );
+            unreachable;
         },
     }
 }

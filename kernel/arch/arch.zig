@@ -387,6 +387,20 @@ pub const paging = struct {
         )();
     }
 
+    /// Copies memory from `source` to `destination`.
+    ///
+    /// Sets `target` to the address any unhandleable page fault should return to after setting the result in the slot.
+    pub fn safeMemcpy(
+        destination: cascade.VirtualRange,
+        source: cascade.VirtualRange,
+        target: *cascade.KernelVirtualAddress,
+    ) callconv(core.inline_in_non_debug) void {
+        getFunction(
+            current_functions.paging,
+            "safeMemcpy",
+        )(destination, source, target);
+    }
+
     pub const init = struct {
         /// The total size of the virtual address space that one entry in the top level of the page table covers.
         pub fn sizeOfTopLevelEntry() callconv(core.inline_in_non_debug) core.Size {
@@ -1099,6 +1113,15 @@ pub const Functions = struct {
         /// This is allowed to be a no-op if the architecture does not support stopping the kernel from accessing user
         /// memory.
         disableAccessToUserMemory: ?fn () void = null,
+
+        /// Copies memory from `source` to `destination`.
+        ///
+        /// Sets `target` to the address any unhandleable page fault should return to after setting the result in the slot.
+        safeMemcpy: ?fn (
+            destination: cascade.VirtualRange,
+            source: cascade.VirtualRange,
+            target: *cascade.KernelVirtualAddress,
+        ) void = null,
 
         init: struct {
             /// The total size of the virtual address space that one entry in the top level of the page table covers.

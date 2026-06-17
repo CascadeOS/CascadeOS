@@ -62,6 +62,7 @@ pub const functions: arch.Functions = .{
         .flushCache = x64.paging.flushCache,
         .enableAccessToUserMemory = x64.instructions.enableAccessToUserMemory,
         .disableAccessToUserMemory = x64.instructions.disableAccessToUserMemory,
+        .safeMemcpy = x64.paging.safeMemcpy,
 
         .init = .{
             .sizeOfTopLevelEntry = x64.paging.PageTable.sizeOfTopLevelEntry,
