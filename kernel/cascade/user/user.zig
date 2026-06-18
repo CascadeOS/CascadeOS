@@ -81,16 +81,10 @@ fn syscallDebugPrint(
             .byte,
         );
 
-        if (!cascade.mem.safe.memcpy(.{
-            .destination = full_destination.subslice(
-                .from(writer.end, .byte),
-                bytes_to_copy,
-            ),
+        try cascade.mem.safe.memcpy(.{
+            .destination = full_destination.subslice(.from(writer.end, .byte), bytes_to_copy),
             .source = full_source.subslice(bytes_copied, bytes_to_copy),
-        })) {
-            @branchHint(.cold);
-            return;
-        }
+        });
 
         bytes_copied.addInPlace(bytes_to_copy);
         last_copy = bytes_copied.greaterThanOrEqual(full_source.size);

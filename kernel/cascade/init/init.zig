@@ -369,7 +369,7 @@ fn loadHelloWorld() !void {
         var iter = header.loadableRegionIterator(program_header_table);
 
         while (try iter.next()) |loadable_region| {
-            if (!cascade.mem.safe.memcpy(.{
+            try cascade.mem.safe.memcpy(.{
                 .destination = loadable_region.virtual_range.subslice(
                     loadable_region.destination_offset,
                     loadable_region.source_length,
@@ -378,9 +378,7 @@ fn loadHelloWorld() !void {
                     loadable_region.source_base,
                     loadable_region.source_length,
                 ),
-            })) {
-                return error.FailedToLoadHelloWorld;
-            }
+            });
         }
     }
 

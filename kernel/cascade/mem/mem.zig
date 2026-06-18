@@ -283,12 +283,14 @@ pub fn changeProtection(
 }
 
 pub const safe = struct {
+    pub const MemcpyError = error{MemcpyFailed};
+
     /// Perform a copy from `args.source` to `args.destination`, if an unhandleable page fault occurs returns `false`.
     ///
     /// Copy direction is unspecified so overlapping ranges may cause undefined behaviour.
     ///
     /// Caller must ensure the `args.destination` is larger or equal in size to `args.source`.
-    pub fn memcpy(args: Args) bool {
+    pub fn memcpy(args: Args) MemcpyError!void {
         std.debug.assert(args.destination.size.greaterThanOrEqual(args.source.size));
 
         const current_task: cascade.Task.Current = .get();
@@ -312,7 +314,7 @@ pub const safe = struct {
         };
 
         var slot: ResultSlot = .{
-            .result = true,
+            .successful = true,
             .target = undefined,
         };
 
@@ -325,12 +327,11 @@ pub const safe = struct {
 
         arch.mem.safeMemcpy(args.destination, args.source, &slot.target);
 
-        return slot.result;
+        if (!slot.successful) return error.MemcpyFailed;
     }
 
     pub const ResultSlot = struct {
-        /// If the copy failed due to an unhandleable page fault this will be set to `false`.
-        result: bool,
+        successful: bool,
 
         /// If a read/write fails this is the address the page fault handler will return to.
         target: cascade.KernelVirtualAddress,
@@ -392,7 +393,7 @@ fn onKernelPageFault(
                 if (current_task.task.safe_result_slot.load(.monotonic)) |result_slot| {
                     @branchHint(.likely);
 
-                    result_slot.result = false;
+                    result_slot.successful = false;
                     interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
                     return;
                 }
@@ -409,7 +410,7 @@ fn onKernelPageFault(
                 if (current_task.task.safe_result_slot.load(.monotonic)) |result_slot| {
                     @branchHint(.likely);
 
-                    result_slot.result = false;
+                    result_slot.successful = false;
                     interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
                     return;
                 }
@@ -429,7 +430,7 @@ fn onKernelPageFault(
                 if (current_task.task.safe_result_slot.load(.monotonic)) |result_slot| {
                     @branchHint(.likely);
 
-                    result_slot.result = false;
+                    result_slot.successful = false;
                     interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
                     return;
                 }
@@ -449,7 +450,7 @@ fn onKernelPageFault(
                         if (current_task.task.safe_result_slot.load(.monotonic)) |result_slot| {
                             @branchHint(.likely);
 
-                            result_slot.result = false;
+                            result_slot.successful = false;
                             interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
                             return;
                         }
@@ -474,7 +475,7 @@ fn onKernelPageFault(
                     if (current_task.task.safe_result_slot.load(.monotonic)) |result_slot| {
                         @branchHint(.likely);
 
-                        result_slot.result = false;
+                        result_slot.successful = false;
                         interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
                         return;
                     }
@@ -494,7 +495,7 @@ fn onKernelPageFault(
             if (current_task.task.safe_result_slot.load(.monotonic)) |result_slot| {
                 @branchHint(.likely);
 
-                result_slot.result = false;
+                result_slot.successful = false;
                 interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
                 return;
             }
