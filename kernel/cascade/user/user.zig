@@ -39,7 +39,6 @@ pub fn onSyscall(
         },
         .debug_print => {
             const full_source = (syscall_frame.getUserRange(.two, .one) orelse return 0).toVirtualRange();
-
             if (full_source.size.equal(.zero)) return 0;
 
             const writer = cascade.init.Output.terminal.writer;
@@ -86,7 +85,6 @@ pub fn onSyscall(
                 last_copy = bytes_copied.greaterThanOrEqual(full_source.size);
 
                 writer.end += bytes_to_copy.value;
-                defer writer.end = 0;
 
                 if (last_copy and writer.buffer[writer.end - 1] != '\n') writer.writeByte('\n') catch {
                     @branchHint(.cold);
