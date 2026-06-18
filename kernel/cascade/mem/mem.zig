@@ -375,19 +375,17 @@ fn onKernelPageFault(
 
     switch (page_fault_details.faulting_address.tagged()) {
         .user => {
-            const process: *cascade.user.Process = blk: {
-                break :blk switch (current_task.task.type) {
-                    .kernel => {
-                        @branchHint(.cold);
-                        cascade.debug.interruptSourcePanic(
-                            interrupt_frame,
-                            "kernel only task attempted to access user memory\n{f}",
-                            .{page_fault_details},
-                        );
-                        unreachable;
-                    },
-                    .user => .from(current_task.task),
-                };
+            const process: *cascade.user.Process = switch (current_task.task.type) {
+                .kernel => {
+                    @branchHint(.cold);
+                    cascade.debug.interruptSourcePanic(
+                        interrupt_frame,
+                        "kernel only task attempted to access user memory\n{f}",
+                        .{page_fault_details},
+                    );
+                    unreachable;
+                },
+                .user => .from(current_task.task),
             };
 
             if (!page_fault_details.faulting_context.kernel.access_user_memory_enabled) {
