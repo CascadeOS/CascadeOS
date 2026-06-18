@@ -383,7 +383,7 @@ fn onKernelPageFault(
                         "kernel only task attempted to access user memory\n{f}",
                         .{page_fault_details},
                     );
-                    unreachable;
+                    comptime unreachable;
                 },
                 .user => .from(current_task.task),
             };
@@ -396,6 +396,7 @@ fn onKernelPageFault(
 
                     result_slot.successful = false;
                     interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
+
                     return;
                 }
 
@@ -404,7 +405,7 @@ fn onKernelPageFault(
                     "attempt to access user memory without enabling user memory access\n{f}",
                     .{page_fault_details},
                 );
-                unreachable;
+                comptime unreachable;
             }
 
             process.address_space.handlePageFault(page_fault_details) catch |err| {
@@ -413,6 +414,7 @@ fn onKernelPageFault(
 
                     result_slot.successful = false;
                     interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
+
                     return;
                 }
 
@@ -421,8 +423,10 @@ fn onKernelPageFault(
                     "kernel triggered unhandleable page fault in user memory: {t}\n{f}",
                     .{ err, page_fault_details },
                 );
-                unreachable;
+                comptime unreachable;
             };
+
+            return;
         },
         .kernel => |address| {
             const region_type = globals.regions.containingAddress(address) orelse {
@@ -433,6 +437,7 @@ fn onKernelPageFault(
 
                     result_slot.successful = false;
                     interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
+
                     return;
                 }
 
@@ -441,18 +446,20 @@ fn onKernelPageFault(
                     "kernel page fault outside of any kernel region\n{f}",
                     .{page_fault_details},
                 );
-                unreachable;
+                comptime unreachable;
             };
 
             switch (region_type) {
                 .kernel_address_space => {
                     @branchHint(.likely);
+
                     globals.kernel_address_space.handlePageFault(page_fault_details) catch |err| {
                         if (current_task.task.safe_result_slot.load(.monotonic)) |result_slot| {
                             @branchHint(.likely);
 
                             result_slot.successful = false;
                             interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
+
                             return;
                         }
 
@@ -467,8 +474,10 @@ fn onKernelPageFault(
                                 .{ e, page_fault_details },
                             ),
                         }
-                        unreachable;
+                        comptime unreachable;
                     };
+
+                    return;
                 },
                 else => |t| {
                     @branchHint(.cold);
@@ -478,6 +487,7 @@ fn onKernelPageFault(
 
                         result_slot.successful = false;
                         interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
+
                         return;
                     }
 
@@ -486,7 +496,7 @@ fn onKernelPageFault(
                         "kernel page fault in '{t}'\n{f}",
                         .{ t, page_fault_details },
                     );
-                    unreachable;
+                    comptime unreachable;
                 },
             }
         },
@@ -498,6 +508,7 @@ fn onKernelPageFault(
 
                 result_slot.successful = false;
                 interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
+
                 return;
             }
 
@@ -506,9 +517,10 @@ fn onKernelPageFault(
                 "kernel page fault with invalid address\n{f}",
                 .{page_fault_details},
             );
-            unreachable;
+            comptime unreachable;
         },
     }
+    comptime unreachable;
 }
 
 pub const PageFaultDetails = struct {

@@ -143,7 +143,7 @@ pub const Handle = struct {
         if (old_task.is_scheduler_task) {
             log.verbose("switching from idle to {f}", .{new_task});
             switchToTaskFromIdleYield(old_task, new_task);
-            unreachable;
+            comptime unreachable;
         }
 
         if (core.is_debug) std.debug.assert(old_task != new_task);
@@ -263,7 +263,7 @@ pub const Handle = struct {
                     std.debug.assert(scheduler_task.spinlocks_held == 1);
                 }
                 idle();
-                unreachable;
+                comptime unreachable;
             }
         };
 
@@ -289,7 +289,7 @@ pub const Handle = struct {
         switch (task_resume) {
             .no => {
                 arch.scheduling.callNoSave(&scheduler_task.stack, type_erased_call);
-                unreachable;
+                comptime unreachable;
             },
             .yes => {
                 arch.scheduling.call(old_task, &scheduler_task.stack, type_erased_call);
@@ -299,7 +299,7 @@ pub const Handle = struct {
         }
     }
 
-    fn switchToTaskFromIdleYield(scheduler_task: *cascade.Task, new_task: *cascade.Task) void {
+    fn switchToTaskFromIdleYield(scheduler_task: *cascade.Task, new_task: *cascade.Task) noreturn {
         const executor = scheduler_task.known_executor orelse unreachable;
         if (core.is_debug) std.debug.assert(&executor.scheduler.task == scheduler_task);
 
@@ -324,7 +324,7 @@ pub const Handle = struct {
         scheduler_task.interrupt_disable_count.store(1, .release);
 
         arch.scheduling.switchTaskNoSave(new_task);
-        unreachable;
+        comptime unreachable;
     }
 
     fn switchToTaskFromTaskYield(
@@ -380,7 +380,7 @@ pub const Handle = struct {
                 scheduler_task.state = .ready;
 
                 arch.scheduling.switchTaskNoSave(inner_new_task);
-                unreachable;
+                comptime unreachable;
             }
         };
 
@@ -407,7 +407,7 @@ pub const Handle = struct {
         switch (task_resume) {
             .no => {
                 arch.scheduling.callNoSave(&scheduler_task.stack, type_erased_call);
-                unreachable;
+                comptime unreachable;
             },
             .yes => {
                 arch.scheduling.call(old_task, &scheduler_task.stack, type_erased_call);

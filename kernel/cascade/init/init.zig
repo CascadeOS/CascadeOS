@@ -86,7 +86,7 @@ pub fn initStage1() !noreturn {
     }
 
     try initStage2(new_bootstrap_executor);
-    unreachable;
+    comptime unreachable;
 }
 
 /// Stage 2 of kernel initialization.
@@ -128,7 +128,7 @@ fn initStage2(executor: *cascade.Executor) !noreturn {
             .{},
         ),
     );
-    unreachable;
+    comptime unreachable;
 }
 
 /// Stage 3 of kernel initialization.
@@ -165,7 +165,7 @@ fn initStage3() !noreturn {
 
     const scheduler_handle: cascade.Task.Scheduler.Handle = .get();
     scheduler_handle.terminate();
-    unreachable;
+    comptime unreachable;
 }
 
 /// Stage 4 of kernel initialization.
@@ -400,5 +400,5 @@ fn loadHelloWorld() !void {
     }
 
     try thread.start(entry_point);
-    unreachable;
+    comptime unreachable;
 }

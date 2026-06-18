@@ -400,7 +400,7 @@ pub const internal = struct {
 
         const scheduler_handle: Scheduler.Handle = .get();
         scheduler_handle.terminate();
-        unreachable;
+        comptime unreachable;
     }
 };
 

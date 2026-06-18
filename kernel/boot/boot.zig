@@ -274,7 +274,7 @@ pub fn exportEntryPoints() void {
         pub fn unknownBootloaderEntryPoint() callconv(.naked) noreturn {
             asm volatile (arch.scheduling.cfi_prevent_unwinding);
             @call(.always_inline, arch.interrupts.disableAndHalt, .{});
-            unreachable;
+            comptime unreachable;
         }
     }.unknownBootloaderEntryPoint;
 

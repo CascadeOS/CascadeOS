@@ -45,7 +45,7 @@ pub fn onSyscall(
 fn syscallThreadExitCurrent() noreturn {
     const scheduler_handle: cascade.Task.Scheduler.Handle = .get();
     scheduler_handle.terminate();
-    unreachable;
+    comptime unreachable;
 }
 
 fn syscallDebugPrint(
