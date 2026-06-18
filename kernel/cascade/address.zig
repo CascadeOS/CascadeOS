@@ -370,7 +370,7 @@ pub const VirtualRange = struct {
     pub const fullyContains: fn (range: @This(), other: @This()) bool = Mixin.fullyContains;
     pub const containsAddress: fn (range: @This(), address: Address) bool = Mixin.containsAddress;
     pub const containsAddressOrder: fn (range: @This(), address: Address) std.math.Order = Mixin.containsAddressOrder;
-    pub const subslice: fn (range: @This(), offset: core.Size, size: core.Size) @This() = Mixin.subslice;
+    pub const subslice: fn (range: @This(), offset: core.Size, size: ?core.Size) @This() = Mixin.subslice;
     pub const format: fn (range: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void = Mixin.format;
 
     const Address = VirtualAddress;
@@ -435,7 +435,7 @@ pub const KernelVirtualRange = struct {
     pub const fullyContains: fn (range: @This(), other: @This()) bool = Mixin.fullyContains;
     pub const containsAddress: fn (range: @This(), address: Address) bool = Mixin.containsAddress;
     pub const containsAddressOrder: fn (range: @This(), address: Address) std.math.Order = Mixin.containsAddressOrder;
-    pub const subslice: fn (range: @This(), offset: core.Size, size: core.Size) @This() = Mixin.subslice;
+    pub const subslice: fn (range: @This(), offset: core.Size, size: ?core.Size) @This() = Mixin.subslice;
     pub const format: fn (range: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void = Mixin.format;
 
     const Address = KernelVirtualAddress;
@@ -479,7 +479,7 @@ pub const UserVirtualRange = struct {
     pub const fullyContains: fn (range: @This(), other: @This()) bool = Mixin.fullyContains;
     pub const containsAddress: fn (range: @This(), address: Address) bool = Mixin.containsAddress;
     pub const containsAddressOrder: fn (range: @This(), address: Address) std.math.Order = Mixin.containsAddressOrder;
-    pub const subslice: fn (range: @This(), offset: core.Size, size: core.Size) @This() = Mixin.subslice;
+    pub const subslice: fn (range: @This(), offset: core.Size, size: ?core.Size) @This() = Mixin.subslice;
     pub const format: fn (range: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void = Mixin.format;
 
     const Address = UserVirtualAddress;
@@ -529,7 +529,7 @@ pub const PhysicalRange = struct {
     pub const fullyContains: fn (range: @This(), other: @This()) bool = Mixin.fullyContains;
     pub const containsAddress: fn (range: @This(), address: Address) bool = Mixin.containsAddress;
     pub const containsAddressOrder: fn (range: @This(), address: Address) std.math.Order = Mixin.containsAddressOrder;
-    pub const subslice: fn (range: @This(), offset: core.Size, size: core.Size) @This() = Mixin.subslice;
+    pub const subslice: fn (range: @This(), offset: core.Size, size: ?core.Size) @This() = Mixin.subslice;
     pub const format: fn (range: @This(), writer: *std.Io.Writer) std.Io.Writer.Error!void = Mixin.format;
 
     const Address = PhysicalAddress;
@@ -724,15 +724,26 @@ fn RangeMixin(comptime Range: type) type {
             return .eq;
         }
 
-        /// Performs the same slicing operation as `slice[offset..][0..size]`.
+        /// If `size` is non-null performs the same slicing operation as `slice[offset..][0..size]` where `slice` is a slice of bytes.
+        /// Caller must ensure that `offset + size <= range.size`.
         ///
-        /// Caller must ensure that `offset + size <= slice.len`.
-        fn subslice(range: Range, offset: core.Size, size: core.Size) Range {
-            if (core.is_debug) std.debug.assert(offset.add(size).lessThanOrEqual(range.size));
+        /// If `size` is null performs the same slicing operation as `slice[offset..]` where `slice` is a slice of bytes.
+        /// Caller must ensure that `offset <= range.size`.
+        fn subslice(range: Range, offset: core.Size, size: ?core.Size) Range {
+            if (size) |s| {
+                if (core.is_debug) std.debug.assert(offset.add(s).lessThanOrEqual(range.size));
+
+                return .{
+                    .address = range.address.moveForward(offset),
+                    .size = s,
+                };
+            }
+
+            if (core.is_debug) std.debug.assert(offset.lessThanOrEqual(range.size));
 
             return .{
                 .address = range.address.moveForward(offset),
-                .size = size,
+                .size = range.size.subtract(offset),
             };
         }
 
