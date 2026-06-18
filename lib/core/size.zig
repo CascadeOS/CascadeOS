@@ -142,14 +142,6 @@ pub const Size = extern struct {
         size.value -= other.value;
     }
 
-    pub fn multiply(size: Size, other: Size) Size {
-        return .{ .value = size.value * other.value };
-    }
-
-    pub fn multiplyInPlace(size: *Size, other: Size) void {
-        size.value *= other.value;
-    }
-
     pub fn multiplyScalar(size: Size, value: u64) Size {
         return .{ .value = size.value * value };
     }
