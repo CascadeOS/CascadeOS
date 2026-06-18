@@ -31,15 +31,15 @@ pub const Header = struct {
     /// The virtual address to which the system first transfers control, thus starting the process.
     ///
     /// Zero if the file has no associated entry point.
-    entry: u64,
+    entry: cascade.VirtualAddress,
 
     /// The program header tables file offset in bytes.
     ///
     /// Zero if the file has no program header table.
-    program_header_offset: u64,
+    program_header_offset: core.Size,
 
     /// Size in bytes of one entry in the program header table.
-    program_header_entry_size: u16,
+    program_header_entry_size: core.Size,
 
     /// The number of entries in the program header table.
     program_header_entry_count: u16,
@@ -47,10 +47,10 @@ pub const Header = struct {
     /// The section header tables file offset in bytes.
     ///
     /// Zero if the file has no section header table.
-    section_header_offset: u64,
+    section_header_offset: core.Size,
 
     /// Size in bytes of one entry in the section header table.
-    section_header_entry_size: u16,
+    section_header_entry_size: core.Size,
 
     /// The number of entries in the section header table.
     section_header_entry_count: u16,
@@ -67,9 +67,11 @@ pub const Header = struct {
 
     /// Parse the given slice into an ELF header.
     ///
-    /// The slice must be atleast 64 bytes long.
-    pub fn parse(elf_header_slice: []const u8) ParseError!Header {
-        if (builtin.mode == .Debug) std.debug.assert(elf_header_slice.len >= 64);
+    /// `elf_header` must be atleast 64 bytes long.
+    pub fn parse(elf_header: cascade.KernelVirtualRange) ParseError!Header {
+        if (builtin.mode == .Debug) std.debug.assert(elf_header.size.greaterThanOrEqual(.from(64, .byte)));
+
+        const elf_header_slice: []const u8 = elf_header.byteSlice();
 
         const ident: HeaderIdent = .from(elf_header_slice);
         if (!std.mem.eql(u8, ident.magic(), HeaderIdent.MAGIC)) return error.InvalidMagic;
@@ -103,33 +105,33 @@ pub const Header = struct {
             .endian = endian,
             .type = @enumFromInt(std.mem.toNative(u16, raw_elf_header.e_type, endian)),
             .machine = @enumFromInt(std.mem.toNative(u16, raw_elf_header.e_machine, endian)),
-            .entry = std.mem.toNative(FileOffset, raw_elf_header.e_entry, endian),
-            .program_header_offset = std.mem.toNative(FileOffset, raw_elf_header.e_phoff, endian),
-            .program_header_entry_size = std.mem.toNative(u16, raw_elf_header.e_phentsize, endian),
+            .entry = .from(std.mem.toNative(FileOffset, raw_elf_header.e_entry, endian)),
+            .program_header_offset = .from(std.mem.toNative(FileOffset, raw_elf_header.e_phoff, endian), .byte),
+            .program_header_entry_size = .from(std.mem.toNative(u16, raw_elf_header.e_phentsize, endian), .byte),
             .program_header_entry_count = std.mem.toNative(u16, raw_elf_header.e_phnum, endian),
-            .section_header_offset = std.mem.toNative(FileOffset, raw_elf_header.e_shoff, endian),
-            .section_header_entry_size = std.mem.toNative(u16, raw_elf_header.e_shentsize, endian),
+            .section_header_offset = .from(std.mem.toNative(FileOffset, raw_elf_header.e_shoff, endian), .byte),
+            .section_header_entry_size = .from(std.mem.toNative(u16, raw_elf_header.e_shentsize, endian), .byte),
             .section_header_entry_count = std.mem.toNative(u16, raw_elf_header.e_shnum, endian),
             .section_name_string_table_index = std.mem.toNative(u16, raw_elf_header.e_shstrndx, endian),
         };
     }
 
     pub const TableLocation = struct {
-        base: u64,
-        length: u32, // as number and size of entries are both u16 the length cannot be larger than u32
+        offset: core.Size,
+        size: core.Size,
     };
 
     pub fn programHeaderTableLocation(header: *const Header) TableLocation {
         return .{
-            .base = header.program_header_offset,
-            .length = header.program_header_entry_count * header.program_header_entry_size,
+            .offset = header.program_header_offset,
+            .size = header.program_header_entry_size.multiplyScalar(header.program_header_entry_count),
         };
     }
 
     /// Iterates over the program header table and returns a `LoadableRegion` for each region that must be loaded.
     ///
     /// The provided slice must match the location and size given by `programHeaderTableLocation`.
-    pub fn loadableRegionIterator(header: *const Header, program_header_table: []const u8) LoadableRegion.Iterator {
+    pub fn loadableRegionIterator(header: *const Header, program_header_table: cascade.KernelVirtualRange) LoadableRegion.Iterator {
         return .{
             .program_header_iterator = header.iterateProgramHeaders(program_header_table),
         };
@@ -137,10 +139,12 @@ pub const Header = struct {
 
     /// Iterates over the program header table.
     ///
-    /// The provided slice must match the location and size given by `programHeaderTableLocation`.
-    pub fn iterateProgramHeaders(header: *const Header, program_header_table: []const u8) ProgramHeader.Iterator {
+    /// The provided range must match the location and size given by `programHeaderTableLocation`.
+    pub fn iterateProgramHeaders(header: *const Header, program_header_table: cascade.KernelVirtualRange) ProgramHeader.Iterator {
         if (builtin.mode == .Debug) std.debug.assert(
-            program_header_table.len >= header.program_header_entry_count * header.program_header_entry_size,
+            program_header_table.size.greaterThanOrEqual(
+                header.program_header_entry_size.multiplyScalar(header.program_header_entry_count),
+            ),
         );
 
         return .{
@@ -276,7 +280,7 @@ pub const ProgramHeader = struct {
     pub const Iterator = struct {
         header: *const Header,
         index: usize = 0,
-        program_header_table: []const u8,
+        program_header_table: cascade.KernelVirtualRange,
 
         pub fn next(it: *Iterator) ?ProgramHeader {
             const index = it.index;
@@ -284,7 +288,12 @@ pub const ProgramHeader = struct {
             if (index >= header.program_header_entry_count) return null;
             defer it.index += 1;
 
-            var reader: std.Io.Reader = .fixed(it.program_header_table[header.program_header_entry_size * index ..]);
+            var reader: std.Io.Reader = .fixed(
+                it.program_header_table.subslice(
+                    header.program_header_entry_size.multiplyScalar(index),
+                    null,
+                ).byteSlice(),
+            );
 
             if (header.is_64) {
                 const raw_header = reader.takeStruct(
@@ -499,7 +508,7 @@ pub const LoadableRegion = struct {
     /// The virtual range to allocate in the address space.
     ///
     /// Page aligned.
-    virtual_range: cascade.UserVirtualRange,
+    virtual_range: cascade.VirtualRange,
 
     /// The protection to use for the mapping.
     protection: cascade.mem.MapType.Protection,
@@ -533,18 +542,8 @@ pub const LoadableRegion = struct {
                     .add(program_header.memory_size)
                     .alignForward(arch.mem.standard_page_size_alignment);
 
-                const virtual_range = blk: {
-                    const virtual_range: cascade.VirtualRange = .from(address, range_size);
-                    if (core.is_debug) std.debug.assert(virtual_range.pageAligned());
-
-                    switch (virtual_range.tagged()) {
-                        .user => |user| break :blk user,
-                        else => {
-                            log.warn("program header has invalid user virtual address range: {f}", .{program_header});
-                            return error.ProgramHeaderInvalidVirtualAddress;
-                        },
-                    }
-                };
+                const virtual_range: cascade.VirtualRange = .from(address, range_size);
+                if (core.is_debug) std.debug.assert(virtual_range.pageAligned());
 
                 const new_protection = blk: {
                     var prot: cascade.mem.MapType.Protection = .{};
@@ -1184,8 +1183,8 @@ pub const OSABI = enum(u8) {
 const HeaderIdent = extern struct {
     value: [header_ident_size]u8,
 
-    inline fn from(slice: []const u8) HeaderIdent {
-        return .{ .value = slice[0..header_ident_size].* };
+    inline fn from(elf_header_slice: []const u8) HeaderIdent {
+        return .{ .value = elf_header_slice[0..header_ident_size].* };
     }
 
     const MAGIC = "\x7fELF";

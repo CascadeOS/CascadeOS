@@ -326,8 +326,7 @@ const StageBarrier = struct {
 };
 
 fn loadHelloWorld() !void {
-    const hello_world_elf = @embedFile("hello_world");
-    const source_range = cascade.KernelVirtualRange.fromSlice(u8, hello_world_elf).toVirtualRange();
+    const hello_world_elf: cascade.KernelVirtualRange = .fromSlice(u8, @embedFile("hello_world"));
 
     const current_task: cascade.Task.Current = .get();
     const thread: *cascade.user.Thread = .from(current_task.task);
@@ -335,17 +334,14 @@ fn loadHelloWorld() !void {
 
     const header = try cascade.user.elf.Header.parse(hello_world_elf);
 
-    const entry_point = blk: {
-        const possible_entry_point: cascade.VirtualAddress = .from(header.entry);
-        switch (possible_entry_point.tagged()) {
-            .user => |user| break :blk user,
-            else => return error.InvalidEntryPoint,
-        }
+    const entry_point = switch (header.entry.tagged()) {
+        .user => |user| user,
+        else => return error.InvalidEntryPoint,
     };
 
-    const program_header_table: []const u8 = blk: {
+    const program_header_table = blk: {
         const program_header_table_location = header.programHeaderTableLocation();
-        break :blk hello_world_elf[program_header_table_location.base..][0..program_header_table_location.length];
+        break :blk hello_world_elf.subslice(program_header_table_location.offset, program_header_table_location.size);
     };
 
     // map all loadable segments read write - this allows the address space to merge the entries
@@ -355,7 +351,7 @@ fn loadHelloWorld() !void {
 
         while (try iter.next()) |loadable_region| {
             _ = try address_space.map(.{
-                .base = loadable_region.virtual_range.address.toVirtualAddress(),
+                .base = loadable_region.virtual_range.address,
                 .size = loadable_region.virtual_range.size,
                 .protection = .{ .read = true, .write = true },
                 .max_protection = .all,
@@ -366,6 +362,8 @@ fn loadHelloWorld() !void {
 
     // copy the regions from the elf into the address space
     {
+        const source_range = hello_world_elf.toVirtualRange();
+
         var iter = header.loadableRegionIterator(program_header_table);
 
         while (try iter.next()) |loadable_region| {
@@ -373,7 +371,7 @@ fn loadHelloWorld() !void {
                 .destination = loadable_region.virtual_range.subslice(
                     loadable_region.destination_offset,
                     loadable_region.source_length,
-                ).toVirtualRange(),
+                ),
                 .source = source_range.subslice(
                     loadable_region.source_base,
                     loadable_region.source_length,
@@ -388,7 +386,7 @@ fn loadHelloWorld() !void {
 
         while (try iter.next()) |loadable_region| {
             try address_space.changeProtection(
-                loadable_region.virtual_range.toVirtualRange(),
+                loadable_region.virtual_range,
                 .{
                     .both = .{
                         .protection = loadable_region.protection,

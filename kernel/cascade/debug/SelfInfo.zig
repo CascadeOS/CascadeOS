@@ -167,14 +167,14 @@ fn getModule(si: *SelfInfo, gpa: std.mem.Allocator, address: usize) Error!*Modul
         else
             0;
 
-        const kernel_elf_slice = boot.kernelExecutableFile() orelse return error.MissingDebugInfo;
+        const kernel_elf: cascade.KernelVirtualRange = .fromSlice(u8, boot.kernelExecutableFile() orelse return error.MissingDebugInfo);
 
-        const header = cascade.user.elf.Header.parse(kernel_elf_slice) catch return error.InvalidDebugInfo;
+        const header = cascade.user.elf.Header.parse(kernel_elf) catch return error.InvalidDebugInfo;
 
         const program_headers_location = header.programHeaderTableLocation();
 
         var program_headers = header.iterateProgramHeaders(
-            kernel_elf_slice[program_headers_location.base..][0..program_headers_location.length],
+            kernel_elf.subslice(program_headers_location.offset, program_headers_location.size),
         );
 
         var build_id: ?[]const u8 = null;
@@ -196,7 +196,7 @@ fn getModule(si: *SelfInfo, gpa: std.mem.Allocator, address: usize) Error!*Modul
                 .note => {
                     std.debug.assert(program_header.file_size.equal(program_header.memory_size));
                     var r: std.Io.Reader = .fixed(
-                        kernel_elf_slice[program_header.offset.value..][0..program_header.file_size.value],
+                        kernel_elf.subslice(program_header.offset, program_header.file_size).byteSlice(),
                     );
                     const name_size = r.takeInt(u32, native_endian) catch continue;
                     const desc_size = r.takeInt(u32, native_endian) catch continue;
@@ -218,7 +218,7 @@ fn getModule(si: *SelfInfo, gpa: std.mem.Allocator, address: usize) Error!*Modul
             .gnu_eh_frame = gnu_eh_frame,
             .unwind = null,
             .loaded_elf = null,
-            .mapped_elf = kernel_elf_slice,
+            .mapped_elf = @alignCast(kernel_elf.byteSlice()),
         };
         break :blk &(si.module orelse unreachable);
     };
