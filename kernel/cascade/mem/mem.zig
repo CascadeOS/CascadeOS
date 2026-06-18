@@ -289,7 +289,9 @@ pub const safe = struct {
     ///
     /// Copy direction is unspecified so overlapping ranges may cause undefined behaviour.
     ///
-    /// Caller must ensure the `args.destination` is larger or equal in size to `args.source`.
+    /// Caller must ensure:
+    /// - args.destination` is larger or equal in size to `args.source`
+    /// - if either `args.destination` or `args.source` is a user range, the current task is a user task.
     pub fn memcpy(args: Args) MemcpyError!void {
         std.debug.assert(args.destination.size.greaterThanOrEqual(args.source.size));
 
@@ -298,18 +300,20 @@ pub const safe = struct {
         const user_range_involved = args.destination.tagged() == .user or args.source.tagged() == .user;
 
         if (user_range_involved) {
-            if (core.is_debug) std.debug.assert(current_task.task.type == .user);
-            std.debug.assert(
-                !current_task.task.access_user_memory.swap(true, .monotonic),
-            );
+            const thread: *cascade.user.Thread = .from(current_task.task);
+            const previous = thread.access_user_memory.swap(true, .monotonic);
+            std.debug.assert(!previous);
             arch.mem.enableAccessToUserMemory();
         } else {
-            std.debug.assert(!current_task.task.access_user_memory.load(.monotonic));
+            if (core.is_debug and current_task.task.type == .user) {
+                const thread: *cascade.user.Thread = .from(current_task.task);
+                std.debug.assert(!thread.access_user_memory.load(.monotonic));
+            }
         }
         defer if (user_range_involved) {
-            std.debug.assert(
-                current_task.task.access_user_memory.swap(false, .monotonic),
-            );
+            const thread: *cascade.user.Thread = .from(current_task.task);
+            const previous = thread.access_user_memory.swap(false, .monotonic);
+            std.debug.assert(previous);
             arch.mem.disableAccessToUserMemory();
         };
 
@@ -318,12 +322,12 @@ pub const safe = struct {
             .target = undefined,
         };
 
-        std.debug.assert(
-            current_task.task.safe_result_slot.swap(&slot, .monotonic) == null,
-        );
-        defer std.debug.assert(
-            current_task.task.safe_result_slot.swap(null, .monotonic) == &slot,
-        );
+        var previous = current_task.task.safe_result_slot.swap(&slot, .monotonic);
+        std.debug.assert(previous == null);
+        defer {
+            previous = current_task.task.safe_result_slot.swap(null, .monotonic);
+            std.debug.assert(previous == &slot);
+        }
 
         arch.mem.safeMemcpy(args.destination, args.source, &slot.target);
 
@@ -375,7 +379,6 @@ fn onKernelPageFault(
                 break :blk switch (current_task.task.type) {
                     .kernel => {
                         @branchHint(.cold);
-                        if (core.is_debug) std.debug.assert(!current_task.task.access_user_memory.load(.monotonic));
                         cascade.debug.interruptSourcePanic(
                             interrupt_frame,
                             "kernel only task attempted to access user memory\n{f}",

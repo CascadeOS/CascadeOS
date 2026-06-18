@@ -423,46 +423,44 @@ pub const Handle = struct {
     ) void {
         const transition: cascade.Task.Transition = .from(old_task, new_task);
 
-        const old_task_access_user_memory = transition.old_task.access_user_memory.load(.acquire);
-        const new_task_access_user_memory = transition.new_task.access_user_memory.load(.acquire);
-
         switch (transition.type) {
-            .kernel_to_kernel => {
-                if (core.is_debug) {
-                    std.debug.assert(!old_task_access_user_memory);
-                    std.debug.assert(!new_task_access_user_memory);
-                }
-            },
+            .kernel_to_kernel => {},
             .kernel_to_user => {
-                if (core.is_debug) std.debug.assert(!old_task_access_user_memory);
+                const new_thread: *cascade.user.Thread = .from(transition.new_task);
+                const new_process = new_thread.process;
 
-                const new_process: *cascade.user.Process = .from(transition.new_task);
                 new_process.address_space.page_table.load();
 
-                if (new_task_access_user_memory) {
-                    @branchHint(.unlikely); // we expect this to be 0 most of the time
+                if (new_thread.access_user_memory.load(.monotonic)) {
+                    @branchHint(.unlikely); // we expect this to be false most of the time
                     arch.mem.enableAccessToUserMemory();
                 }
             },
             .user_to_kernel => {
-                if (core.is_debug) std.debug.assert(!new_task_access_user_memory);
-
                 cascade.mem.kernelPageTable().load();
 
-                if (old_task_access_user_memory) {
-                    @branchHint(.unlikely); // we expect this to be 0 most of the time
+                const old_thread: *cascade.user.Thread = .from(transition.old_task);
+
+                if (old_thread.access_user_memory.load(.monotonic)) {
+                    @branchHint(.unlikely); // we expect this to be false most of the time
                     arch.mem.disableAccessToUserMemory();
                 }
             },
             .user_to_user => {
-                const old_process: *const cascade.user.Process = .from(transition.old_task);
-                const new_process: *cascade.user.Process = .from(transition.new_task);
-                if (old_process != new_process) new_process.address_space.page_table.load();
+                const old_thread: *cascade.user.Thread = .from(transition.old_task);
 
-                if (old_task_access_user_memory != new_task_access_user_memory) {
-                    @branchHint(.unlikely); // we expect both to be 0 most of the time
+                const new_thread: *cascade.user.Thread = .from(transition.new_task);
+                const new_process = new_thread.process;
 
-                    if (new_task_access_user_memory) {
+                if (old_thread.process != new_process) new_process.address_space.page_table.load();
+
+                const old_thread_access_user_memory = old_thread.access_user_memory.load(.monotonic);
+                const new_thread_access_user_memory = new_thread.access_user_memory.load(.monotonic);
+
+                if (old_thread_access_user_memory != new_thread_access_user_memory) {
+                    @branchHint(.unlikely); // we expect both to be false most of the time
+
+                    if (new_thread_access_user_memory) {
                         arch.mem.disableAccessToUserMemory();
                     } else {
                         arch.mem.enableAccessToUserMemory();

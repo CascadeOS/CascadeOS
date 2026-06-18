@@ -85,13 +85,21 @@ pub fn onInterruptEntry() StateBeforeInterrupt {
 
     const task = arch.scheduling.getCurrentTask();
 
-    const before_interrupt_interrupt_disable_count = task.interrupt_disable_count.fetchAdd(1, .acq_rel);
-    const before_interrupt_access_user_memory = task.access_user_memory.swap(false, .acq_rel);
+    const before_interrupt_interrupt_disable_count = task.interrupt_disable_count.fetchAdd(1, .monotonic);
+    const before_interrupt_access_user_memory = switch (task.type) {
+        .kernel => false,
+        .user => blk: {
+            const thread: *cascade.user.Thread = .from(task);
+            const before_interrupt_access_user_memory = thread.access_user_memory.swap(false, .monotonic);
 
-    if (before_interrupt_access_user_memory) {
-        @branchHint(.unlikely);
-        arch.mem.disableAccessToUserMemory();
-    }
+            if (before_interrupt_access_user_memory) {
+                @branchHint(.unlikely);
+                arch.mem.disableAccessToUserMemory();
+            }
+
+            break :blk before_interrupt_access_user_memory;
+        },
+    };
 
     task.known_executor = task.state.running;
 
@@ -111,22 +119,29 @@ pub const StateBeforeInterrupt = struct {
     pub fn onInterruptExit(state_before_interrupt: StateBeforeInterrupt) void {
         const current_task: Current = .get();
 
-        current_task.task.interrupt_disable_count.store(state_before_interrupt.interrupt_disable_count, .release);
+        current_task.task.interrupt_disable_count.store(state_before_interrupt.interrupt_disable_count, .monotonic);
 
-        const before_interrupt_access_user_memory = state_before_interrupt.access_user_memory;
-        const current_access_user_memory = current_task.task.access_user_memory.swap(
-            before_interrupt_access_user_memory,
-            .release,
-        );
+        switch (current_task.task.type) {
+            .kernel => {},
+            .user => {
+                const thread: *cascade.user.Thread = .from(current_task.task);
 
-        if (current_access_user_memory != before_interrupt_access_user_memory) {
-            @branchHint(.unlikely);
+                const before_interrupt_access_user_memory = state_before_interrupt.access_user_memory;
+                const current_access_user_memory = thread.access_user_memory.swap(
+                    before_interrupt_access_user_memory,
+                    .monotonic,
+                );
 
-            if (before_interrupt_access_user_memory) {
-                arch.mem.disableAccessToUserMemory();
-            } else {
-                arch.mem.enableAccessToUserMemory();
-            }
+                if (current_access_user_memory != before_interrupt_access_user_memory) {
+                    @branchHint(.unlikely);
+
+                    if (before_interrupt_access_user_memory) {
+                        arch.mem.disableAccessToUserMemory();
+                    } else {
+                        arch.mem.enableAccessToUserMemory();
+                    }
+                }
+            },
         }
 
         current_task.setKnownExecutor();

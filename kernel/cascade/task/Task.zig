@@ -60,9 +60,6 @@ interrupt_disable_count: std.atomic.Value(u32) = .init(1), // tasks always start
 /// Tracks the depth of nested migration disables.
 migration_disable_count: std.atomic.Value(u32),
 
-/// Whether the task is currently accessing user memory.
-access_user_memory: std.atomic.Value(bool) = .init(false),
-
 /// Non-null during a safe memory copy operation.
 safe_result_slot: std.atomic.Value(?*cascade.mem.safe.ResultSlot) = .init(null),
 

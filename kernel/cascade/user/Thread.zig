@@ -17,6 +17,8 @@ task: cascade.Task,
 
 process: *cascade.user.Process,
 
+access_user_memory: std.atomic.Value(bool) = .init(false),
+
 arch_specific: arch.user.PerThread,
 
 pub inline fn from(task: *cascade.Task) *Thread {
