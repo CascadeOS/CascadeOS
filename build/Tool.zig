@@ -102,6 +102,10 @@ fn resolveTool(
         .root_module = normal_module,
     });
 
+    if (tool_description.force_llvm) {
+        normal_exe.use_llvm = true;
+    }
+
     const release_safe_exe = if (optimize_mode == .ReleaseSafe)
         normal_exe
     else release_safe_exe: {
@@ -113,10 +117,16 @@ fn resolveTool(
             dependencies,
         );
 
-        break :release_safe_exe b.addExecutable(.{
+        const release_safe_exe = b.addExecutable(.{
             .name = tool_description.name,
             .root_module = release_safe_module,
         });
+
+        if (tool_description.force_llvm) {
+            release_safe_exe.use_llvm = true;
+        }
+
+        break :release_safe_exe release_safe_exe;
     };
 
     const exe_install_step = b.addInstallArtifact(
@@ -163,6 +173,10 @@ fn resolveTool(
         .name = test_name,
         .root_module = normal_module,
     });
+
+    if (tool_description.force_llvm) {
+        test_exe.use_llvm = true;
+    }
 
     const test_install_step = b.addInstallArtifact(
         test_exe,

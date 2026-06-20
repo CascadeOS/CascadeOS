@@ -13,6 +13,8 @@ name: []const u8,
 /// The names of the libraries this tool depends on.
 dependencies: []const []const u8 = &.{},
 
+force_llvm: bool = false,
+
 /// Allows for custom configuration of the tool.
 configuration: Configuration = .simple,
 
