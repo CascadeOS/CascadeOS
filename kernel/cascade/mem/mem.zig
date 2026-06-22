@@ -285,7 +285,7 @@ pub fn changeProtection(
 pub const safe = struct {
     pub const MemcpyError = error{MemcpyFailed};
 
-    /// Perform a copy from `args.source` to `args.destination`, if an unhandleable page fault occurs returns `false`.
+    /// Perform a copy from `args.source` to `args.destination`, if an unhandleable page fault occurs returns `error.MemcpyFailed`.
     ///
     /// Copy direction is unspecified so overlapping ranges may cause undefined behaviour.
     ///
