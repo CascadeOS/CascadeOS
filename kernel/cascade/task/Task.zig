@@ -61,7 +61,7 @@ interrupt_disable_count: std.atomic.Value(u32) = .init(1), // tasks always start
 migration_disable_count: std.atomic.Value(u32),
 
 /// Non-null during a safe memory copy operation.
-safe_result_slot: std.atomic.Value(?*cascade.mem.safe.ResultSlot) = .init(null),
+safe_result_slot: cascade.mem.safe.Result.Slot = .{},
 
 spinlocks_held: u32,
 scheduler_locked: bool,

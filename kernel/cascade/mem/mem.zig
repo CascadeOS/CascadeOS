@@ -317,28 +317,50 @@ pub const safe = struct {
             arch.mem.disableAccessToUserMemory();
         };
 
-        var slot: ResultSlot = .{
+        var result: Result = .{
             .successful = true,
             .target = undefined,
         };
 
-        var previous = current_task.task.safe_result_slot.swap(&slot, .monotonic);
-        std.debug.assert(previous == null);
-        defer {
-            previous = current_task.task.safe_result_slot.swap(null, .monotonic);
-            std.debug.assert(previous == &slot);
-        }
+        current_task.task.safe_result_slot.set(&result);
+        defer current_task.task.safe_result_slot.clear(&result);
 
-        arch.mem.safeMemcpy(args.destination, args.source, &slot.target);
+        arch.mem.safeMemcpy(args.destination, args.source, &result.target);
 
-        if (!slot.successful) return error.MemcpyFailed;
+        if (!result.successful) return error.MemcpyFailed;
     }
 
-    pub const ResultSlot = struct {
+    pub const Result = struct {
         successful: bool,
 
         /// If a read/write fails this is the address the page fault handler will return to.
         target: cascade.KernelVirtualAddress,
+
+        pub const Slot = struct {
+            _slot: std.atomic.Value(?*Result) = .init(null),
+
+            pub inline fn set(slot: *Slot, result: *Result) void {
+                const previous = slot._slot.swap(result, .monotonic);
+                if (core.is_debug) std.debug.assert(previous == null);
+            }
+
+            pub inline fn clear(slot: *Slot, result: *Result) void {
+                const previous = slot._slot.swap(null, .monotonic);
+                if (core.is_debug) std.debug.assert(previous == result);
+            }
+
+            pub fn trySignalFailure(slot: *Slot, interrupt_frame: arch.interrupts.InterruptFrame) bool {
+                const result = slot._slot.load(.monotonic) orelse {
+                    @branchHint(.unlikely);
+                    return false;
+                };
+
+                result.successful = false;
+                interrupt_frame.setInstructionPointer(result.target.toVirtualAddress());
+
+                return true;
+            }
+        };
     };
 
     pub const Args = struct {
@@ -391,14 +413,7 @@ fn onKernelPageFault(
             if (!page_fault_details.faulting_context.kernel.access_user_memory_enabled) {
                 @branchHint(.cold);
 
-                if (current_task.task.safe_result_slot.load(.monotonic)) |result_slot| {
-                    @branchHint(.likely);
-
-                    result_slot.successful = false;
-                    interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
-
-                    return;
-                }
+                if (current_task.task.safe_result_slot.trySignalFailure(interrupt_frame)) return;
 
                 cascade.debug.interruptSourcePanic(
                     interrupt_frame,
@@ -409,14 +424,7 @@ fn onKernelPageFault(
             }
 
             process.address_space.handlePageFault(page_fault_details) catch |err| {
-                if (current_task.task.safe_result_slot.load(.monotonic)) |result_slot| {
-                    @branchHint(.likely);
-
-                    result_slot.successful = false;
-                    interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
-
-                    return;
-                }
+                if (current_task.task.safe_result_slot.trySignalFailure(interrupt_frame)) return;
 
                 cascade.debug.interruptSourcePanic(
                     interrupt_frame,
@@ -432,14 +440,7 @@ fn onKernelPageFault(
             const region_type = globals.regions.containingAddress(address) orelse {
                 @branchHint(.cold);
 
-                if (current_task.task.safe_result_slot.load(.monotonic)) |result_slot| {
-                    @branchHint(.likely);
-
-                    result_slot.successful = false;
-                    interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
-
-                    return;
-                }
+                if (current_task.task.safe_result_slot.trySignalFailure(interrupt_frame)) return;
 
                 cascade.debug.interruptSourcePanic(
                     interrupt_frame,
@@ -454,14 +455,7 @@ fn onKernelPageFault(
                     @branchHint(.likely);
 
                     globals.kernel_address_space.handlePageFault(page_fault_details) catch |err| {
-                        if (current_task.task.safe_result_slot.load(.monotonic)) |result_slot| {
-                            @branchHint(.likely);
-
-                            result_slot.successful = false;
-                            interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
-
-                            return;
-                        }
+                        if (current_task.task.safe_result_slot.trySignalFailure(interrupt_frame)) return;
 
                         switch (err) {
                             error.OutOfMemory => std.debug.panic(
@@ -482,14 +476,7 @@ fn onKernelPageFault(
                 else => |t| {
                     @branchHint(.cold);
 
-                    if (current_task.task.safe_result_slot.load(.monotonic)) |result_slot| {
-                        @branchHint(.likely);
-
-                        result_slot.successful = false;
-                        interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
-
-                        return;
-                    }
+                    if (current_task.task.safe_result_slot.trySignalFailure(interrupt_frame)) return;
 
                     cascade.debug.interruptSourcePanic(
                         interrupt_frame,
@@ -503,14 +490,7 @@ fn onKernelPageFault(
         .invalid => {
             @branchHint(.cold);
 
-            if (current_task.task.safe_result_slot.load(.monotonic)) |result_slot| {
-                @branchHint(.likely);
-
-                result_slot.successful = false;
-                interrupt_frame.setInstructionPointer(result_slot.target.toVirtualAddress());
-
-                return;
-            }
+            if (current_task.task.safe_result_slot.trySignalFailure(interrupt_frame)) return;
 
             cascade.debug.interruptSourcePanic(
                 interrupt_frame,
