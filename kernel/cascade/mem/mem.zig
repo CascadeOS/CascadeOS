@@ -369,79 +369,27 @@ pub const safe = struct {
     };
 };
 
-/// Executed upon page fault.
 pub fn onPageFault(
     page_fault_details: PageFaultDetails,
     interrupt_frame: arch.interrupts.InterruptFrame,
 ) void {
     const current_task: cascade.Task.Current = .get();
     current_task.decrementInterruptDisable();
-
-    switch (page_fault_details.faulting_context) {
-        .kernel => onKernelPageFault(page_fault_details, interrupt_frame),
-        .user => {
-            const process: *cascade.user.Process = .from(current_task.task);
-            process.address_space.handlePageFault(page_fault_details) catch |err| std.debug.panic(
-                "user page fault failed: {t}\n{f}",
-                .{ err, page_fault_details },
+    switch (page_fault_details.situation()) {
+        .kernel_invalid => {
+            @branchHint(.cold);
+            if (current_task.task.safe_result_slot.trySignalFailure(interrupt_frame)) return;
+            cascade.debug.interruptSourcePanic(
+                interrupt_frame,
+                "kernel page fault with invalid address\n{f}",
+                .{page_fault_details},
             );
+            comptime unreachable;
         },
-    }
-}
-
-fn onKernelPageFault(
-    page_fault_details: PageFaultDetails,
-    interrupt_frame: arch.interrupts.InterruptFrame,
-) void {
-    const current_task: cascade.Task.Current = .get();
-
-    switch (page_fault_details.faulting_address.tagged()) {
-        .user => {
-            const process: *cascade.user.Process = switch (current_task.task.type) {
-                .kernel => {
-                    @branchHint(.cold);
-                    cascade.debug.interruptSourcePanic(
-                        interrupt_frame,
-                        "kernel only task attempted to access user memory\n{f}",
-                        .{page_fault_details},
-                    );
-                    comptime unreachable;
-                },
-                .user => .from(current_task.task),
-            };
-
-            if (!page_fault_details.faulting_context.kernel.access_user_memory_enabled) {
-                @branchHint(.cold);
-
-                if (current_task.task.safe_result_slot.trySignalFailure(interrupt_frame)) return;
-
-                cascade.debug.interruptSourcePanic(
-                    interrupt_frame,
-                    "attempt to access user memory without enabling user memory access\n{f}",
-                    .{page_fault_details},
-                );
-                comptime unreachable;
-            }
-
-            process.address_space.handlePageFault(page_fault_details) catch |err| {
-                if (current_task.task.safe_result_slot.trySignalFailure(interrupt_frame)) return;
-
-                cascade.debug.interruptSourcePanic(
-                    interrupt_frame,
-                    "kernel triggered unhandleable page fault in user memory: {t}\n{f}",
-                    .{ err, page_fault_details },
-                );
-                comptime unreachable;
-            };
-
-            return;
-        },
-        .kernel => |address| {
+        .kernel_access_kernel => |address| {
             const region_type = globals.regions.containingAddress(address) orelse {
                 @branchHint(.cold);
-
                 if (current_task.task.safe_result_slot.trySignalFailure(interrupt_frame)) return;
-
                 cascade.debug.interruptSourcePanic(
                     interrupt_frame,
                     "kernel page fault outside of any kernel region\n{f}",
@@ -449,14 +397,11 @@ fn onKernelPageFault(
                 );
                 comptime unreachable;
             };
-
-            switch (region_type) {
+            const unexpected_region = switch (region_type) {
                 .kernel_address_space => {
                     @branchHint(.likely);
-
                     globals.kernel_address_space.handlePageFault(page_fault_details) catch |err| {
                         if (current_task.task.safe_result_slot.trySignalFailure(interrupt_frame)) return;
-
                         switch (err) {
                             error.OutOfMemory => std.debug.panic(
                                 "no memory available to handle page fault in kernel address space\n{f}",
@@ -470,34 +415,47 @@ fn onKernelPageFault(
                         }
                         comptime unreachable;
                     };
-
                     return;
                 },
-                else => |t| {
-                    @branchHint(.cold);
-
-                    if (current_task.task.safe_result_slot.trySignalFailure(interrupt_frame)) return;
-
-                    cascade.debug.interruptSourcePanic(
-                        interrupt_frame,
-                        "kernel page fault in '{t}'\n{f}",
-                        .{ t, page_fault_details },
-                    );
-                    comptime unreachable;
-                },
-            }
-        },
-        .invalid => {
-            @branchHint(.cold);
-
+                else => |r| r,
+            };
             if (current_task.task.safe_result_slot.trySignalFailure(interrupt_frame)) return;
-
             cascade.debug.interruptSourcePanic(
                 interrupt_frame,
-                "kernel page fault with invalid address\n{f}",
-                .{page_fault_details},
+                "kernel page fault in '{t}'\n{f}",
+                .{ unexpected_region, page_fault_details },
             );
             comptime unreachable;
+        },
+        .kernel_access_user => {
+            const process: *cascade.user.Process = .from(current_task.task);
+            if (!page_fault_details.faulting_context.kernel.access_user_memory_enabled) {
+                @branchHint(.cold);
+                cascade.debug.interruptSourcePanic(
+                    interrupt_frame,
+                    "attempt to access user memory without enabling user memory access\n{f}",
+                    .{page_fault_details},
+                );
+                comptime unreachable;
+            }
+            process.address_space.handlePageFault(page_fault_details) catch |err| {
+                if (current_task.task.safe_result_slot.trySignalFailure(interrupt_frame)) return;
+                cascade.debug.interruptSourcePanic(
+                    interrupt_frame,
+                    "kernel triggered unhandleable page fault in user memory: {t}\n{f}",
+                    .{ err, page_fault_details },
+                );
+                comptime unreachable;
+            };
+            return;
+        },
+        .user => {
+            const process: *cascade.user.Process = .from(current_task.task);
+            process.address_space.handlePageFault(page_fault_details) catch |err| std.debug.panic(
+                "user page fault failed: {t}\n{f}",
+                .{ err, page_fault_details },
+            );
+            return;
         },
     }
     comptime unreachable;
@@ -534,6 +492,24 @@ pub const PageFaultDetails = struct {
         /// The access was not permitted by the page protection.
         protection,
     };
+
+    pub const Situation = union(enum) {
+        kernel_invalid,
+        kernel_access_kernel: cascade.KernelVirtualAddress,
+        kernel_access_user: cascade.UserVirtualAddress,
+        user,
+    };
+
+    pub fn situation(page_fault_details: PageFaultDetails) Situation {
+        return switch (page_fault_details.faulting_context) {
+            .kernel => switch (page_fault_details.faulting_address.tagged()) {
+                .kernel => |k| .{ .kernel_access_kernel = k },
+                .user => |u| .{ .kernel_access_user = u },
+                .invalid => .kernel_invalid,
+            },
+            .user => .user,
+        };
+    }
 
     pub fn print(details: PageFaultDetails, writer: *std.Io.Writer, indent: usize) !void {
         const new_indent = indent + 2;
