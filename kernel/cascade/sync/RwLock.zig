@@ -14,7 +14,7 @@ const cascade = @import("cascade");
 
 const RwLock = @This();
 
-state: usize = 0,
+state: usize align(std.atomic.cache_line) = 0,
 mutex: cascade.sync.Mutex = .{},
 
 wait_queue_spinlock: cascade.sync.TicketSpinLock = .{},

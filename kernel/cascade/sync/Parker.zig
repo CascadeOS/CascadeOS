@@ -12,7 +12,7 @@ const Parker = @This();
 
 lock: cascade.sync.TicketSpinLock = .{},
 parked_task: ?*cascade.Task,
-unpark_attempts: std.atomic.Value(usize) = .init(0),
+unpark_attempts: std.atomic.Value(usize) align(std.atomic.cache_line) = .init(0),
 
 pub const empty: Parker = .{ .parked_task = null };
 

@@ -15,8 +15,6 @@ const core = @import("core");
 
 const TicketSpinLock = @This();
 
-_: void align(std.atomic.cache_line) = {},
-
 container: Container align(std.atomic.cache_line) = .{ .full = 0 },
 holding_executor: ?*const cascade.Executor = null,
 
