@@ -210,24 +210,20 @@ pub fn unmap(
         if (flush_batch.full()) {
             @branchHint(.unlikely);
 
-            var request: FlushRequest = .{
+            FlushRequest.submitAndWait(.{
                 .batch = &flush_batch,
                 .flush_target = flush_target,
-            };
-
-            request.submitAndWait();
+            });
 
             flush_batch.clear();
         }
     }
 
     if (flush_batch.ranges.len != 0) {
-        var request: FlushRequest = .{
+        FlushRequest.submitAndWait(.{
             .batch = &flush_batch,
             .flush_target = flush_target,
-        };
-
-        request.submitAndWait();
+        });
     }
 
     physical_page_allocator.deallocate(deallocate_page_list);
@@ -261,24 +257,20 @@ pub fn changeProtection(
         if (flush_batch.full()) {
             @branchHint(.unlikely);
 
-            var request: FlushRequest = .{
+            FlushRequest.submitAndWait(.{
                 .batch = &flush_batch,
                 .flush_target = flush_target,
-            };
-
-            request.submitAndWait();
+            });
 
             flush_batch.clear();
         }
     }
 
     if (flush_batch.ranges.len != 0) {
-        var request: FlushRequest = .{
+        FlushRequest.submitAndWait(.{
             .batch = &flush_batch,
             .flush_target = flush_target,
-        };
-
-        request.submitAndWait();
+        });
     }
 }
 
