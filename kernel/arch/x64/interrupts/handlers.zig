@@ -71,7 +71,7 @@ pub fn earlyPageFaultHandler(
             "kernel page fault @ {f} - {f}",
             .{ faulting_address, error_code },
         ),
-        .user => unreachable, // a user execption is not possible during early initialization
+        .user => unreachable, // a user exception is not possible during early initialization
     }
 }
 
