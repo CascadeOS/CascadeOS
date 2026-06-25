@@ -11,16 +11,28 @@ const FlushRequest = @This();
 
 batch: *const cascade.mem.VirtualRangeBatch,
 flush_target: cascade.Context,
-count: std.atomic.Value(usize) = .init(1), // starts at `1` to account for the current executor
-nodes: core.containers.BoundedArray(Node, cascade.config.executor.maximum_number_of_executors) = .{},
 
-pub const Node = struct {
-    request: *FlushRequest,
-    node: std.SinglyLinkedList.Node,
-};
+pub fn submitAndWait(flush_request: FlushRequest) void {
+    const all_executors = cascade.Executor.executors();
 
-pub fn submitAndWait(flush_request: *FlushRequest) void {
+    if (all_executors.len == 1) {
+        // either there is only one executor or we are early in init and only the bootstrap executor is present
+        flush_request.rawFlush();
+        return;
+    }
+
     const current_task: cascade.Task.Current = .get();
+    if (core.is_debug) {
+        // only when the bootstrap executor is running during early init will be in this function with interrupts disabled
+        // but that will trigger the above branch so will not reach here, so it is safe to assert interrupt enabled
+        std.debug.assert(current_task.task.interrupt_disable_count.load(.monotonic) == 0);
+        std.debug.assert(arch.interrupts.areEnabled());
+    }
+
+    var state: State = .{
+        .request = flush_request,
+        .count = .init(all_executors.len - 1), // exclude current executor
+    };
 
     {
         current_task.incrementMigrationDisable();
@@ -30,24 +42,25 @@ pub fn submitAndWait(flush_request: *FlushRequest) void {
 
         // TODO: all except self IPI
         // TODO: is there a better way to determine which executors to target?
-        for (cascade.Executor.executors()) |*executor| {
+        for (all_executors) |*executor| {
             if (executor == current_executor) continue; // skip ourselves
-            flush_request.requestExecutor(executor);
+
+            const node = state.nodes.addOne() catch @panic("exceeded maximum number of executors");
+            node.* = .{
+                .state = &state,
+                .node = .{},
+            };
+            executor.flush_requests.prepend(&node.node);
+            arch.interrupts.sendFlushIPI(executor);
         }
 
-        flush_request.flush();
+        // use `rawFlush` instead of `flush` as the current executor is not included in the count
+        flush_request.rawFlush();
     }
 
-    if (current_task.task.interrupt_disable_count.load(.acquire) == 0) {
-        // interrupts are enabled so flush requests from other cores will be serviced
-        while (flush_request.count.load(.monotonic) != 0) {
-            arch.spinLoopHint();
-        }
-    } else {
-        // interrupts are disabled so service flush requests here
-        while (flush_request.count.load(.monotonic) != 0) {
-            processFlushRequests();
-        }
+    // TODO: spinloops are bad, we should have a `sync.Parker` on the `flush_request`
+    while (state.count.load(.acquire) != 0) {
+        processFlushRequests();
     }
 }
 
@@ -57,15 +70,27 @@ pub fn processFlushRequests() void {
 
     while (executor.flush_requests.popFirst()) |node| {
         const request_node: *const cascade.mem.FlushRequest.Node = @fieldParentPtr("node", node);
-        request_node.request.flush();
+        request_node.state.flush();
     }
 }
 
-fn flush(flush_request: *FlushRequest) void {
-    const current_task: cascade.Task.Current = .get();
-    defer _ = flush_request.count.fetchSub(1, .monotonic);
+const State = struct {
+    request: FlushRequest,
+    count: std.atomic.Value(usize),
+    nodes: core.containers.BoundedArray(Node, cascade.config.executor.maximum_number_of_executors) = .{},
 
-    switch (flush_request.flush_target) {
+    /// Flush the request and decrement the reference count.
+    fn flush(state: *State) void {
+        state.request.rawFlush();
+        _ = state.count.fetchSub(1, .release);
+    }
+};
+
+/// This function performs the actual cache flush, it does not perform any synchronization see `State.flush`.
+fn rawFlush(request: FlushRequest) void {
+    const current_task: cascade.Task.Current = .get();
+
+    switch (request.flush_target) {
         .kernel => {},
         .user => |target_process| switch (current_task.task.type) {
             .kernel => return,
@@ -76,20 +101,12 @@ fn flush(flush_request: *FlushRequest) void {
         },
     }
 
-    for (flush_request.batch.ranges.constSlice()) |range| {
+    for (request.batch.ranges.constSlice()) |range| {
         arch.mem.flushCache(range);
     }
 }
 
-fn requestExecutor(flush_request: *FlushRequest, executor: *cascade.Executor) void {
-    _ = flush_request.count.fetchAdd(1, .monotonic);
-
-    const node = flush_request.nodes.addOne() catch @panic("exceeded maximum number of executors");
-    node.* = .{
-        .request = flush_request,
-        .node = .{},
-    };
-    executor.flush_requests.prepend(&node.node);
-
-    arch.interrupts.sendFlushIPI(executor);
-}
+pub const Node = struct {
+    state: *State,
+    node: std.SinglyLinkedList.Node,
+};
