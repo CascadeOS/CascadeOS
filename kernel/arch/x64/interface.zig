@@ -176,7 +176,7 @@ pub const functions: arch.Functions = .{
     },
 };
 
-const size_of_address_space_half = core.Size.from(128, .tib).subtract(x64.mem.PageTable.small_page_size);
+const size_of_canonical_region = core.Size.from(128, .tib);
 
 pub const decls: arch.Decls = .{
     .PerExecutor = x64.PerExecutor,
@@ -191,7 +191,9 @@ pub const decls: arch.Decls = .{
         .largest_page_size = x64.mem.PageTable.large_page_size,
         .kernel_memory_range = .from(
             cascade.VirtualAddress.from(0xffff800000000000),
-            size_of_address_space_half,
+            size_of_canonical_region
+                // exclude the last page of memory, this prevents boundary conditions
+                .subtract(x64.mem.PageTable.small_page_size),
         ),
         .PageTable = x64.mem.PageTable,
     },
@@ -210,7 +212,12 @@ pub const decls: arch.Decls = .{
         .SyscallFrame = x64.user.SyscallFrame,
         .user_memory_range = .from(
             cascade.VirtualAddress.zero.moveForward(x64.mem.PageTable.small_page_size),
-            size_of_address_space_half,
+            size_of_canonical_region
+                // exclude the first page of memory so that a null pointer is not a valid user address
+                .subtract(x64.mem.PageTable.small_page_size)
+                // exclude the last page of memory, this prevents boundary conditions like a syscall instruction at the end of the last page
+                // causing a general protection fault in the kernel on sysret as the return address is non-canonical
+                .subtract(x64.mem.PageTable.small_page_size),
         ),
     },
 

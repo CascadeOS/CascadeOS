@@ -95,7 +95,7 @@ pub const functions: arch.Functions = .{
 
 const standard_page_size: core.Size = .from(4, .kib);
 
-const size_of_address_space_half = core.Size.from(128, .tib).subtract(standard_page_size);
+const size_of_canonical_region = core.Size.from(128, .tib);
 
 pub const decls: arch.Decls = .{
     .PerExecutor = struct { hartid: u32 },
@@ -111,7 +111,9 @@ pub const decls: arch.Decls = .{
         .largest_page_size = .from(1, .gib),
         .kernel_memory_range = .from(
             cascade.VirtualAddress.from(0xffff800000000000),
-            size_of_address_space_half,
+            size_of_canonical_region
+                // exclude the last page of memory, this prevents boundary conditions
+                .subtract(standard_page_size),
         ),
         .PageTable = extern struct {},
     },
@@ -130,7 +132,11 @@ pub const decls: arch.Decls = .{
         .SyscallFrame = struct {},
         .user_memory_range = .from(
             cascade.VirtualAddress.zero.moveForward(standard_page_size),
-            size_of_address_space_half,
+            size_of_canonical_region
+                // exclude the first page of memory so that a null pointer is not a valid user address
+                .subtract(standard_page_size)
+                // exclude the last page of memory, this prevents boundary conditions
+                .subtract(standard_page_size),
         ),
     },
 
