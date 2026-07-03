@@ -57,3 +57,7 @@ pub const user = struct {
     // the process name is also used as the name of its address space
     pub const address_space_name_length = process_name_length;
 };
+
+pub const init = struct {
+    pub const code_section = ".init_text";
+};

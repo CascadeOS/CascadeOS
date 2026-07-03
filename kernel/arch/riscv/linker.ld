@@ -24,6 +24,10 @@ SECTIONS
 
     __text_start = .;
 
+    .init_text : {
+        *(.init_text .init_text.*)
+    } :text
+
     .text : {
         *(.text .text.*)
     } :text

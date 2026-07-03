@@ -201,7 +201,7 @@ pub fn deviceTreeBlob() ?cascade.KernelVirtualAddress {
     return resp.address;
 }
 
-fn limineEntryPoint() callconv(.c) noreturn {
+fn limineEntryPoint() linksection(cascade.config.init.code_section) callconv(.c) noreturn {
     asm volatile (arch.cfi_prevent_unwinding);
 
     boot.bootloader_api = .limine;
