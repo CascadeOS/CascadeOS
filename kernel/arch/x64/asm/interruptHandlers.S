@@ -7,25 +7,15 @@
 .set .HasError, 1
 .set .NoError, 2
 
-.macro INTERRUPT_HANDLER type, number
-
 .section .text
-.global _interrupt_handler_\number
-.type _interrupt_handler_\number, @function
-_interrupt_handler_\number:
+.global commonInterruptHandler
+.type commonInterruptHandler, @function
+commonInterruptHandler:
 	.cfi_startproc simple
-	.cfi_signal_frame
+    .cfi_signal_frame
 
     .cfi_undefined %rip
 	.cfi_def_cfa %rsp, 0
-
-.if \type != .HasError
-    push $0
-    .cfi_adjust_cfa_offset 8
-.endif
-
-    push $\number
-    .cfi_adjust_cfa_offset 8
 
     // if we interrupted userspace then swapgs
     testl $3, 24(%rsp)
@@ -58,8 +48,19 @@ _interrupt_handler_\number:
     .cfi_adjust_cfa_offset -16
     iretq
     .cfi_endproc
+.size commonInterruptHandler, . - commonInterruptHandler
 
-.size _interrupt_handler_\number, . - _interrupt_handler_\number
+.macro INTERRUPT_HANDLER type, number
+.section .text
+.global interruptHandler\number
+.type interruptHandler\number, @function
+interruptHandler\number:
+.if \type != .HasError
+    push $0
+.endif
+    push $\number
+    jmp commonInterruptHandler
+.size interruptHandler\number, . - interruptHandler\number
 .endm
 
 INTERRUPT_HANDLER .NoError,  0
