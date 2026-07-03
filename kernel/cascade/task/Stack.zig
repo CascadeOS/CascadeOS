@@ -130,7 +130,7 @@ pub fn destroyStack(stack: Stack) void {
     globals.stack_arena.deallocate(.fromVirtualRange(stack.range));
 }
 
-const stack_size_including_guard_page = cascade.config.task.kernel_stack_size.add(arch.mem.standard_page_size);
+const stack_size_including_guard_page = cascade.config.task.kernel_stack_size.add(arch.PageTable.standard_page_size);
 
 const globals = struct {
     var stack_arena: cascade.mem.resource_arena.Arena(.none) = undefined;
@@ -145,7 +145,7 @@ pub const init = struct {
         try globals.stack_arena.init(
             .{
                 .name = try .fromSlice("stacks"),
-                .quantum = arch.mem.standard_page_size.value,
+                .quantum = arch.PageTable.standard_page_size.value,
             },
         );
 

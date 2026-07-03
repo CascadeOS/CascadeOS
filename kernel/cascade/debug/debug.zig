@@ -13,7 +13,7 @@ pub fn hasAnExecutorPanicked() bool {
 }
 
 pub fn interruptSourcePanic(
-    interrupt_frame: arch.interrupts.InterruptFrame,
+    interrupt_frame: arch.Interrupt.Frame,
     comptime format: []const u8,
     args: anytype,
 ) noreturn {
@@ -35,7 +35,7 @@ const PanicType = union(enum) {
         return_address: usize,
         error_return_trace: ?*const std.builtin.StackTrace,
     },
-    interrupt: arch.interrupts.InterruptFrame,
+    interrupt: arch.Interrupt.Frame,
 };
 
 fn panicDispatch(
@@ -48,7 +48,7 @@ fn panicDispatch(
         var nested_panic_count: usize = 0;
     };
 
-    arch.interrupts.disable();
+    arch.Executor.current.disableInterrupts();
 
     no_op_panic: {
         switch (globals.panic_mode) {
@@ -69,7 +69,7 @@ fn panicDispatch(
 
                 cascade.init.Output.lock.poison();
 
-                arch.interrupts.sendPanicIPI();
+                arch.Executor.sendPanicAllButSelf();
             },
         }
 
@@ -79,7 +79,7 @@ fn panicDispatch(
         printPanic(cascade.init.Output.terminal, msg, panic_type, nested_panic_count) catch {};
     }
 
-    arch.interrupts.disableAndHalt();
+    arch.Executor.current.disableInterruptsAndHalt();
 }
 
 fn printPanic(

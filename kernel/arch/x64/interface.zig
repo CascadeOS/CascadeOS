@@ -10,222 +10,228 @@ const core = @import("core");
 const x64 = @import("x64.zig");
 
 pub const functions: arch.Functions = .{
-    .spinLoopHint = x64.instructions.pause,
-    .halt = x64.instructions.halt,
+    .safeMemcpy = x64.safeMemcpy,
 
-    .interrupts = .{
-        .disableAndHalt = x64.instructions.disableInterruptsAndHalt,
-        .areEnabled = x64.instructions.interruptsEnabled,
-        .enable = x64.instructions.enableInterrupts,
-        .disable = x64.instructions.disableInterrupts,
+    .executor = .{
+        .flushRequestNotify = x64.Executor.flushRequestNotify,
+        .sendPanicAllButSelf = x64.Executor.sendPanicAllButSelf,
 
-        .sendPanicIPI = x64.apic.sendPanicIPI,
-        .sendFlushIPI = x64.apic.sendFlushIPI,
-        .eoiType = x64.ioapic.eoiType,
-
-        .allocateInterrupt = x64.interrupts.Interrupt.allocate,
-        .deallocateInterrupt = x64.interrupts.Interrupt.deallocate,
-        .routeInterrupt = x64.interrupts.Interrupt.route,
-
-        .fillContext = x64.interrupts.InterruptFrame.fillContext,
-        .instructionPointer = struct {
-            fn instructionPointer(interrupt_frame: *const x64.interrupts.InterruptFrame) cascade.VirtualAddress {
-                return interrupt_frame.rip;
-            }
-        }.instructionPointer,
-        .setInstructionPointer = struct {
-            fn setInstructionPointer(interrupt_frame: *x64.interrupts.InterruptFrame, address: cascade.VirtualAddress) void {
-                interrupt_frame.rip = address;
-            }
-        }.setInstructionPointer,
+        .current = .{
+            .spinLoopHint = x64.Executor.current.spinLoopHint,
+            .halt = x64.Executor.current.halt,
+            .disableInterruptsAndHalt = x64.Executor.current.disableInterruptsAndHalt,
+            .interruptsEnabled = x64.Executor.current.interruptsEnabled,
+            .enableInterrupts = x64.Executor.current.enableInterrupts,
+            .disableInterrupts = x64.Executor.current.disableInterrupts,
+            .flushCache = x64.Executor.current.flushCache,
+            .enableAccessToUserMemory = x64.Executor.current.enableAccessToUserMemory,
+            .disableAccessToUserMemory = x64.Executor.current.disableAccessToUserMemory,
+        },
 
         .init = .{
-            .initializeEarlyInterrupts = x64.interrupts.init.initializeEarlyInterrupts,
-            .initializeInterruptRouting = x64.interrupts.init.initializeInterruptRouting,
-            .loadStandardInterruptHandlers = x64.interrupts.init.loadStandardInterruptHandlers,
+            .prepareBootstrap = x64.Executor.init.prepareBootstrap,
+            .prepare = x64.Executor.init.prepare,
+            .initialize = x64.Executor.init.initialize,
+            .configurePerExecutorSystemFeatures = x64.Executor.init.configurePerExecutorSystemFeatures,
+            .initLocalInterruptController = x64.Executor.init.initLocalInterruptController,
         },
     },
 
-    .mem = .{
-        .createPageTable = x64.mem.PageTable.create,
+    .interrupt = .{
+        .from = x64.Interrupt.from,
+        .to = x64.Interrupt.to,
+        .allocate = x64.Interrupt.allocate,
+        .deallocate = x64.Interrupt.deallocate,
 
-        .loadPageTable = struct {
-            fn loadPageTable(physical_page: cascade.mem.PhysicalPage.Index) void {
-                x64.registers.Cr3.writeAddress(physical_page.baseAddress());
-            }
-        }.loadPageTable,
+        .frame = .{
+            .fillContext = x64.Interrupt.Frame.fillContext,
+            .getInstructionPointer = x64.Interrupt.Frame.getInstructionPointer,
+            .setInstructionPointer = x64.Interrupt.Frame.setInstructionPointer,
+        },
 
-        .copyTopLevelIntoPageTable = x64.mem.PageTable.copyTopLevelIntoPageTable,
-        .mapSinglePage = x64.mem.PageTable.map4KiB,
-        .unmap = x64.mem.PageTable.unmap,
-        .changeProtection = x64.mem.PageTable.changeProtection,
-        .flushCache = x64.mem.flushCache,
-        .enableAccessToUserMemory = x64.instructions.enableAccessToUserMemory,
-        .disableAccessToUserMemory = x64.instructions.disableAccessToUserMemory,
-        .safeMemcpy = x64.mem.safeMemcpy,
+        .external = .{
+            .from = x64.Interrupt.External.from,
+            .eoiType = x64.Interrupt.External.eoiType,
+            .route = x64.Interrupt.External.route,
+        },
 
         .init = .{
-            .sizeOfTopLevelEntry = x64.mem.PageTable.sizeOfTopLevelEntry,
-            .fillTopLevel = x64.mem.PageTable.init.fillTopLevel,
-            .mapToPhysicalRangeAllPageSizes = x64.mem.PageTable.init.mapToPhysicalRangeAllPageSizes,
+            .initializeEarlyInterrupts = x64.Interrupt.init.initializeEarlyInterrupts,
+            .initializeInterruptRouting = x64.Interrupt.init.initializeInterruptRouting,
+            .loadStandardInterruptHandlers = x64.Interrupt.init.loadStandardInterruptHandlers,
         },
     },
 
-    .user = .{
-        .createThread = x64.user.PerThread.createThread,
-        .destroyThread = x64.user.PerThread.destroyThread,
-        .initializeThread = x64.user.PerThread.initializeThread,
-        .enterUserspace = x64.user.enterUserspace,
-        .syscallFromSyscallFrame = x64.user.SyscallFrame.syscall,
-        .argFromSyscallFrame = x64.user.SyscallFrame.arg,
+    .page_table = .{
+        .create = x64.PageTable.create,
+        .load = x64.PageTable.load,
+        .copyTopLevel = x64.PageTable.copyTopLevel,
+        .mapSinglePage = x64.PageTable.mapSinglePage,
+        .unmap = x64.PageTable.unmap,
+        .changeProtection = x64.PageTable.changeProtection,
 
         .init = .{
-            .initialize = x64.user.init.initialize,
+            .sizeOfTopLevelEntry = x64.PageTable.init.sizeOfTopLevelEntry,
+            .fillTopLevel = x64.PageTable.init.fillTopLevel,
+            .mapToPhysicalRangeAllPageSizes = x64.PageTable.init.mapToPhysicalRangeAllPageSizes,
         },
     },
 
-    .scheduling = .{
-        .initializeTaskArchSpecific = x64.PerTask.initializeTaskArchSpecific,
-        .getCurrentTask = x64.PerTask.getCurrentTask,
-        .setCurrentTask = x64.PerTask.setCurrentTask,
-        .beforeSwitchTask = x64.scheduling.beforeSwitchTask,
-        .switchTask = x64.scheduling.switchTask,
-        .switchTaskNoSave = x64.scheduling.switchTaskNoSave,
-        .prepareTaskForScheduling = x64.scheduling.prepareTaskForScheduling,
-        .call = x64.scheduling.call,
-        .callNoSave = x64.scheduling.callNoSave,
+    .thread = .{
+        .create = x64.Thread.create,
+        .destroy = x64.Thread.destroy,
+        .initialize = x64.Thread.initialize,
+
+        .current = .{
+            .enterUserspace = x64.Thread.current.enterUserspace,
+        },
+
+        .init = .{
+            .initialize = x64.Thread.init.initialize,
+        },
     },
 
-    .io = .{
-        .readPciU8 = struct {
+    .syscall_frame = .{
+        .syscall = x64.syscall.Frame.syscall,
+        .arg = x64.syscall.Frame.arg,
+    },
+
+    .task = .{
+        .initialize = x64.Task.initialize,
+        .getCurrent = x64.Task.getCurrent,
+        .setCurrent = x64.Task.setCurrent,
+        .prepareForScheduling = x64.Task.prepareForScheduling,
+        .prepareSwitch = x64.Task.prepareSwitch,
+        .performSwitch = x64.Task.performSwitch,
+        .performSwitchNoSave = x64.Task.performSwitchNoSave,
+        .call = x64.Task.call,
+        .callNoSave = x64.Task.callNoSave,
+    },
+
+    .pci = .{
+        .readU8 = struct {
             fn readPciU8(address: cascade.KernelVirtualAddress) u8 {
-                return x64.instructions.readPciU8(address);
+                return asm volatile ("movb (%[address]), %[ret]"
+                    : [ret] "={al}" (-> u8),
+                    : [address] "r" (address.value),
+                );
             }
         }.readPciU8,
-        .readPciU16 = struct {
+        .readU16 = struct {
             fn readPciU16(address: cascade.KernelVirtualAddress) u16 {
-                return x64.instructions.readPciU16(address);
+                return asm volatile ("movw (%[address]), %[ret]"
+                    : [ret] "={ax}" (-> u16),
+                    : [address] "r" (address.value),
+                );
             }
         }.readPciU16,
-        .readPciU32 = struct {
+        .readU32 = struct {
             fn readPciU32(address: cascade.KernelVirtualAddress) u32 {
-                return x64.instructions.readPciU32(address);
+                return asm volatile ("movl (%[address]), %[ret]"
+                    : [ret] "={eax}" (-> u32),
+                    : [address] "r" (address.value),
+                );
             }
         }.readPciU32,
-
-        .writePciU8 = struct {
+        .writeU8 = struct {
             fn writePciU8(address: cascade.KernelVirtualAddress, value: u8) void {
-                x64.instructions.writePciU8(address, value);
+                asm volatile ("movb %[value], (%[address])"
+                    :
+                    : [address] "r" (address.value),
+                      [value] "{al}" (value),
+                    : .{ .memory = true });
             }
         }.writePciU8,
-        .writePciU16 = struct {
+        .writeU16 = struct {
             fn writePciU16(address: cascade.KernelVirtualAddress, value: u16) void {
-                x64.instructions.writePciU16(address, value);
+                asm volatile ("movw %[value], (%[address])"
+                    :
+                    : [address] "r" (address.value),
+                      [value] "{ax}" (value),
+                    : .{ .memory = true });
             }
         }.writePciU16,
-        .writePciU32 = struct {
+        .writeU32 = struct {
             fn writePciU32(address: cascade.KernelVirtualAddress, value: u32) void {
-                x64.instructions.writePciU32(address, value);
+                asm volatile ("movl %[value], (%[address])"
+                    :
+                    : [address] "r" (address.value),
+                      [value] "{eax}" (value),
+                    : .{ .memory = true });
             }
         }.writePciU32,
+    },
 
-        .readPortU8 = struct {
-            fn readPortU8(port: decls.io.Port) u8 {
-                return x64.instructions.portReadU8(@intFromEnum(port));
-            }
-        }.readPortU8,
-        .readPortU16 = struct {
-            fn readPortU16(port: decls.io.Port) u16 {
-                return x64.instructions.portReadU16(@intFromEnum(port));
-            }
-        }.readPortU16,
-        .readPortU32 = struct {
-            fn readPortU32(port: decls.io.Port) u32 {
-                return x64.instructions.portReadU32(@intFromEnum(port));
-            }
-        }.readPortU32,
-
-        .writePortU8 = struct {
-            fn writePortU8(port: decls.io.Port, value: u8) void {
-                x64.instructions.portWriteU8(@intFromEnum(port), value);
-            }
-        }.writePortU8,
-        .writePortU16 = struct {
-            fn writePortU16(port: decls.io.Port, value: u16) void {
-                x64.instructions.portWriteU16(@intFromEnum(port), value);
-            }
-        }.writePortU16,
-        .writePortU32 = struct {
-            fn writePortU32(port: decls.io.Port, value: u32) void {
-                x64.instructions.portWriteU32(@intFromEnum(port), value);
-            }
-        }.writePortU32,
+    .port = .{
+        .from = x64.Port.from,
+        .readU8 = x64.Port.readPortU8,
+        .readU16 = x64.Port.readPortU16,
+        .readU32 = x64.Port.readPortU32,
+        .writeU8 = x64.Port.writePortU8,
+        .writeU16 = x64.Port.writePortU16,
+        .writeU32 = x64.Port.writePortU32,
     },
 
     .init = .{
-        .getStandardWallclockStartTime = x64.tsc.init.getStandardWallclockStartTime,
+        .getStandardWallclockStartTime = x64.init.getStandardWallclockStartTime,
+        .registerArchitecturalTimeSources = x64.init.registerArchitecturalTimeSources,
         .tryGetSerialOutput = x64.init.tryGetSerialOutput,
-        .prepareBootstrapExecutor = x64.init.prepareBootstrapExecutor,
-        .prepareExecutor = x64.init.prepareExecutor,
-        .initExecutor = x64.init.initExecutor,
         .captureSystemInformation = x64.init.captureSystemInformation,
         .configureGlobalSystemFeatures = x64.init.configureGlobalSystemFeatures,
-        .configurePerExecutorSystemFeatures = x64.init.configurePerExecutorSystemFeatures,
-        .registerArchitecturalTimeSources = x64.init.registerArchitecturalTimeSources,
-        .initLocalInterruptController = x64.init.initLocalInterruptController,
     },
 };
 
-const size_of_canonical_region = core.Size.from(128, .tib);
+const size_of_canonical_region: core.Size = .from(128, .tib); // TODO: 5 level paging
 
 pub const decls: arch.Decls = .{
-    .PerExecutor = x64.PerExecutor,
+    .kernel_memory_range = .from(
+        cascade.VirtualAddress.from(0xffff800000000000),
+        size_of_canonical_region
+            // exclude the last page of memory, this prevents boundary conditions
+            .subtract(x64.PageTable.small_page_size),
+    ),
 
-    .interrupts = .{
-        .Interrupt = x64.interrupts.Interrupt,
-        .InterruptFrame = x64.interrupts.InterruptFrame,
-    },
+    .user_memory_range = .from(
+        cascade.VirtualAddress.zero
+            // exclude the first page of memory so that a null pointer is not a valid user address
+            .moveForward(x64.PageTable.small_page_size),
+        size_of_canonical_region
+            // exclude the first page of memory so that a null pointer is not a valid user address
+            .subtract(x64.PageTable.small_page_size)
+            // exclude the last page of memory, this prevents boundary conditions like a syscall instruction at the end of the last page
+            // causing a general protection fault in the kernel on sysret as the return address is non-canonical
+            .subtract(x64.PageTable.small_page_size),
+    ),
 
-    .mem = .{
-        .standard_page_size = x64.mem.PageTable.small_page_size,
-        .largest_page_size = x64.mem.PageTable.large_page_size,
-        .kernel_memory_range = .from(
-            cascade.VirtualAddress.from(0xffff800000000000),
-            size_of_canonical_region
-                // exclude the last page of memory, this prevents boundary conditions
-                .subtract(x64.mem.PageTable.small_page_size),
-        ),
-        .PageTable = x64.mem.PageTable,
-    },
+    .cfi_prevent_unwinding =
+    \\.cfi_sections .debug_frame
+    \\.cfi_undefined rip
+    \\
+    ,
 
-    .scheduling = .{
-        .PerTask = x64.PerTask,
-        .cfi_prevent_unwinding =
-        \\.cfi_sections .debug_frame
-        \\.cfi_undefined rip
-        \\
-        ,
-    },
+    .Executor = x64.Executor,
 
-    .user = .{
-        .PerThread = x64.user.PerThread,
-        .SyscallFrame = x64.user.SyscallFrame,
-        .user_memory_range = .from(
-            cascade.VirtualAddress.zero.moveForward(x64.mem.PageTable.small_page_size),
-            size_of_canonical_region
-                // exclude the first page of memory so that a null pointer is not a valid user address
-                .subtract(x64.mem.PageTable.small_page_size)
-                // exclude the last page of memory, this prevents boundary conditions like a syscall instruction at the end of the last page
-                // causing a general protection fault in the kernel on sysret as the return address is non-canonical
-                .subtract(x64.mem.PageTable.small_page_size),
-        ),
-    },
+    .ExecutorId = x64.Executor.Id,
 
-    .io = .{
-        .Port = enum(u16) { _ },
-    },
+    .Interrupt = x64.Interrupt,
 
-    .init = .{
-        .CaptureSystemInformationOptions = x64.init.CaptureSystemInformationOptions,
-    },
+    .InterruptFrame = x64.Interrupt.Frame,
+
+    .ExternalInterrupt = x64.Interrupt.External,
+
+    .PageTable = x64.PageTable,
+
+    .standard_page_size = x64.PageTable.small_page_size,
+
+    .largest_page_size = x64.PageTable.large_page_size,
+
+    .Thread = x64.Thread,
+
+    .SyscallFrame = x64.syscall.Frame,
+
+    .Task = x64.Task,
+
+    .Port = x64.Port,
+
+    .CaptureSystemInformationOptions = x64.init.CaptureSystemInformationOptions,
 };

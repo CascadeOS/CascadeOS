@@ -401,7 +401,7 @@ pub const RawCache = struct {
                 const slab_base_ptr: [*]u8 = switch (raw_cache.slab_source) {
                     .heap => slab_base_ptr: {
                         const slab_allocation = cascade.mem.heap.heap_page_arena.allocate(
-                            arch.mem.standard_page_size.value,
+                            arch.PageTable.standard_page_size.value,
                             .instant_fit,
                         ) catch return AllocateError.SlabAllocationFailed;
                         break :slab_base_ptr @ptrFromInt(slab_allocation.base);
@@ -412,7 +412,7 @@ pub const RawCache = struct {
 
                         const slab_base_ptr = physical_page.baseAddress().toDirectMap().toPtr([*]u8);
 
-                        if (core.is_debug) @memset(slab_base_ptr[0..arch.mem.standard_page_size.value], undefined);
+                        if (core.is_debug) @memset(slab_base_ptr[0..arch.PageTable.standard_page_size.value], undefined);
 
                         break :slab_base_ptr slab_base_ptr;
                     },
@@ -421,7 +421,7 @@ pub const RawCache = struct {
                 errdefer switch (raw_cache.slab_source) {
                     .heap => cascade.mem.heap.heap_page_arena.deallocate(.{
                         .base = @intFromPtr(slab_base_ptr),
-                        .len = arch.mem.standard_page_size.value,
+                        .len = arch.PageTable.standard_page_size.value,
                     }),
                     .pmm => {
                         var deallocate_page_list: cascade.mem.PhysicalPage.List = .{};
@@ -433,7 +433,7 @@ pub const RawCache = struct {
                 };
 
                 const slab: *Slab = @ptrCast(@alignCast(
-                    slab_base_ptr + arch.mem.standard_page_size.value - @sizeOf(Slab),
+                    slab_base_ptr + arch.PageTable.standard_page_size.value - @sizeOf(Slab),
                 ));
                 slab.* = .{
                     .large_item_allocation = undefined,
@@ -574,10 +574,10 @@ pub const RawCache = struct {
                     const page_start = std.mem.alignBackward(
                         usize,
                         @intFromPtr(item.ptr),
-                        arch.mem.standard_page_size.value,
+                        arch.PageTable.standard_page_size.value,
                     );
 
-                    const slab: *Slab = @ptrFromInt(page_start + arch.mem.standard_page_size.value - @sizeOf(Slab));
+                    const slab: *Slab = @ptrFromInt(page_start + arch.PageTable.standard_page_size.value - @sizeOf(Slab));
 
                     const item_node: *std.SinglyLinkedList.Node = @ptrCast(@alignCast(
                         item.ptr + raw_cache.item_size.alignForward(single_node_alignment).value,
@@ -643,7 +643,7 @@ pub const RawCache = struct {
         switch (raw_cache.size_class) {
             .small => {
                 const slab_info_ptr: [*]u8 = @ptrCast(slab);
-                const slab_base_ptr: [*]u8 = slab_info_ptr + @sizeOf(Slab) - arch.mem.standard_page_size.value;
+                const slab_base_ptr: [*]u8 = slab_info_ptr + @sizeOf(Slab) - arch.PageTable.standard_page_size.value;
 
                 if (raw_cache.construct_destruct) |con_des| {
                     const destructor = con_des.destructor;
@@ -657,7 +657,7 @@ pub const RawCache = struct {
                     .heap => cascade.mem.heap.heap_page_arena.deallocate(
                         .{
                             .base = @intFromPtr(slab_base_ptr),
-                            .len = arch.mem.standard_page_size.value,
+                            .len = arch.PageTable.standard_page_size.value,
                         },
                     ),
                     .pmm => {
@@ -727,18 +727,18 @@ pub const RawCache = struct {
                 size.alignForward(alignment);
 
             const items_per_slab = if (is_small)
-                arch.mem.standard_page_size.subtract(.of(Slab)).divide(effective_item_size)
+                arch.PageTable.standard_page_size.subtract(.of(Slab)).divide(effective_item_size)
             else blk: {
                 // TODO: why search when we can calculate?
 
                 var candidate_large_items_per_slab: usize = default_large_items_per_slab;
 
-                const initial_pages_for_allocation = arch.mem.standard_page_size.amountToCover(
+                const initial_pages_for_allocation = arch.PageTable.standard_page_size.amountToCover(
                     effective_item_size.multiplyScalar(candidate_large_items_per_slab),
                 );
 
                 while (true) {
-                    const next_pages_for_allocation = arch.mem.standard_page_size.amountToCover(
+                    const next_pages_for_allocation = arch.PageTable.standard_page_size.amountToCover(
                         effective_item_size.multiplyScalar(candidate_large_items_per_slab + 1),
                     );
 
@@ -775,7 +775,7 @@ pub const ConstructorError = error{ItemConstructionFailed};
 pub const Name = core.containers.BoundedArray(u8, cascade.config.mem.cache_name_length);
 
 const minimum_small_items_per_slab = 8;
-const maximum_small_item_size = arch.mem.standard_page_size
+const maximum_small_item_size = arch.PageTable.standard_page_size
     .subtract(.of(RawCache.Slab))
     .divideScalar(minimum_small_items_per_slab);
 const single_node_alignment: std.mem.Alignment = .of(std.SinglyLinkedList.Node);

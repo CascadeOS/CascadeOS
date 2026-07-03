@@ -37,7 +37,7 @@ pub fn initStage1() !noreturn {
     try acpi_tables.log();
 
     log.debug("initializing early interrupts", .{});
-    arch.interrupts.init.initializeEarlyInterrupts();
+    arch.Interrupt.init.initializeEarlyInterrupts();
 
     log.debug("capturing early system information", .{});
     const capture_system_information_options: arch.init.CaptureSystemInformationOptions = switch (arch.current_arch) {
@@ -47,7 +47,7 @@ pub fn initStage1() !noreturn {
     try arch.init.captureSystemInformation(.early, capture_system_information_options);
 
     log.debug("configuring per-executor system features with early system information", .{});
-    arch.init.configurePerExecutorSystemFeatures();
+    arch.Executor.init.configurePerExecutorSystemFeatures();
 
     log.debug("initializing memory system", .{});
     try cascade.mem.init.initializeMemorySystem();
@@ -59,7 +59,7 @@ pub fn initStage1() !noreturn {
     try arch.init.captureSystemInformation(.full, capture_system_information_options);
 
     log.debug("configuring per-executor system features with full system information", .{});
-    arch.init.configurePerExecutorSystemFeatures();
+    arch.Executor.init.configurePerExecutorSystemFeatures();
 
     log.debug("configuring global system features", .{});
     arch.init.configureGlobalSystemFeatures();
@@ -68,7 +68,7 @@ pub fn initStage1() !noreturn {
     try cascade.time.init.initializeTime();
 
     log.debug("initializing interrupt routing", .{});
-    try arch.interrupts.init.initializeInterruptRouting();
+    try arch.Interrupt.init.initializeInterruptRouting();
 
     log.debug("initializing tasks", .{});
     try cascade.Task.init.initializeTasks();
@@ -99,10 +99,10 @@ fn initStage2(executor: *cascade.Executor) !noreturn {
         var stage2_barrier: StageBarrier = .{};
     };
 
-    arch.interrupts.disable(); // some executors don't have interrupts disabled on load
+    arch.Executor.current.disableInterrupts(); // some executors don't have interrupts disabled on load
 
     cascade.mem.kernelPageTable().load();
-    arch.init.initExecutor(executor);
+    arch.Executor.init.initialize(executor);
     executor.setCurrentTask(executor._current_task);
 
     if (static.stage2_barrier.start()) {
@@ -113,15 +113,15 @@ fn initStage2(executor: *cascade.Executor) !noreturn {
     }
 
     log.debug("configuring per-executor system features on {f}", .{executor.id});
-    arch.init.configurePerExecutorSystemFeatures();
+    arch.Executor.init.configurePerExecutorSystemFeatures();
 
     log.debug("configuring local interrupt controller on {f}", .{executor.id});
-    arch.init.initLocalInterruptController();
+    arch.Executor.init.initLocalInterruptController();
 
     log.debug("enabling per-executor interrupt on {f}", .{executor.id});
     cascade.time.per_executor_periodic.enableInterrupt(cascade.config.scheduler.per_executor_interrupt_period);
 
-    try arch.scheduling.callNoSave(
+    try arch.Task.callNoSave(
         &executor._current_task.stack,
         .prepare(
             initStage3,
@@ -143,7 +143,7 @@ fn initStage3() !noreturn {
 
     if (static.stage3_barrier.start()) {
         log.debug("loading standard interrupt handlers", .{});
-        arch.interrupts.init.loadStandardInterruptHandlers();
+        arch.Interrupt.init.loadStandardInterruptHandlers();
 
         log.debug("creating and scheduling init stage 4 task", .{});
         {
@@ -211,11 +211,12 @@ fn loadBootstrapExecutorAndTask() !void {
         &static.bootstrap_executor,
     );
 
-    arch.init.prepareBootstrapExecutor(
+    arch.Executor.init.prepareBootstrap(
         &static.bootstrap_executor,
         boot.bootstrapArchitectureProcessorId(),
     );
-    arch.init.initExecutor(&static.bootstrap_executor);
+    arch.Executor.init.initialize(&static.bootstrap_executor);
+
     static.bootstrap_executor.setCurrentTask(&static.bootstrap_init_task);
 
     cascade.Executor.init.setExecutors(@ptrCast(&static.bootstrap_executor));
@@ -258,7 +259,7 @@ fn createExecutors() !struct { []cascade.Executor, *cascade.Executor } {
         try cascade.Task.init.createAndAssignInitTask(executor);
         try cascade.Task.init.initializeSchedulerTask(&executor.scheduler.task, executor);
 
-        arch.init.prepareExecutor(
+        arch.Executor.init.prepare(
             executor,
             desc.architectureProcessorId(),
         );
@@ -305,12 +306,12 @@ const StageBarrier = struct {
             // wait for all executors to signal that they are ready for the stage to occur
             const number_of_executors = cascade.Executor.executors().len;
             while (barrier.number_of_executors_ready.load(.acquire) != number_of_executors) {
-                arch.spinLoopHint();
+                arch.Executor.current.spinLoopHint();
             }
         } else {
             // wait for the stage executor to signal that the stage has completed
             while (!barrier.stage_complete.load(.acquire)) {
-                arch.spinLoopHint();
+                arch.Executor.current.spinLoopHint();
             }
         }
 

@@ -12,6 +12,26 @@ const x64 = @import("x64.zig");
 
 const log = cascade.debug.log.scoped(.init_x64);
 
+/// Read current wallclock time from the standard wallclock source of the current architecture.
+///
+/// For example on x86_64 this is the TSC.
+///
+/// Non-optional because it is used during early initialization.
+pub fn getStandardWallclockStartTime() cascade.time.wallclock.Tick {
+    return x64.tsc.init.getStandardWallclockStartTime();
+}
+
+/// Register any architectural time sources.
+///
+/// For example, on x86_64 this should register the TSC, HPEC, PIT, etc.
+pub fn registerArchitecturalTimeSources(candidate_time_sources: *cascade.time.init.CandidateTimeSources) void {
+    x64.tsc.init.registerTimeSource(candidate_time_sources);
+    x64.hpet.init.registerTimeSource(candidate_time_sources);
+    x64.apic.init.registerTimeSource(candidate_time_sources);
+
+    // TODO: PIT, KVMCLOCK
+}
+
 /// Attempt to get some form of architecture specific init output if it is available.
 ///
 /// If `memory_system_available` is false, then the memory system has not been initialized so heap allocation and the special heap are
@@ -57,91 +77,21 @@ pub fn tryGetSerialOutput(memory_system_available: bool) ?arch.init.InitOutput {
     return null;
 }
 
-/// Prepares the executor as the bootstrap executor.
-pub fn prepareBootstrapExecutor(
-    executor: *cascade.Executor,
-    architecture_processor_id: u64,
-) void {
-    const static = struct {
-        var bootstrap_double_fault_stack: [cascade.config.task.kernel_stack_size.value]u8 align(16) = undefined;
-        var bootstrap_non_maskable_interrupt_stack: [cascade.config.task.kernel_stack_size.value]u8 align(16) = undefined;
-    };
-
-    prepareExecutorShared(
-        executor,
-        @intCast(architecture_processor_id),
-        .fromRange(
-            .fromSlice(u8, &static.bootstrap_double_fault_stack),
-            .fromSlice(u8, &static.bootstrap_double_fault_stack),
-        ),
-        .fromRange(
-            .fromSlice(u8, &static.bootstrap_non_maskable_interrupt_stack),
-            .fromSlice(u8, &static.bootstrap_non_maskable_interrupt_stack),
-        ),
-    );
-}
-
-/// Prepares the provided `Executor` for use.
-///
-/// **WARNING**: This function will panic if the cpu cannot be prepared.
-pub fn prepareExecutor(executor: *cascade.Executor, architecture_processor_id: u64) void {
-    prepareExecutorShared(
-        executor,
-        @intCast(architecture_processor_id),
-        cascade.Task.init.earlyCreateStack() catch @panic("failed to allocate double fault stack"),
-        cascade.Task.init.earlyCreateStack() catch @panic("failed to allocate NMI stack"),
-    );
-}
-
-fn prepareExecutorShared(
-    executor: *cascade.Executor,
-    apic_id: u32,
-    double_fault_stack: cascade.Task.Stack,
-    non_maskable_interrupt_stack: cascade.Task.Stack,
-) void {
-    const per_executor: *x64.PerExecutor = .from(executor);
-
-    per_executor.* = .{
-        .apic_id = apic_id,
-        .double_fault_stack = double_fault_stack,
-        .non_maskable_interrupt_stack = non_maskable_interrupt_stack,
-    };
-
-    per_executor.tss.setInterruptStack(
-        .double_fault,
-        per_executor.double_fault_stack.stack_pointer,
-    );
-    per_executor.tss.setInterruptStack(
-        .non_maskable_interrupt,
-        per_executor.non_maskable_interrupt_stack.stack_pointer,
-    );
-}
-
-/// Initialize the executor.
-///
-/// ** REQUIREMENTS **:
-/// - Must be called by the executor represented by `executor`
-pub fn initExecutor(executor: *cascade.Executor) void {
-    const per_executor: *x64.PerExecutor = .from(executor);
-
-    per_executor.gdt.load();
-    per_executor.gdt.setTss(&per_executor.tss);
-
-    x64.interrupts.init.loadIdt();
-}
-
 pub const CaptureSystemInformationOptions = struct {
     x2apic_enabled: bool,
 };
 
-pub fn captureSystemInformation(stage: arch.init.CaptureSystemInformationStage, options: CaptureSystemInformationOptions) !void {
+pub fn captureSystemInformation(
+    stage: arch.init.CaptureSystemInformationStage,
+    options: CaptureSystemInformationOptions,
+) !void {
     switch (stage) {
         .early => {
             log.debug("capturing cpuid information", .{});
             x64.info.cpu_id.capture() catch @panic("failed to capture cpuid information");
 
             if (x64.info.cpu_id.physical_address_size) |physical_address_size| {
-                if (physical_address_size > x64.mem.PageTable.maximum_physical_address_bit) {
+                if (physical_address_size > x64.PageTable.maximum_physical_address_bit) {
                     std.debug.panic("unsupported physical address size: {}", .{physical_address_size});
                 }
             } else {
@@ -256,191 +206,58 @@ pub fn configureGlobalSystemFeatures() void {
 
 /// Remaps the PIC interrupts to 0x20-0x2f and masks all of them.
 fn disablePic() void {
-    const portWriteU8 = x64.instructions.portWriteU8;
-
-    const PRIMARY_COMMAND_PORT = 0x20;
-    const PRIMARY_DATA_PORT = 0x21;
-    const SECONDARY_COMMAND_PORT = 0xA0;
-    const SECONDARY_DATA_PORT = 0xA1;
+    const PRIMARY_COMMAND_PORT = arch.Port.from(0x20) catch unreachable;
+    const PRIMARY_DATA_PORT = arch.Port.from(0x21) catch unreachable;
+    const SECONDARY_COMMAND_PORT = arch.Port.from(0xA0) catch unreachable;
+    const SECONDARY_DATA_PORT = arch.Port.from(0xA1) catch unreachable;
+    const WAIT_PORT = arch.Port.from(0x80) catch unreachable;
 
     const CMD_INIT = 0x11;
     const MODE_8086: u8 = 0x01;
 
     // Tell each PIC that we're going to send it a three-byte initialization sequence on its data port.
-    portWriteU8(PRIMARY_COMMAND_PORT, CMD_INIT);
-    portWriteU8(0x80, 0); // wait
-    portWriteU8(SECONDARY_COMMAND_PORT, CMD_INIT);
-    portWriteU8(0x80, 0); // wait
+    PRIMARY_COMMAND_PORT.write(u8, CMD_INIT);
+    WAIT_PORT.write(u8, 0); // wait
+    SECONDARY_COMMAND_PORT.write(u8, CMD_INIT);
+    WAIT_PORT.write(u8, 0); // wait
 
     // Remap master PIC to 0x20
-    portWriteU8(PRIMARY_DATA_PORT, 0x20);
-    portWriteU8(0x80, 0); // wait
+    PRIMARY_DATA_PORT.write(u8, 0x20);
+    WAIT_PORT.write(u8, 0); // wait
 
     // Remap slave PIC to 0x28
-    portWriteU8(SECONDARY_DATA_PORT, 0x28);
-    portWriteU8(0x80, 0); // wait
+    SECONDARY_DATA_PORT.write(u8, 0x28);
+    WAIT_PORT.write(u8, 0); // wait
 
     // Configure chaining between master and slave
-    portWriteU8(PRIMARY_DATA_PORT, 4);
-    portWriteU8(0x80, 0); // wait
-    portWriteU8(SECONDARY_DATA_PORT, 2);
-    portWriteU8(0x80, 0); // wait
+    PRIMARY_DATA_PORT.write(u8, 4);
+    WAIT_PORT.write(u8, 0); // wait
+    SECONDARY_DATA_PORT.write(u8, 2);
+    WAIT_PORT.write(u8, 0); // wait
 
     // Set our mode.
-    portWriteU8(PRIMARY_DATA_PORT, MODE_8086);
-    portWriteU8(0x80, 0); // wait
-    portWriteU8(SECONDARY_DATA_PORT, MODE_8086);
-    portWriteU8(0x80, 0); // wait
+    PRIMARY_DATA_PORT.write(u8, MODE_8086);
+    WAIT_PORT.write(u8, 0); // wait
+    SECONDARY_DATA_PORT.write(u8, MODE_8086);
+    WAIT_PORT.write(u8, 0); // wait
 
     // Mask all interrupts
-    portWriteU8(PRIMARY_DATA_PORT, 0xFF);
-    portWriteU8(0x80, 0); // wait
-    portWriteU8(SECONDARY_DATA_PORT, 0xFF);
-    portWriteU8(0x80, 0); // wait
-}
-
-/// Configure any per-executor system features.
-///
-/// This function is called in a few different contexts and must leave the system in a reasonable state for each of them:
-///  - By the bootstrap executor after calling `captureEarlySystemInformation`
-///  - By the bootstrap executor after calling `captureSystemInformation`
-///  - By every executor after `captureSystemInformation` has been called
-pub fn configurePerExecutorSystemFeatures() void {
-    if (x64.info.cpu_id.rdtscp) {
-        x64.registers.IA32_TSC_AUX.write(@intFromEnum(cascade.Task.Current.get().knownExecutor().id));
-    }
-
-    // TODO: be more thorough with setting up these registers
-
-    // CR0
-    {
-        var cr0 = x64.registers.Cr0.read();
-
-        if (!cr0.protected_mode_enable) @panic("protected mode not enabled");
-        if (!cr0.paging) @panic("paging not enabled");
-
-        cr0.monitor_coprocessor = true;
-        cr0.emulate_coprocessor = false;
-        cr0.task_switched = true; // disable SSE instructions in the kernel
-        cr0.write_protect = true;
-
-        cr0.write();
-    }
-
-    // CR4
-    {
-        var cr4 = x64.registers.Cr4.read();
-
-        if (!cr4.physical_address_extension) @panic("physical address extension not enabled");
-
-        cr4.time_stamp_disable = false;
-        cr4.debugging_extensions = true;
-        cr4.machine_check_exception = x64.info.cpu_id.mce;
-        cr4.page_global = true;
-        cr4.performance_monitoring_counter = true;
-        cr4.os_fxsave = true;
-        cr4.unmasked_exception_support = true;
-        cr4.usermode_instruction_prevention = x64.info.cpu_id.umip;
-        cr4.level_5_paging = false;
-        cr4.fsgsbase = x64.info.cpu_id.fsgsbase;
-        cr4.pcid = false; // TODO
-
-        if (!x64.info.cpu_id.xsave.supported) @panic("XSAVE not supported");
-        cr4.osxsave = true;
-
-        cr4.supervisor_mode_execution_prevention = x64.info.cpu_id.smep;
-        cr4.supervisor_mode_access_prevention = x64.info.cpu_id.smap;
-
-        cr4.write();
-    }
-
-    // EFER
-    {
-        var efer = x64.registers.EFER.read();
-
-        if (!efer.long_mode_active or !efer.long_mode_enable) @panic("not in long mode");
-
-        if (!x64.info.cpu_id.syscall_sysret) @panic("syscall/sysret not supported");
-        efer.syscall_enable = true;
-
-        efer.no_execute_enable = x64.info.cpu_id.execute_disable;
-
-        efer.write();
-    }
-
-    // SYSCALL/SYSRET
-    {
-        x64.registers.IA32_SFMASK.write(.{
-            .clear_enable_interrupts = true,
-            .clear_direction = true,
-        });
-
-        x64.registers.IA32_STAR.write(.{
-            .syscall_target_eip_32bit = 0, // 32-bit mode not supported
-            .syscall_cs_ss = .kernel_code,
-            .sysret_cs_ss = .user_code_32bit,
-        });
-
-        x64.registers.IA32_LSTAR.write(@intFromPtr(&x64.user.syscallEntry));
-    }
-
-    // PAT
-    {
-        var pat = x64.registers.PAT.read();
-
-        pat.entry0 = .write_back;
-        pat.entry1 = .write_through;
-        pat.entry2 = .uncached;
-        pat.entry3 = .unchacheable;
-        pat.entry4 = .write_protected;
-        pat.entry5 = .write_combining;
-        pat.entry6 = .uncached;
-        pat.entry7 = .unchacheable;
-        x64.registers.PAT.write(pat);
-
-        // flip the page global bit to ensure the PAT is applied
-        var cr4 = x64.registers.Cr4.read();
-        cr4.page_global = false;
-        cr4.write();
-        cr4.page_global = true;
-        cr4.write();
-    }
-
-    // XCr0
-    {
-        x64.instructions.enableSSEUsage();
-        x64.info.xsave.xcr0_value.write();
-        x64.instructions.disableSSEUsage();
-    }
-}
-
-/// Register any architectural time sources.
-///
-/// For example, on x86_64 this should register the TSC, HPET, PIT, etc.
-pub fn registerArchitecturalTimeSources(candidate_time_sources: *cascade.time.init.CandidateTimeSources) void {
-    x64.tsc.init.registerTimeSource(candidate_time_sources);
-    x64.hpet.init.registerTimeSource(candidate_time_sources);
-    x64.apic.init.registerTimeSource(candidate_time_sources);
-
-    // TODO: PIT, KVMCLOCK
-}
-
-/// Initialize the local interrupt controller for the current executor.
-///
-/// For example, on x86_64 this should initialize the APIC.
-pub fn initLocalInterruptController() void {
-    x64.apic.init.initApicOnCurrentExecutor();
+    PRIMARY_DATA_PORT.write(u8, 0xFF);
+    WAIT_PORT.write(u8, 0); // wait
+    SECONDARY_DATA_PORT.write(u8, 0xFF);
+    WAIT_PORT.write(u8, 0); // wait
 }
 
 const DebugCon = struct {
-    const port = 0xe9;
+    const port_value = 0xe9;
+    const port = arch.Port.from(port_value) catch unreachable;
 
     fn detect() bool {
-        return x64.instructions.portReadU8(port) == port;
+        return port.read(u8) == port_value;
     }
 
     fn writeStr(_: void, str: []const u8) void {
-        for (str) |byte| x64.instructions.portWriteU8(port, byte);
+        for (str) |byte| port.write(u8, byte);
     }
 
     const output: arch.init.InitOutput.Output = .{

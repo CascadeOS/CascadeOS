@@ -3,9 +3,10 @@
 
 const std = @import("std");
 
-const arch = @import("arch");
 const cascade = @import("cascade");
 const core = @import("core");
+
+const x64 = @import("x64.zig");
 
 const globals = struct {
     var hpet: Hpet = undefined; // Initalized during `initializeHPET`
@@ -79,7 +80,7 @@ pub const init = struct {
         const target_value = current_value + duration_ticks;
 
         while (globals.hpet.readCounterRegister() < target_value) {
-            arch.spinLoopHint();
+            x64.Executor.current.spinLoopHint();
         }
     }
 

@@ -41,7 +41,7 @@ pub const init = struct {
     /// NOP if ACPI is not present.
     pub fn earlyInitialize() !AcpiTablesHandle {
         const static = struct {
-            var buffer: [arch.mem.standard_page_size.value]u8 align(@sizeOf(usize)) = undefined;
+            var buffer: [arch.PageTable.standard_page_size.value]u8 align(@sizeOf(usize)) = undefined;
         };
 
         const rsdp = switch (boot.rsdp() orelse return .{}) {

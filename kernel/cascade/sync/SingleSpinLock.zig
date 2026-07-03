@@ -46,7 +46,7 @@ pub fn lock(single_spin_lock: *SingleSpinLock) void {
         .acquire,
         .monotonic,
     )) |_| {
-        arch.spinLoopHint();
+        arch.Executor.current.spinLoopHint();
     }
 }
 

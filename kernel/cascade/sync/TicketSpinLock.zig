@@ -29,7 +29,7 @@ pub fn lock(ticket_spin_lock: *TicketSpinLock) void {
 
     if (@atomicLoad(u32, &ticket_spin_lock.container.contents.current, .acquire) != ticket) {
         while (true) {
-            arch.spinLoopHint();
+            arch.Executor.current.spinLoopHint();
             if (@atomicLoad(u32, &ticket_spin_lock.container.contents.current, .monotonic) == ticket) break;
         }
 

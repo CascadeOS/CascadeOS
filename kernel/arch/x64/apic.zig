@@ -14,7 +14,7 @@ pub fn eoi() void {
 }
 
 /// Send a panic IPI to all other executors.
-pub fn sendPanicIPI() void {
+pub fn sendPanicAllButSelfIPI() void {
     var icr = globals.lapic.readInterruptCommandRegister();
 
     icr.vector = .non_maskable_interrupt;
@@ -29,7 +29,7 @@ pub fn sendPanicIPI() void {
 }
 
 /// Send a flush IPI to the given executor.
-pub fn sendFlushIPI(executor: *cascade.Executor) void {
+pub fn sendFlushIPI(x64_executor: *const x64.Executor) void {
     var icr = globals.lapic.readInterruptCommandRegister();
 
     icr.vector = .flush_request;
@@ -39,11 +39,9 @@ pub fn sendFlushIPI(executor: *cascade.Executor) void {
     icr.trigger_mode = .edge;
     icr.destination_shorthand = .no_shorthand;
 
-    const per_executor: *x64.PerExecutor = .from(executor);
-
     switch (globals.lapic) {
-        .xapic => icr.destination_field.xapic.destination = @intCast(per_executor.apic_id),
-        .x2apic => icr.destination_field.x2apic = per_executor.apic_id,
+        .xapic => icr.destination_field.xapic.destination = @intCast(@intFromEnum(x64_executor.apic_id)),
+        .x2apic => icr.destination_field.x2apic = @intFromEnum(x64_executor.apic_id),
     }
 
     globals.lapic.writeInterruptCommandRegister(icr);
@@ -253,7 +251,7 @@ pub const LAPIC = union(enum) {
     /// Spurious-Interrupt Vector Register
     pub const SupriousInterruptRegister = packed struct(u32) {
         /// The vector number to be delivered to the processor when the local APIC generates a spurious vector.
-        spurious_vector: x64.interrupts.Interrupt,
+        spurious_vector: x64.Interrupt,
 
         /// Indicates whether the local APIC is enabled.
         apic_enable: bool,
@@ -300,7 +298,7 @@ pub const LAPIC = union(enum) {
     /// initial-count value.
     pub const LVTTimerRegister = packed struct(u32) {
         /// Interrupt vector number.
-        vector: x64.interrupts.Interrupt,
+        vector: x64.Interrupt,
 
         _reserved1: u4,
 
@@ -646,7 +644,7 @@ pub const LAPIC = union(enum) {
     /// The act of writing to the low doubleword of the ICR causes the IPI to be sent.
     pub const InterruptCommandRegister = packed struct(u64) {
         /// The vector number of the interrupt being sent.
-        vector: x64.interrupts.Interrupt,
+        vector: x64.Interrupt,
 
         /// Specifies the type of IPI to be sent.
         delivery_mode: DeliveryMode,

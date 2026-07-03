@@ -31,9 +31,9 @@ pub const VirtualAddress = extern union {
 
     /// Returns the type of memory this address points to.
     pub fn tagged(address: VirtualAddress) Tagged {
-        if (arch.mem.kernel_memory_range.containsAddress(address))
+        if (arch.kernel_memory_range.containsAddress(address))
             return .{ .kernel = .{ .value = address.value } }
-        else if (arch.user.user_memory_range.containsAddress(address))
+        else if (arch.user_memory_range.containsAddress(address))
             return .{ .user = .{ .value = address.value } }
         else {
             @branchHint(.cold);
@@ -46,7 +46,7 @@ pub const VirtualAddress = extern union {
     /// **REQUIREMENTS**:
     /// - The address must be in the kernel memory range.
     pub inline fn toKernel(address: VirtualAddress) KernelVirtualAddress {
-        if (core.is_debug) std.debug.assert(arch.mem.kernel_memory_range.containsAddress(address));
+        if (core.is_debug) std.debug.assert(arch.kernel_memory_range.containsAddress(address));
         return address._kernel;
     }
 
@@ -55,7 +55,7 @@ pub const VirtualAddress = extern union {
     /// **REQUIREMENTS**:
     /// - The address must be in the user memory range.
     pub inline fn toUser(address: VirtualAddress) UserVirtualAddress {
-        if (core.is_debug) std.debug.assert(arch.user.user_memory_range.containsAddress(address));
+        if (core.is_debug) std.debug.assert(arch.user_memory_range.containsAddress(address));
         return address._user;
     }
 
@@ -104,7 +104,7 @@ pub const KernelVirtualAddress = extern struct {
     /// - The address must be within the kernel memory range.
     pub inline fn from(value: usize) KernelVirtualAddress {
         const address: KernelVirtualAddress = .{ .value = value };
-        if (core.is_debug) std.debug.assert(arch.mem.kernel_memory_range.containsAddress(address.toVirtualAddress()));
+        if (core.is_debug) std.debug.assert(arch.kernel_memory_range.containsAddress(address.toVirtualAddress()));
         return address;
     }
 
@@ -318,14 +318,14 @@ pub const VirtualRange = struct {
     ///
     /// If the range is not fully contained in either kernel or user memory, returns `.invalid`.
     pub fn tagged(range: VirtualRange) Tagged {
-        if (arch.mem.kernel_memory_range.fullyContains(range))
+        if (arch.kernel_memory_range.fullyContains(range))
             return .{
                 .kernel = .{
                     .address = range.address._kernel,
                     .size = range.size,
                 },
             }
-        else if (arch.user.user_memory_range.fullyContains(range))
+        else if (arch.user_memory_range.fullyContains(range))
             return .{
                 .user = .{
                     .address = range.address._user,
@@ -343,7 +343,7 @@ pub const VirtualRange = struct {
     /// **REQUIREMENTS**:
     /// - The range must be fully contained in kernel memory.
     pub inline fn toKernel(range: VirtualRange) KernelVirtualRange {
-        if (core.is_debug) std.debug.assert(arch.mem.kernel_memory_range.fullyContains(range));
+        if (core.is_debug) std.debug.assert(arch.kernel_memory_range.fullyContains(range));
         return .{
             .address = range.address._kernel,
             .size = range.size,
@@ -355,7 +355,7 @@ pub const VirtualRange = struct {
     /// **REQUIREMENTS**:
     /// - The range must be fully contained in user memory.
     pub inline fn toUser(range: VirtualRange) UserVirtualRange {
-        if (core.is_debug) std.debug.assert(arch.user.user_memory_range.fullyContains(range));
+        if (core.is_debug) std.debug.assert(arch.user_memory_range.fullyContains(range));
         return .{
             .address = range.address._user,
             .size = range.size,
@@ -387,7 +387,7 @@ pub const KernelVirtualRange = struct {
     /// - The range must be fully contained in kernel memory.
     pub inline fn from(address: Address, size: core.Size) KernelVirtualRange {
         const range: KernelVirtualRange = .{ .address = address, .size = size };
-        if (core.is_debug) std.debug.assert(arch.mem.kernel_memory_range.fullyContains(range.toVirtualRange()));
+        if (core.is_debug) std.debug.assert(arch.kernel_memory_range.fullyContains(range.toVirtualRange()));
         return range;
     }
 
@@ -543,7 +543,7 @@ fn AddressMixin(comptime Address: type) type {
         }
 
         inline fn pageAligned(address: Address) bool {
-            return arch.mem.standard_page_size_alignment.check(address.value);
+            return arch.PageTable.standard_page_size_alignment.check(address.value);
         }
 
         inline fn alignForward(address: Address, alignment: std.mem.Alignment) Address {
@@ -551,7 +551,7 @@ fn AddressMixin(comptime Address: type) type {
         }
 
         inline fn pageAlignForward(address: Address) Address {
-            return .{ .value = arch.mem.standard_page_size_alignment.forward(address.value) };
+            return .{ .value = arch.PageTable.standard_page_size_alignment.forward(address.value) };
         }
 
         inline fn alignForwardInPlace(address: *Address, alignment: std.mem.Alignment) void {
@@ -559,7 +559,7 @@ fn AddressMixin(comptime Address: type) type {
         }
 
         inline fn pageAlignForwardInPlace(address: *Address) void {
-            address.value = arch.mem.standard_page_size_alignment.forward(address.value);
+            address.value = arch.PageTable.standard_page_size_alignment.forward(address.value);
         }
 
         inline fn alignBackward(address: Address, alignment: std.mem.Alignment) Address {
@@ -567,7 +567,7 @@ fn AddressMixin(comptime Address: type) type {
         }
 
         inline fn pageAlignBackward(address: Address) Address {
-            return .{ .value = arch.mem.standard_page_size_alignment.backward(address.value) };
+            return .{ .value = arch.PageTable.standard_page_size_alignment.backward(address.value) };
         }
 
         inline fn alignBackwardInPlace(address: *Address, alignment: std.mem.Alignment) void {
@@ -575,7 +575,7 @@ fn AddressMixin(comptime Address: type) type {
         }
 
         inline fn pageAlignBackwardInPlace(address: *Address) void {
-            address.value = arch.mem.standard_page_size_alignment.backward(address.value);
+            address.value = arch.PageTable.standard_page_size_alignment.backward(address.value);
         }
 
         inline fn moveForward(address: Address, size: core.Size) Address {
@@ -583,7 +583,7 @@ fn AddressMixin(comptime Address: type) type {
         }
 
         inline fn moveForwardPage(address: Address) Address {
-            return .{ .value = address.value + arch.mem.standard_page_size.value };
+            return .{ .value = address.value + arch.PageTable.standard_page_size.value };
         }
 
         inline fn moveForwardInPlace(address: *Address, size: core.Size) void {
@@ -591,7 +591,7 @@ fn AddressMixin(comptime Address: type) type {
         }
 
         inline fn moveForwardPageInPlace(address: *Address) void {
-            address.value += arch.mem.standard_page_size.value;
+            address.value += arch.PageTable.standard_page_size.value;
         }
 
         inline fn moveBackward(address: Address, size: core.Size) Address {
@@ -599,7 +599,7 @@ fn AddressMixin(comptime Address: type) type {
         }
 
         inline fn moveBackwardPage(address: Address) Address {
-            return .{ .value = address.value - arch.mem.standard_page_size.value };
+            return .{ .value = address.value - arch.PageTable.standard_page_size.value };
         }
 
         inline fn moveBackwardInPlace(address: *Address, size: core.Size) void {
@@ -607,7 +607,7 @@ fn AddressMixin(comptime Address: type) type {
         }
 
         inline fn moveBackwardPageInPlace(address: *Address) void {
-            address.value -= arch.mem.standard_page_size.value;
+            address.value -= arch.PageTable.standard_page_size.value;
         }
 
         inline fn equal(address: Address, other: Address) bool {
@@ -674,7 +674,7 @@ fn RangeMixin(comptime Range: type) type {
         ///
         /// Both the address and size must be page aligned for this to return true.
         inline fn pageAligned(range: Range) bool {
-            return range.address.pageAligned() and range.size.aligned(arch.mem.standard_page_size_alignment);
+            return range.address.pageAligned() and range.size.aligned(arch.PageTable.standard_page_size_alignment);
         }
 
         /// Returns the range with the address and size page aligned.

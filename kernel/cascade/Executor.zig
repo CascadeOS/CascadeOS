@@ -18,7 +18,7 @@ _current_task: *cascade.Task,
 
 scheduler: cascade.Task.Scheduler,
 
-arch_specific: arch.PerExecutor,
+arch_specific: arch.Executor,
 
 /// List of `cascade.mem.FlushRequest` objects that need to be actioned.
 flush_requests: core.containers.AtomicSinglyLinkedList = .{},
@@ -31,7 +31,7 @@ const interrupt_source_panic_truncated = " (msg truncated)";
 
 pub fn setCurrentTask(executor: *Executor, task: *cascade.Task) void {
     executor._current_task = task;
-    arch.scheduling.setCurrentTask(task);
+    task.arch_specific.setCurrent();
 }
 
 /// Renders the given message using this executor's interrupt source panic buffer.

@@ -19,7 +19,7 @@ const log = cascade.debug.log.scoped(.user);
 /// The current task's `interrupt_disable_count` is set to 1 and interrupts are disabled.
 pub fn onSyscall(
     current_task: cascade.Task.Current,
-    syscall_frame: arch.user.SyscallFrame,
+    syscall_frame: arch.SyscallFrame,
 ) i64 {
     // enable interrupts
     current_task.decrementInterruptDisable();
@@ -50,7 +50,7 @@ fn syscallThreadExitCurrent() noreturn {
 
 fn syscallDebugPrint(
     current_task: cascade.Task.Current,
-    syscall_frame: arch.user.SyscallFrame,
+    syscall_frame: arch.SyscallFrame,
 ) !void {
     const full_source = (syscall_frame.getUserRange(.two, .one) orelse return).toVirtualRange();
     if (full_source.size.equal(.zero)) return;
@@ -103,6 +103,6 @@ pub const init = struct {
     pub fn initialize() !void {
         try Process.init.initializeProcesses();
         try Thread.init.initializeThreads();
-        try arch.user.init.initialize();
+        try arch.Thread.init.initialize();
     }
 };

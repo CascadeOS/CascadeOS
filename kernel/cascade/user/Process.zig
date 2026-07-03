@@ -260,14 +260,14 @@ const globals = struct {
                         cascade.mem.PhysicalPage.allocator.deallocate(page_list);
                     }
 
-                    const page_table: arch.mem.PageTable = .create(page);
-                    cascade.mem.kernelPageTable().copyTopLevelInto(page_table);
+                    const page_table: arch.PageTable = .create(page);
+                    cascade.mem.kernelPageTable().copyTopLevel(page_table);
 
                     process.address_space.init(.{
                         .name = cascade.mem.AddressSpace.Name.fromSlice(
                             temp_name.constSlice(),
                         ) catch unreachable, // ensured in `cascade.config`
-                        .range = arch.user.user_memory_range,
+                        .range = arch.user_memory_range,
                         .page_table = page_table,
                         .context = .{ .user = process },
                     }) catch |err| {

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // SPDX-FileCopyrightText: CascadeOS Contributors
 
+const std = @import("std");
+
 const arch = @import("arch");
 const cascade = @import("cascade");
 const core = @import("core");
@@ -8,143 +10,106 @@ const core = @import("core");
 const riscv = @import("riscv.zig");
 
 pub const functions: arch.Functions = .{
-    .spinLoopHint = riscv.instructions.pause,
+    .executor = .{
+        .current = .{
+            .spinLoopHint = riscv.Executor.current.spinLoopHint,
+            .halt = riscv.Executor.current.halt,
+            .disableInterruptsAndHalt = riscv.Executor.current.disableInterruptsAndHalt,
+            .interruptsEnabled = riscv.Executor.current.interruptsEnabled,
+            .enableInterrupts = riscv.Executor.current.enableInterrupts,
+            .disableInterrupts = riscv.Executor.current.disableInterrupts,
+        },
 
-    .halt = riscv.instructions.halt,
+        .init = .{
+            .prepareBootstrap = riscv.Executor.init.prepareBootstrap,
+            .initialize = riscv.Executor.init.initialize,
+        },
+    },
 
-    .interrupts = .{
-        .disableAndHalt = riscv.instructions.disableInterruptsAndHalt,
-        .areEnabled = riscv.instructions.interruptsEnabled,
-        .enable = riscv.instructions.enableInterrupts,
-        .disable = riscv.instructions.disableInterrupts,
+    .interrupt = .{
+        .frame = .{},
+
+        .external = .{},
 
         .init = .{},
     },
 
-    .mem = .{
+    .page_table = .{
         .init = .{},
     },
 
-    .user = .{
+    .thread = .{
+        .current = .{},
+
         .init = .{},
     },
 
-    .scheduling = .{
-        .initializeTaskArchSpecific = struct {
-            fn initializeTaskArchSpecific(_: *cascade.Task) void {}
-        }.initializeTaskArchSpecific,
+    .syscall_frame = .{},
 
-        .getCurrentTask = struct {
-            inline fn getCurrentTask() *cascade.Task {
-                return @ptrFromInt(riscv.registers.SupervisorScratch.read());
-            }
-        }.getCurrentTask,
-        .setCurrentTask = struct {
-            inline fn setCurrentTask(task: *cascade.Task) void {
-                riscv.registers.SupervisorScratch.write(@intFromPtr(task));
-            }
-        }.setCurrentTask,
+    .task = .{
+        .initialize = riscv.Task.initialize,
+        .getCurrent = riscv.Task.getCurrent,
+        .setCurrent = riscv.Task.setCurrent,
     },
 
-    .io = .{},
+    .pci = .{},
+
+    .port = .{},
 
     .init = .{
-        .getStandardWallclockStartTime = struct {
-            fn getStandardWallclockStartTime() cascade.time.wallclock.Tick {
-                return @enumFromInt(riscv.instructions.readTime());
-            }
-        }.getStandardWallclockStartTime,
-
-        .tryGetSerialOutput = struct {
-            fn tryGetSerialOutput(memory_system_available: bool) ?arch.init.InitOutput {
-                _ = memory_system_available;
-
-                if (riscv.sbi_debug_console.detect()) {
-                    return .{
-                        .output = riscv.sbi_debug_console.output,
-                        .preference = .use,
-                    };
-                }
-
-                return null;
-            }
-
-            const log = cascade.debug.log.scoped(.riscv_init);
-        }.tryGetSerialOutput,
-
-        .prepareBootstrapExecutor = struct {
-            fn prepareBootstrapExecutor(
-                executor: *cascade.Executor,
-                architecture_processor_id: u64,
-            ) void {
-                executor.arch_specific = .{
-                    .hartid = @intCast(architecture_processor_id),
-                };
-            }
-        }.prepareBootstrapExecutor,
-
-        .initExecutor = struct {
-            fn initExecutor(
-                executor: *cascade.Executor,
-            ) void {
-                _ = executor;
-            }
-        }.initExecutor,
+        .getStandardWallclockStartTime = riscv.init.getStandardWallclockStartTime,
+        .tryGetSerialOutput = riscv.init.tryGetSerialOutput,
     },
 };
 
-const standard_page_size: core.Size = .from(4, .kib);
-
-const size_of_canonical_region = core.Size.from(128, .tib);
+const size_of_canonical_region: core.Size = .from(128, .tib);
 
 pub const decls: arch.Decls = .{
-    .PerExecutor = struct { hartid: u32 },
+    .kernel_memory_range = .from(
+        cascade.VirtualAddress.from(0xffff800000000000),
+        size_of_canonical_region
+            // exclude the last page of memory, this prevents boundary conditions
+            .subtract(riscv.PageTable.small_page_size),
+    ),
 
-    .interrupts = .{
-        .Interrupt = enum(u0) { _ },
-        .InterruptFrame = extern struct {},
-    },
+    .user_memory_range = .from(
+        cascade.VirtualAddress.zero.moveForward(riscv.PageTable.small_page_size),
+        size_of_canonical_region
+            // exclude the first page of memory so that a null pointer is not a valid user address
+            .subtract(riscv.PageTable.small_page_size)
+            // exclude the last page of memory, this prevents boundary conditions
+            .subtract(riscv.PageTable.small_page_size),
+    ),
 
-    .mem = .{
-        // TODO: most of these values are copied from the x64, so all of them need to be checked
-        .standard_page_size = standard_page_size,
-        .largest_page_size = .from(1, .gib),
-        .kernel_memory_range = .from(
-            cascade.VirtualAddress.from(0xffff800000000000),
-            size_of_canonical_region
-                // exclude the last page of memory, this prevents boundary conditions
-                .subtract(standard_page_size),
-        ),
-        .PageTable = extern struct {},
-    },
+    .cfi_prevent_unwinding =
+    \\.cfi_sections .debug_frame
+    \\.cfi_undefined ra
+    \\
+    ,
 
-    .scheduling = .{
-        .PerTask = struct {},
-        .cfi_prevent_unwinding =
-        \\.cfi_sections .debug_frame
-        \\.cfi_undefined ra
-        \\
-        ,
-    },
+    .Executor = riscv.Executor,
 
-    .user = .{
-        .PerThread = struct {},
-        .SyscallFrame = struct {},
-        .user_memory_range = .from(
-            cascade.VirtualAddress.zero.moveForward(standard_page_size),
-            size_of_canonical_region
-                // exclude the first page of memory so that a null pointer is not a valid user address
-                .subtract(standard_page_size)
-                // exclude the last page of memory, this prevents boundary conditions
-                .subtract(standard_page_size),
-        ),
-    },
+    .ExecutorId = riscv.Executor.Id,
 
-    .io = .{
-        .Port = enum(u0) { _ },
-    },
+    .Interrupt = riscv.Interrupt,
 
-    .init = .{
-        .CaptureSystemInformationOptions = struct {},
-    },
+    .InterruptFrame = riscv.Interrupt.Frame,
+
+    .ExternalInterrupt = riscv.Interrupt.External,
+
+    .PageTable = riscv.PageTable,
+
+    .standard_page_size = riscv.PageTable.small_page_size,
+
+    .largest_page_size = riscv.PageTable.large_page_size,
+
+    .Thread = riscv.Thread,
+
+    .SyscallFrame = riscv.syscall.Frame,
+
+    .Task = riscv.Task,
+
+    .Port = enum(u0) { _ },
+
+    .CaptureSystemInformationOptions = riscv.init.CaptureSystemInformationOptions,
 };

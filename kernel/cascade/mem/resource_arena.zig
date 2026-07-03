@@ -124,7 +124,7 @@ pub fn Arena(comptime quantum_caching: QuantumCaching) type {
 
                     var caches_created: usize = 0;
 
-                    const pages_to_allocate = arch.mem.standard_page_size.amountToCover(
+                    const pages_to_allocate = arch.PageTable.standard_page_size.amountToCover(
                         core.Size.of([QUANTUM_CACHES_PER_PAGE]RawCache).multiplyScalar(count),
                     );
 
@@ -1332,7 +1332,7 @@ inline fn smallestPossibleLenInFreelist(index: usize) usize {
 }
 
 const MAX_NUMBER_OF_QUANTUM_CACHES = 64;
-const QUANTUM_CACHES_PER_PAGE = arch.mem.standard_page_size.divide(core.Size.of(RawCache));
+const QUANTUM_CACHES_PER_PAGE = arch.PageTable.standard_page_size.divide(core.Size.of(RawCache));
 
 const NUMBER_OF_HASH_BUCKETS = 64;
 const HashIndex: type = std.math.Log2Int(std.meta.Int(.unsigned, NUMBER_OF_HASH_BUCKETS));

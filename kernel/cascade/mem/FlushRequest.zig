@@ -26,7 +26,7 @@ pub fn submitAndWait(flush_request: FlushRequest) void {
         // only when the bootstrap executor is running during early init will be in this function with interrupts disabled
         // but that will trigger the above branch so will not reach here, so it is safe to assert interrupt enabled
         std.debug.assert(current_task.task.interrupt_disable_count.load(.monotonic) == 0);
-        std.debug.assert(arch.interrupts.areEnabled());
+        std.debug.assert(arch.Executor.current.interruptsEnabled());
     }
 
     var state: State = .{
@@ -51,7 +51,7 @@ pub fn submitAndWait(flush_request: FlushRequest) void {
                 .node = .{},
             };
             executor.flush_requests.prepend(&node.node);
-            arch.interrupts.sendFlushIPI(executor);
+            executor.arch_specific.flushRequestNotify();
         }
 
         // use `rawFlush` instead of `flush` as the current executor is not included in the count
@@ -102,7 +102,7 @@ fn rawFlush(request: FlushRequest) void {
     }
 
     for (request.batch.ranges.constSlice()) |range| {
-        arch.mem.flushCache(range);
+        arch.Executor.current.flushCache(range);
     }
 }
 

@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: BSD-3-Clause
 // SPDX-FileCopyrightText: CascadeOS Contributors
 
+const std = @import("std");
+
 const arch = @import("arch");
 const cascade = @import("cascade");
 const core = @import("core");
@@ -8,132 +10,106 @@ const core = @import("core");
 const arm = @import("arm.zig");
 
 pub const functions: arch.Functions = .{
-    .spinLoopHint = arm.instructions.isb,
-    .halt = arm.instructions.halt,
+    .executor = .{
+        .current = .{
+            .spinLoopHint = arm.Executor.current.spinLoopHint,
+            .halt = arm.Executor.current.halt,
+            .disableInterruptsAndHalt = arm.Executor.current.disableInterruptsAndHalt,
+            .interruptsEnabled = arm.Executor.current.interruptsEnabled,
+            .enableInterrupts = arm.Executor.current.enableInterrupts,
+            .disableInterrupts = arm.Executor.current.disableInterrupts,
+        },
 
-    .interrupts = .{
-        .disableAndHalt = arm.instructions.disableInterruptsAndHalt,
-        .areEnabled = arm.instructions.interruptsEnabled,
-        .enable = arm.instructions.enableInterrupts,
-        .disable = arm.instructions.disableInterrupts,
+        .init = .{
+            .prepareBootstrap = arm.Executor.init.prepareBootstrap,
+            .initialize = arm.Executor.init.initialize,
+        },
+    },
+
+    .interrupt = .{
+        .frame = .{},
+
+        .external = .{},
 
         .init = .{},
     },
 
-    .mem = .{
+    .page_table = .{
         .init = .{},
     },
 
-    .user = .{
+    .thread = .{
+        .current = .{},
+
         .init = .{},
     },
 
-    .scheduling = .{
-        .initializeTaskArchSpecific = struct {
-            fn initializeTaskArchSpecific(_: *cascade.Task) void {}
-        }.initializeTaskArchSpecific,
+    .syscall_frame = .{},
 
-        .getCurrentTask = struct {
-            inline fn getCurrentTask() *cascade.Task {
-                return @ptrFromInt(arm.registers.TPIDR_EL1.read());
-            }
-        }.getCurrentTask,
-        .setCurrentTask = struct {
-            inline fn setCurrentTask(task: *cascade.Task) void {
-                arm.registers.TPIDR_EL1.write(@intFromPtr(task));
-            }
-        }.setCurrentTask,
+    .task = .{
+        .initialize = arm.Task.initialize,
+        .getCurrent = arm.Task.getCurrent,
+        .setCurrent = arm.Task.setCurrent,
     },
 
-    .io = .{},
+    .pci = .{},
+
+    .port = .{},
 
     .init = .{
-        .getStandardWallclockStartTime = struct {
-            fn getStandardWallclockStartTime() cascade.time.wallclock.Tick {
-                return @enumFromInt(arm.instructions.readPhysicalCount()); // TODO: should this be virtual count?
-            }
-        }.getStandardWallclockStartTime,
-
-        .tryGetSerialOutput = struct {
-            fn tryGetSerialOutput(memory_system_available: bool) ?arch.init.InitOutput {
-                _ = memory_system_available;
-                return null;
-            }
-        }.tryGetSerialOutput,
-
-        .prepareBootstrapExecutor = struct {
-            fn prepareBootstrapExecutor(
-                executor: *cascade.Executor,
-                architecture_processor_id: u64,
-            ) void {
-                executor.arch_specific = .{
-                    .mpidr = architecture_processor_id,
-                };
-            }
-        }.prepareBootstrapExecutor,
-
-        .initExecutor = struct {
-            fn initExecutor(
-                executor: *cascade.Executor,
-            ) void {
-                _ = executor;
-            }
-        }.initExecutor,
+        .getStandardWallclockStartTime = arm.init.getStandardWallclockStartTime,
+        .tryGetSerialOutput = arm.init.tryGetSerialOutput,
     },
 };
 
-const standard_page_size: core.Size = .from(4, .kib);
-
-const size_of_canonical_region = core.Size.from(256, .tib);
+const size_of_canonical_region: core.Size = .from(256, .tib);
 
 pub const decls: arch.Decls = .{
-    .PerExecutor = struct { mpidr: u64 },
+    .kernel_memory_range = .from(
+        cascade.VirtualAddress.from(0xffff000000000000),
+        size_of_canonical_region
+            // exclude the last page of memory, this prevents boundary conditions
+            .subtract(arm.PageTable.small_page_size),
+    ),
 
-    .interrupts = .{
-        .Interrupt = enum(u0) { _ },
-        .InterruptFrame = extern struct {},
-    },
+    .user_memory_range = .from(
+        cascade.VirtualAddress.zero.moveForward(arm.PageTable.small_page_size),
+        size_of_canonical_region
+            // exclude the first page of memory so that a null pointer is not a valid user address
+            .subtract(arm.PageTable.small_page_size)
+            // exclude the last page of memory, this prevents boundary conditions
+            .subtract(arm.PageTable.small_page_size),
+    ),
 
-    .mem = .{
-        // TODO: most of these values are copied from the x64, so all of them need to be checked
-        .standard_page_size = standard_page_size,
-        .largest_page_size = .from(1, .gib),
-        .kernel_memory_range = .from(
-            cascade.VirtualAddress.from(0xffff000000000000),
-            size_of_canonical_region
-                // exclude the last page of memory, this prevents boundary conditions
-                .subtract(standard_page_size),
-        ),
-        .PageTable = extern struct {},
-    },
+    .cfi_prevent_unwinding =
+    \\.cfi_sections .debug_frame
+    \\.cfi_undefined lr
+    \\
+    ,
 
-    .scheduling = .{
-        .PerTask = struct {},
-        .cfi_prevent_unwinding =
-        \\.cfi_sections .debug_frame
-        \\.cfi_undefined lr
-        \\
-        ,
-    },
+    .Executor = arm.Executor,
 
-    .user = .{
-        .PerThread = struct {},
-        .SyscallFrame = struct {},
-        .user_memory_range = .from(
-            cascade.VirtualAddress.zero.moveForward(standard_page_size),
-            size_of_canonical_region
-                // exclude the first page of memory so that a null pointer is not a valid user address
-                .subtract(standard_page_size)
-                // exclude the last page of memory, this prevents boundary conditions
-                .subtract(standard_page_size),
-        ),
-    },
+    .ExecutorId = arm.Executor.Id,
 
-    .io = .{
-        .Port = enum(u0) { _ },
-    },
+    .Interrupt = arm.Interrupt,
 
-    .init = .{
-        .CaptureSystemInformationOptions = struct {},
-    },
+    .InterruptFrame = arm.Interrupt.Frame,
+
+    .ExternalInterrupt = arm.Interrupt.External,
+
+    .PageTable = arm.PageTable,
+
+    .standard_page_size = arm.PageTable.small_page_size,
+
+    .largest_page_size = arm.PageTable.large_page_size,
+
+    .Thread = arm.Thread,
+
+    .SyscallFrame = arm.syscall.Frame,
+
+    .Task = arm.Task,
+
+    .Port = enum(u0) { _ },
+
+    .CaptureSystemInformationOptions = arm.init.CaptureSystemInformationOptions,
 };

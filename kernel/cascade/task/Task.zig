@@ -66,7 +66,7 @@ safe_result_slot: cascade.mem.safe.Result.Slot = .{},
 spinlocks_held: u32,
 scheduler_locked: bool,
 
-arch_specific: arch.scheduling.PerTask,
+arch_specific: arch.Task,
 
 pub const State = union(enum) {
     ready,
@@ -125,10 +125,12 @@ pub fn wakeFromBlocked(task_to_wake: *cascade.Task) void {
             .{task_to_wake},
         );
 
-        executor.scheduler.lock();
-        defer executor.scheduler.unlock();
+        {
+            executor.scheduler.lock();
+            defer executor.scheduler.unlock();
+            executor.scheduler.queueTask(task_to_wake);
+        }
 
-        executor.scheduler.queueTask(task_to_wake);
         return;
     }
 
@@ -377,11 +379,11 @@ pub const internal = struct {
 
             .arch_specific = undefined, // initialized by `initializeTaskArchSpecific` below
         };
-        arch.scheduling.initializeTaskArchSpecific(task);
+        task.arch_specific.initialize();
 
         task.stack.reset();
 
-        arch.scheduling.prepareTaskForScheduling(task, options.entry);
+        task.arch_specific.prepareForScheduling(options.entry);
     }
 
     // Called directly by assembly code in `arch.scheduling.prepareTaskForScheduling`, so the signature must match.
@@ -393,7 +395,7 @@ pub const internal = struct {
         arg3: usize,
         arg4: usize,
     ) callconv(.c) noreturn {
-        asm volatile (arch.scheduling.cfi_prevent_unwinding);
+        asm volatile (arch.cfi_prevent_unwinding);
 
         cascade.Task.Current.get().knownExecutor().scheduler.unlock();
         target_function(arg0, arg1, arg2, arg3, arg4);
@@ -469,7 +471,7 @@ pub const init = struct {
 
             .arch_specific = undefined, // initialized by `initializeTaskArchSpecific` below
         };
-        arch.scheduling.initializeTaskArchSpecific(bootstrap_init_task);
+        bootstrap_init_task.arch_specific.initialize();
     }
 
     pub fn createAndAssignInitTask(executor: *cascade.Executor) !void {
@@ -516,6 +518,6 @@ pub const init = struct {
 
             .arch_specific = undefined, // initialized by `initializeTaskArchSpecific` below
         };
-        arch.scheduling.initializeTaskArchSpecific(scheduler_task);
+        scheduler_task.arch_specific.initialize();
     }
 };

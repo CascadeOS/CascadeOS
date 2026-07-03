@@ -22,7 +22,7 @@ pub const KernelBaseAddress = struct {
 };
 
 /// Returns the kernel's ELF executable file provided by the bootloader, if any.
-pub fn kernelExecutableFile() ?[]align(arch.mem.standard_page_size_alignment.toByteUnits()) const u8 {
+pub fn kernelExecutableFile() ?[]align(arch.PageTable.standard_page_size_alignment.toByteUnits()) const u8 {
     return switch (bootloader_api) {
         .limine => limine_interface.kernelExecutableFile(),
         .unknown => null,
@@ -166,7 +166,7 @@ pub fn x2apicEnabled() bool {
     };
 }
 
-pub fn bootstrapArchitectureProcessorId() u64 {
+pub fn bootstrapArchitectureProcessorId() arch.Executor.Id {
     return switch (bootloader_api) {
         .limine => limine_interface.bootstrapArchitectureProcessorId(),
         .unknown => unreachable,
@@ -221,7 +221,7 @@ pub const CpuDescriptors = union {
             };
         }
 
-        pub fn architectureProcessorId(descriptor: *const Descriptor) u64 {
+        pub fn architectureProcessorId(descriptor: *const Descriptor) arch.Executor.Id {
             return switch (bootloader_api) {
                 .limine => descriptor.limine.architectureProcessorId(),
                 .unknown => unreachable,
@@ -272,8 +272,8 @@ pub fn exportEntryPoints() void {
         /// No bootloader is ever expected to call `_start` and instead should use bootloader specific entry points;
         /// meaning this function is not expected to ever be called.
         pub fn unknownBootloaderEntryPoint() callconv(.naked) noreturn {
-            asm volatile (arch.scheduling.cfi_prevent_unwinding);
-            @call(.always_inline, arch.interrupts.disableAndHalt, .{});
+            asm volatile (arch.cfi_prevent_unwinding);
+            @call(.always_inline, arch.Executor.current.disableInterruptsAndHalt, .{});
             comptime unreachable;
         }
     }.unknownBootloaderEntryPoint;

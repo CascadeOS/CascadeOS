@@ -96,7 +96,7 @@ fn logFn(
     const t = cascade.init.Output.terminal;
 
     switch (globals.log_mode) {
-        .single_executor_init_log => if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled()),
+        .single_executor_init_log => if (core.is_debug) std.debug.assert(!arch.Executor.current.interruptsEnabled()),
         .init_log => cascade.init.Output.lock.lock(),
     }
     defer switch (globals.log_mode) {

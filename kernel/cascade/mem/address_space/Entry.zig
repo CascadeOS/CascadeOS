@@ -131,7 +131,7 @@ pub fn canMerge(first_entry: *const Entry, second_entry: *const Entry) bool {
             if (first_anonymous_map.number_of_pages.count !=
                 first_entry.anonymous_map_reference.start_offset
                     .add(first_entry.range.size)
-                    .divide(arch.mem.standard_page_size))
+                    .divide(arch.PageTable.standard_page_size))
             {
                 // `first_entry` anonymous map reference does not extend to the end of the anonymous map, so it is not
                 // safe to extend the anonymous map
@@ -222,7 +222,7 @@ pub fn split(first_entry: *Entry, new_second_entry: *Entry, split_size: core.Siz
         std.debug.assert(first_entry != new_second_entry);
         std.debug.assert(first_entry.range.size.notEqual(.zero));
         std.debug.assert(split_size.lessThanOrEqual(first_entry.range.size));
-        std.debug.assert(split_size.aligned(arch.mem.standard_page_size_alignment));
+        std.debug.assert(split_size.aligned(arch.PageTable.standard_page_size_alignment));
     }
 
     new_second_entry.* = .{
@@ -284,7 +284,7 @@ pub fn shrink(
     if (core.is_debug) {
         std.debug.assert(new_size.notEqual(.zero));
         std.debug.assert(new_size.lessThan(entry.range.size));
-        std.debug.assert(new_size.aligned(arch.mem.standard_page_size_alignment));
+        std.debug.assert(new_size.aligned(arch.PageTable.standard_page_size_alignment));
     }
 
     const size_change = entry.range.size.subtract(new_size);

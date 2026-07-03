@@ -10,46 +10,48 @@ const core = @import("core");
 const x64 = @import("x64.zig");
 
 /// Get the EOI type for the given external interrupt if known.
-pub fn eoiType(external_interrupt: u32) ?arch.interrupts.Interrupt.Handler.EOI {
-    const mapping = getMapping(@intCast(external_interrupt));
+pub fn eoiType(external_interrupt: x64.Interrupt.External) ?arch.Interrupt.Handler.EOI {
+    const mapping = getMapping(external_interrupt);
     return switch (mapping.trigger_mode) {
         .edge => .edge,
         .level => .level,
     };
 }
 
-pub fn routeInterrupt(
-    interrupt: u8,
-    vector: x64.interrupts.Interrupt,
-) arch.interrupts.Interrupt.RouteError!void {
-    const mapping = getMapping(interrupt);
+pub fn route(external_interrupt: x64.Interrupt.External, interrupt: x64.Interrupt) arch.Interrupt.External.RouteError!void {
+    const mapping = getMapping(external_interrupt);
     const ioapic = getIOAPIC(mapping.gsi) catch return error.UnableToRouteExternalInterrupt;
 
     ioapic.setRedirectionTableEntry(
-        @intCast(mapping.gsi - ioapic.gsi_base),
-        vector,
+        @intCast(@intFromEnum(mapping.gsi) - @intFromEnum(ioapic.gsi_base)),
+        interrupt,
         .fixed,
         .{ .physical = 0 }, // TODO: support routing to other/multiple processors
         mapping.polarity,
         mapping.trigger_mode,
         false,
-    ) catch |err| {
-        // TODO: return error
-        std.debug.panic("failed to route interrupt {}: {t}", .{ interrupt, err });
+    ) catch {
+        @branchHint(.cold);
+        return error.UnableToRouteExternalInterrupt;
     };
 }
 
-fn getMapping(interrupt: u8) SourceOverride {
-    return globals.source_overrides[interrupt] orelse .{
-        .gsi = interrupt,
+fn getMapping(external_interrupt: x64.Interrupt.External) SourceOverride {
+    const gsi: u8 = @intCast(@intFromEnum(external_interrupt));
+    return globals.source_overrides[gsi] orelse .{
+        .gsi = external_interrupt,
         .polarity = .active_high,
         .trigger_mode = .edge,
     };
 }
 
-fn getIOAPIC(gsi: u32) !IOAPIC {
+fn getIOAPIC(external_interrupt: x64.Interrupt.External) !IOAPIC {
+    const gsi = @intFromEnum(external_interrupt);
     for (globals.io_apics.constSlice()) |io_apic| {
-        if (gsi >= io_apic.gsi_base and gsi < (io_apic.gsi_base + io_apic.number_of_redirection_entries)) {
+        const gsi_base = @intFromEnum(io_apic.gsi_base);
+        if (gsi >= gsi_base and
+            gsi < (gsi_base + io_apic.number_of_redirection_entries))
+        {
             return io_apic;
         }
     }
@@ -57,7 +59,7 @@ fn getIOAPIC(gsi: u32) !IOAPIC {
 }
 
 const SourceOverride = struct {
-    gsi: u32,
+    gsi: x64.Interrupt.External,
     polarity: IOAPIC.Polarity,
     trigger_mode: IOAPIC.TriggerMode,
 
@@ -83,7 +85,7 @@ const SourceOverride = struct {
         };
 
         return .{
-            .gsi = source_override.global_system_interrupt,
+            .gsi = @enumFromInt(source_override.global_system_interrupt),
             .polarity = polarity,
             .trigger_mode = trigger_mode,
         };
@@ -103,7 +105,7 @@ const SourceOverride = struct {
 
 const globals = struct {
     var io_apics: core.containers.BoundedArray(IOAPIC, x64.config.maximum_number_of_io_apics) = .{};
-    var source_overrides: [x64.mem.PageTable.number_of_entries]?SourceOverride = @splat(null);
+    var source_overrides: [x64.PageTable.number_of_entries]?SourceOverride = @splat(null);
 };
 
 pub const init = struct {
@@ -130,12 +132,12 @@ pub const init = struct {
 
                     const ioapic = IOAPIC.init(
                         register_region_range.address,
-                        io_apic_data.global_system_interrupt_base,
+                        @enumFromInt(io_apic_data.global_system_interrupt_base),
                     );
 
                     init_log.debug("found ioapic for gsi {}-{}", .{
                         ioapic.gsi_base,
-                        ioapic.gsi_base + ioapic.number_of_redirection_entries,
+                        @intFromEnum(ioapic.gsi_base) + ioapic.number_of_redirection_entries,
                     });
 
                     try globals.io_apics.append(ioapic);
@@ -157,7 +159,7 @@ pub const init = struct {
             {},
             struct {
                 fn lessThan(_: void, lhs: IOAPIC, rhs: IOAPIC) bool {
-                    return lhs.gsi_base < rhs.gsi_base;
+                    return @intFromEnum(lhs.gsi_base) < @intFromEnum(rhs.gsi_base);
                 }
             }.lessThan,
         );
@@ -172,13 +174,13 @@ const IOAPIC = struct {
     iowin: *volatile u32,
 
     /// The global system interrupt number where this I/O APIC's interrupt inputs start.
-    gsi_base: u32,
+    gsi_base: x64.Interrupt.External,
 
     number_of_redirection_entries: u8,
 
     pub const register_region_size = core.Size.of(u32).multiplyScalar(2);
 
-    pub fn init(base_address: cascade.KernelVirtualAddress, gsi_base: u32) IOAPIC {
+    fn init(base_address: cascade.KernelVirtualAddress, gsi_base: x64.Interrupt.External) IOAPIC {
         var ioapic: IOAPIC = .{
             .ioregsel = base_address.toPtr(*volatile u32),
             .iowin = base_address.moveForward(.from(0x10, .byte)).toPtr(*volatile u32),
@@ -204,7 +206,7 @@ const IOAPIC = struct {
     pub fn setRedirectionTableEntry(
         ioapic: IOAPIC,
         index: u8,
-        interrupt_vector: x64.interrupts.Interrupt,
+        vector: x64.Interrupt,
         delivery_mode: DeliveryMode,
         destination: Destination,
         pin_polarity: Polarity,
@@ -215,7 +217,7 @@ const IOAPIC = struct {
 
         var register: RedirectionTableRegister = .read(ioapic, index);
 
-        register.interrupt_vector = interrupt_vector;
+        register.vector = vector;
         register.delivery_mode = delivery_mode;
         switch (destination) {
             .physical => |physical| {
@@ -247,7 +249,7 @@ const IOAPIC = struct {
     }
 
     const RedirectionTableRegister = packed struct(u64) {
-        interrupt_vector: x64.interrupts.Interrupt,
+        vector: x64.Interrupt,
         delivery_mode: DeliveryMode,
         destination_mode: DestinationMode,
         delivery_status: DeliveryStatus,

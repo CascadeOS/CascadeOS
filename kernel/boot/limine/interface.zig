@@ -19,7 +19,7 @@ pub fn kernelBaseAddress() ?boot.KernelBaseAddress {
     };
 }
 
-pub fn kernelExecutableFile() ?[]align(arch.mem.standard_page_size_alignment.toByteUnits()) const u8 {
+pub fn kernelExecutableFile() ?[]align(arch.PageTable.standard_page_size_alignment.toByteUnits()) const u8 {
     const resp = requests.executable_file.response orelse return &.{};
     return @alignCast(resp.executable_file.getContents());
 }
@@ -79,14 +79,16 @@ pub fn x2apicEnabled() bool {
     return resp.flags.x2apic_enabled;
 }
 
-pub fn bootstrapArchitectureProcessorId() u64 {
-    const resp = requests.smp.response orelse return 0;
+pub fn bootstrapArchitectureProcessorId() arch.Executor.Id {
+    const resp = requests.smp.response orelse @panic("no SMP response");
 
-    return switch (arch.current_arch) {
-        .arm => resp.bsp_mpidr,
-        .riscv => resp.bsp_hartid,
-        .x64 => resp.bsp_lapic_id,
-    };
+    return @enumFromInt(
+        switch (arch.current_arch) {
+            .arm => resp.bsp_mpidr,
+            .riscv => resp.bsp_hartid,
+            .x64 => resp.bsp_lapic_id,
+        },
+    );
 }
 
 pub fn cpuDescriptors() ?boot.CpuDescriptors {
@@ -155,14 +157,14 @@ pub const CpuDescriptorIterator = struct {
             return descriptor.smp_info.processor_id;
         }
 
-        pub fn architectureProcessorId(
-            descriptor: *const Descriptor,
-        ) u64 {
-            return switch (arch.current_arch) {
-                .arm => descriptor.smp_info.mpidr,
-                .riscv => descriptor.smp_info.hartid,
-                .x64 => descriptor.smp_info.lapic_id,
-            };
+        pub fn architectureProcessorId(descriptor: *const Descriptor) arch.Executor.Id {
+            return @enumFromInt(
+                switch (arch.current_arch) {
+                    .arm => descriptor.smp_info.mpidr,
+                    .riscv => descriptor.smp_info.hartid,
+                    .x64 => descriptor.smp_info.lapic_id,
+                },
+            );
         }
     };
 };
@@ -200,7 +202,7 @@ pub fn deviceTreeBlob() ?cascade.KernelVirtualAddress {
 }
 
 fn limineEntryPoint() callconv(.c) noreturn {
-    asm volatile (arch.scheduling.cfi_prevent_unwinding);
+    asm volatile (arch.cfi_prevent_unwinding);
 
     boot.bootloader_api = .limine;
 

@@ -19,7 +19,7 @@ process: *cascade.user.Process,
 
 access_user_memory: std.atomic.Value(bool) = .init(false),
 
-arch_specific: arch.user.PerThread,
+arch_specific: arch.Thread,
 
 pub inline fn from(task: *cascade.Task) *Thread {
     if (core.is_debug) std.debug.assert(task.type == .user);
@@ -48,7 +48,7 @@ pub fn start(thread: *Thread, entry_point: cascade.UserVirtualAddress) !noreturn
 
     log.debug("starting userspace thread: {f}", .{thread});
 
-    arch.user.enterUserspace(.{
+    arch.Thread.current.enterUserspace(.{
         .entry_point = entry_point,
         .stack_pointer = user_stack.toUser().after(),
     });
@@ -78,7 +78,7 @@ pub const internal = struct {
         };
 
         try cascade.Task.internal.init(&thread.task, options);
-        arch.user.initializeThread(thread);
+        thread.arch_specific.initialize();
 
         return thread;
     }
@@ -106,12 +106,12 @@ const globals = struct {
                     if (core.is_debug) thread.* = undefined;
                     thread.task.stack = try .createStack();
                     errdefer thread.task.stack.destroyStack();
-                    try arch.user.createThread(thread);
+                    try thread.arch_specific.create();
                 }
             }.constructor,
             .destructor = struct {
                 fn destructor(thread: *Thread) void {
-                    arch.user.destroyThread(thread);
+                    thread.arch_specific.destroy();
                     thread.task.stack.destroyStack();
                 }
             }.destructor,

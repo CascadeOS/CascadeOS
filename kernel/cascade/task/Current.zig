@@ -21,11 +21,11 @@ pub inline fn knownExecutor(current_task: Current) *cascade.Executor {
 }
 
 pub inline fn get() Current {
-    return .{ .task = arch.scheduling.getCurrentTask() };
+    return .{ .task = arch.Task.getCurrent() };
 }
 
 pub fn incrementInterruptDisable(current_task: Current) void {
-    arch.interrupts.disable();
+    arch.Executor.current.disableInterrupts();
 
     const previous = current_task.task.interrupt_disable_count.fetchAdd(1, .acq_rel);
     if (core.is_debug) std.debug.assert(previous < std.math.maxInt(u32));
@@ -34,14 +34,14 @@ pub fn incrementInterruptDisable(current_task: Current) void {
 }
 
 pub fn decrementInterruptDisable(current_task: Current) void {
-    if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
+    if (core.is_debug) std.debug.assert(!arch.Executor.current.interruptsEnabled());
 
     const previous = current_task.task.interrupt_disable_count.fetchSub(1, .acq_rel);
     if (core.is_debug) std.debug.assert(previous > 0);
 
     if (previous == 1) {
         current_task.setKnownExecutor();
-        arch.interrupts.enable();
+        arch.Executor.current.enableInterrupts();
     }
 }
 
@@ -81,9 +81,9 @@ pub fn maybePreempt(current_task: Current) void {
 }
 
 pub fn onInterruptEntry() StateBeforeInterrupt {
-    if (core.is_debug) std.debug.assert(!arch.interrupts.areEnabled());
+    if (core.is_debug) std.debug.assert(!arch.Executor.current.interruptsEnabled());
 
-    const task = arch.scheduling.getCurrentTask();
+    const task = arch.Task.getCurrent();
 
     const before_interrupt_interrupt_disable_count = task.interrupt_disable_count.fetchAdd(1, .monotonic);
     const before_interrupt_access_user_memory = switch (task.type) {
@@ -94,7 +94,7 @@ pub fn onInterruptEntry() StateBeforeInterrupt {
 
             if (before_interrupt_access_user_memory) {
                 @branchHint(.unlikely);
-                arch.mem.disableAccessToUserMemory();
+                arch.Executor.current.disableAccessToUserMemory();
             }
 
             break :blk before_interrupt_access_user_memory;
@@ -136,9 +136,9 @@ pub const StateBeforeInterrupt = struct {
                     @branchHint(.unlikely);
 
                     if (before_interrupt_access_user_memory) {
-                        arch.mem.disableAccessToUserMemory();
+                        arch.Executor.current.disableAccessToUserMemory();
                     } else {
-                        arch.mem.enableAccessToUserMemory();
+                        arch.Executor.current.enableAccessToUserMemory();
                     }
                 }
             },
@@ -152,9 +152,9 @@ pub const StateBeforeInterrupt = struct {
 ///
 /// Interrupts must already be disabled when this function is called.
 pub fn panicked() Current {
-    std.debug.assert(!arch.interrupts.areEnabled());
+    std.debug.assert(!arch.Executor.current.interruptsEnabled());
 
-    const task = arch.scheduling.getCurrentTask();
+    const task = arch.Task.getCurrent();
 
     _ = task.interrupt_disable_count.fetchAdd(1, .acq_rel);
     task.known_executor = task.state.running;

@@ -4,11 +4,19 @@
 const std = @import("std");
 
 const cascade = @import("cascade");
-const Tick = cascade.time.wallclock.Tick;
 const core = @import("core");
 
 const x64 = @import("x64.zig");
-const readTsc = x64.instructions.readTsc;
+
+inline fn readTsc() u64 {
+    var low: u32 = undefined;
+    var high: u32 = undefined;
+    asm volatile ("rdtsc"
+        : [_] "={eax}" (low),
+          [_] "={edx}" (high),
+    );
+    return (@as(u64, high) << 32) | @as(u64, low);
+}
 
 const globals = struct {
     /// The duration of a tick in femptoseconds.
@@ -76,12 +84,15 @@ pub const init = struct {
 
             .wallclock = .{
                 .readFn = struct {
-                    fn readFn() Tick {
+                    fn readFn() cascade.time.wallclock.Tick {
                         return @enumFromInt(readTsc());
                     }
                 }.readFn,
                 .elapsedFn = struct {
-                    fn elapsedFn(value1: Tick, value2: Tick) core.Duration {
+                    fn elapsedFn(
+                        value1: cascade.time.wallclock.Tick,
+                        value2: cascade.time.wallclock.Tick,
+                    ) core.Duration {
                         const number_of_ticks = @intFromEnum(value2) - @intFromEnum(value1);
                         return core.Duration.from((number_of_ticks * globals.tick_duration_fs) / cascade.time.fs_per_ns, .nanosecond);
                     }

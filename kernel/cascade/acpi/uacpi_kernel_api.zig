@@ -153,7 +153,7 @@ export fn uacpi_kernel_io_read8(
 ) uacpi.Status {
     log.verbose("uacpi_kernel_io_read8 called", .{});
 
-    const port = arch.io.Port.from(
+    const port = arch.Port.from(
         @intFromPtr(handle) + offset,
     ) catch return .invalid_argument;
 
@@ -171,7 +171,7 @@ export fn uacpi_kernel_io_read16(
 ) uacpi.Status {
     log.verbose("uacpi_kernel_io_read16 called", .{});
 
-    const port = arch.io.Port.from(
+    const port = arch.Port.from(
         @intFromPtr(handle) + offset,
     ) catch return .invalid_argument;
 
@@ -189,7 +189,7 @@ export fn uacpi_kernel_io_read32(
 ) uacpi.Status {
     log.verbose("uacpi_kernel_io_read32 called", .{});
 
-    const port = arch.io.Port.from(
+    const port = arch.Port.from(
         @intFromPtr(handle) + offset,
     ) catch return .invalid_argument;
 
@@ -207,7 +207,7 @@ export fn uacpi_kernel_io_write8(
 ) uacpi.Status {
     log.verbose("uacpi_kernel_io_write8 called", .{});
 
-    const port = arch.io.Port.from(
+    const port = arch.Port.from(
         @intFromPtr(handle) + offset,
     ) catch return .invalid_argument;
 
@@ -225,7 +225,7 @@ export fn uacpi_kernel_io_write16(
 ) uacpi.Status {
     log.verbose("uacpi_kernel_io_write16 called", .{});
 
-    const port = arch.io.Port.from(
+    const port = arch.Port.from(
         @intFromPtr(handle) + offset,
     ) catch return .invalid_argument;
 
@@ -243,7 +243,7 @@ export fn uacpi_kernel_io_write32(
 ) uacpi.Status {
     log.verbose("uacpi_kernel_io_write32 called", .{});
 
-    const port = arch.io.Port.from(
+    const port = arch.Port.from(
         @intFromPtr(handle) + offset,
     ) catch return .invalid_argument;
 
@@ -376,7 +376,7 @@ export fn uacpi_kernel_stall(usec: u8) void {
     const duration: core.Duration = .from(usec, .microsecond);
 
     while (cascade.time.wallclock.elapsed(start, cascade.time.wallclock.read()).lessThan(duration)) {
-        arch.spinLoopHint();
+        arch.Executor.current.spinLoopHint();
     }
 }
 
@@ -532,7 +532,7 @@ export fn uacpi_kernel_install_interrupt_handler(
 ) uacpi.Status {
     const HandlerWrapper = struct {
         fn HandlerWrapper(
-            _: arch.interrupts.InterruptFrame,
+            _: arch.Interrupt.Frame,
             _: cascade.Task.Current.StateBeforeInterrupt,
             inner_handler: uacpi.RawInterruptHandler,
             inner_ctx: *anyopaque,
@@ -541,24 +541,26 @@ export fn uacpi_kernel_install_interrupt_handler(
         }
     }.HandlerWrapper;
 
+    const external_interrupt = arch.Interrupt.External.from(irq) catch return .invalid_argument;
+
     log.verbose("uacpi_kernel_install_interrupt_handler called", .{});
 
-    const interrupt = arch.interrupts.Interrupt.allocate(.{
-        .eoi = arch.interrupts.eoiType(irq) orelse return .not_found,
+    const interrupt = arch.Interrupt.allocate(.{
+        .eoi = external_interrupt.eoiType() orelse return .not_found,
         .call = .prepare(HandlerWrapper, .{ handler, ctx }),
     }) catch |err| {
         log.err("failed to allocate interrupt: {}", .{err});
         return .internal_error;
     };
 
-    interrupt.route(irq) catch |err| {
+    external_interrupt.route(interrupt) catch |err| {
         interrupt.deallocate();
 
         log.err("failed to route interrupt: {}", .{err});
         return .internal_error;
     };
 
-    out_irq_handle.* = interrupt.toUsize();
+    out_irq_handle.* = interrupt.to();
 
     return .ok;
 }
@@ -572,7 +574,7 @@ export fn uacpi_kernel_uninstall_interrupt_handler(
 ) uacpi.Status {
     log.verbose("uacpi_kernel_uninstall_interrupt_handler called", .{});
 
-    const interrupt: arch.interrupts.Interrupt = .fromUsize(irq_handle);
+    const interrupt = arch.Interrupt.from(irq_handle) catch return .invalid_argument;
     interrupt.deallocate();
 
     return .ok;

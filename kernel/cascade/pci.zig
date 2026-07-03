@@ -79,7 +79,7 @@ pub const Function = extern struct {
             std.debug.assert(enhanced_configuration_space_size.greaterThanOrEqual(size_offset.add(.of(T))));
         }
 
-        return arch.io.readPci(
+        return arch.pci.read(
             T,
             cascade.KernelVirtualAddress.fromPtr(function).moveForward(size_offset),
         );
@@ -93,7 +93,7 @@ pub const Function = extern struct {
             std.debug.assert(enhanced_configuration_space_size.greaterThanOrEqual(size_offset.add(.of(T))));
         }
 
-        return arch.io.writePci(
+        return arch.pci.write(
             T,
             cascade.KernelVirtualAddress.fromPtr(function).moveForward(size_offset),
             value,

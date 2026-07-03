@@ -30,7 +30,7 @@ pub const Tss = extern struct {
     /// Sets the stack for the given stack selector.
     pub fn setInterruptStack(
         tss: *Tss,
-        stack_selector: x64.interrupts.InterruptStackSelector,
+        stack_selector: x64.Interrupt.StackSelector,
         stack_pointer: cascade.KernelVirtualAddress,
     ) void {
         tss.interrupt_stack_table[@intFromEnum(stack_selector)] = stack_pointer;

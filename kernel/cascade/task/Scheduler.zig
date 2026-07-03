@@ -288,11 +288,11 @@ pub const Handle = struct {
 
         switch (task_resume) {
             .no => {
-                arch.scheduling.callNoSave(&scheduler_task.stack, type_erased_call);
+                arch.Task.callNoSave(&scheduler_task.stack, type_erased_call);
                 comptime unreachable;
             },
             .yes => {
-                arch.scheduling.call(old_task, &scheduler_task.stack, type_erased_call);
+                old_task.arch_specific.call(&scheduler_task.stack, type_erased_call);
                 if (core.is_debug) std.debug.assert(old_task.known_executor == old_task.state.running);
                 // returning to the old task
             },
@@ -323,7 +323,7 @@ pub const Handle = struct {
         // which is the value is is expected to have upon entry to idle
         scheduler_task.interrupt_disable_count.store(1, .release);
 
-        arch.scheduling.switchTaskNoSave(new_task);
+        new_task.arch_specific.performSwitchNoSave();
         comptime unreachable;
     }
 
@@ -343,7 +343,7 @@ pub const Handle = struct {
         old_task.state = .ready;
         scheduler_handle.scheduler.queueTask(old_task);
 
-        arch.scheduling.switchTask(old_task, new_task);
+        old_task.arch_specific.performSwitch(&new_task.arch_specific);
 
         // returning to the old task
         if (core.is_debug) std.debug.assert(old_task.known_executor == old_task.state.running);
@@ -379,7 +379,7 @@ pub const Handle = struct {
 
                 scheduler_task.state = .ready;
 
-                arch.scheduling.switchTaskNoSave(inner_new_task);
+                inner_new_task.arch_specific.performSwitchNoSave();
                 comptime unreachable;
             }
         };
@@ -406,11 +406,11 @@ pub const Handle = struct {
 
         switch (task_resume) {
             .no => {
-                arch.scheduling.callNoSave(&scheduler_task.stack, type_erased_call);
+                arch.Task.callNoSave(&scheduler_task.stack, type_erased_call);
                 comptime unreachable;
             },
             .yes => {
-                arch.scheduling.call(old_task, &scheduler_task.stack, type_erased_call);
+                old_task.arch_specific.call(&scheduler_task.stack, type_erased_call);
                 if (core.is_debug) std.debug.assert(old_task.known_executor == old_task.state.running);
                 // returning to the old task
             },
@@ -433,7 +433,7 @@ pub const Handle = struct {
 
                 if (new_thread.access_user_memory.load(.monotonic)) {
                     @branchHint(.unlikely); // we expect this to be false most of the time
-                    arch.mem.enableAccessToUserMemory();
+                    arch.Executor.current.enableAccessToUserMemory();
                 }
             },
             .user_to_kernel => {
@@ -443,7 +443,7 @@ pub const Handle = struct {
 
                 if (old_thread.access_user_memory.load(.monotonic)) {
                     @branchHint(.unlikely); // we expect this to be false most of the time
-                    arch.mem.disableAccessToUserMemory();
+                    arch.Executor.current.disableAccessToUserMemory();
                 }
             },
             .user_to_user => {
@@ -461,15 +461,15 @@ pub const Handle = struct {
                     @branchHint(.unlikely); // we expect both to be false most of the time
 
                     if (new_thread_access_user_memory) {
-                        arch.mem.disableAccessToUserMemory();
+                        arch.Executor.current.disableAccessToUserMemory();
                     } else {
-                        arch.mem.enableAccessToUserMemory();
+                        arch.Executor.current.enableAccessToUserMemory();
                     }
                 }
             },
         }
 
-        arch.scheduling.beforeSwitchTask(transition);
+        arch.Task.prepareSwitch(transition);
     }
 
     fn idle() callconv(.c) noreturn {
@@ -482,7 +482,7 @@ pub const Handle = struct {
             std.debug.assert(scheduler_task.interrupt_disable_count.load(.acquire) == 1);
             std.debug.assert(scheduler_task.migration_disable_count.load(.acquire) == 1);
             std.debug.assert(scheduler_task.spinlocks_held == 1);
-            std.debug.assert(!arch.interrupts.areEnabled());
+            std.debug.assert(!arch.Executor.current.interruptsEnabled());
         }
 
         current_task.knownExecutor().scheduler.unlock();
@@ -495,7 +495,7 @@ pub const Handle = struct {
                 scheduler_handle.yield();
             }
 
-            arch.halt();
+            arch.Executor.current.halt();
         }
     }
 };
