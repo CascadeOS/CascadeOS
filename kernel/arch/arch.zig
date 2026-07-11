@@ -372,8 +372,15 @@ pub const PageTable = struct {
     arch_specific: *current_decls.PageTable,
 
     /// The standard page size for the architecture.
+    ///
+    /// **Arch Requirements**:
+    ///  - Must be equal to the value of `user_cascade.page_size`.
     pub const standard_page_size: core.Size = current_decls.standard_page_size;
     pub const standard_page_size_alignment: std.mem.Alignment = standard_page_size.toAlignment();
+
+    comptime {
+        std.debug.assert(standard_page_size.equal(.from(user_cascade.page_size, .byte)));
+    }
 
     /// The largest page size supported by the architecture.
     pub const largest_page_size: core.Size = current_decls.largest_page_size;
@@ -1470,6 +1477,9 @@ pub const Decls = struct {
     PageTable: type,
 
     /// The standard page size for the architecture.
+    ///
+    /// **Arch Requirements**:
+    ///  - Must be equal to the value of `user_cascade.page_size`.
     standard_page_size: core.Size,
 
     /// The largest page size supported by the architecture.
