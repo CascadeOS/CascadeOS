@@ -241,7 +241,12 @@ const requests = struct {
     var memmap: limine.Memmap = .{};
     var hhdm: limine.HHDM = .{};
     var rsdp: limine.RSDP = .{};
-    var smp: limine.MP = .{ .flags = .{ .x2apic = true } };
+    var smp: limine.MP = .{
+        .flags = switch (arch.current_arch) {
+            .arm, .riscv => .{},
+            .x64 => .{ .x2apic = true },
+        },
+    };
     var framebuffer: limine.Framebuffer = .{};
     var device_tree_blob: limine.DeviceTreeBlob = .{};
     var executable_file: limine.ExecutableFile = .{};

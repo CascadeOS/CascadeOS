@@ -2,9 +2,9 @@
 // SPDX-FileCopyrightText: CascadeOS Contributors
 // SPDX-FileCopyrightText: 2022-2026 Mintsuki and contributors (https://github.com/Limine-Bootloader/limine-protocol/blob/trunk/LICENSE)
 
-//! This module contains the definitions of the Limine protocol as of 5b9d13e557590d8eab93fa7449bdd1d7ed72ba8c.
+//! This module contains the definitions of the Limine protocol as of 630686a3dd3ce40f9e510a7dd9fea6b4c60d952e.
 //!
-//! [PROTOCOL DOC](https://github.com/Limine-Bootloader/limine-protocol/blob/5b9d13e557590d8eab93fa7449bdd1d7ed72ba8c/PROTOCOL.md)
+//! [PROTOCOL DOC](https://github.com/Limine-Bootloader/limine-protocol/blob/630686a3dd3ce40f9e510a7dd9fea6b4c60d952e/PROTOCOL.md)
 
 const std = @import("std");
 
@@ -477,8 +477,11 @@ pub const PagingMode = extern struct {
 
 /// MP (Multiprocessor) Feature
 ///
-/// Notes: The presence of this request will prompt the bootloader to bootstrap the secondary processors.
+/// Note: The presence of this request will prompt the bootloader to bootstrap the secondary processors.
 /// This will not be done if this request is not present.
+///
+/// Note: If this request is supported, even on single-processor system, a response will be provided, containing only the bootstrap
+/// processor's entry.
 pub const MP = extern struct {
     id: [4]u64 = LIMINE_COMMON_MAGIC ++ [_]u64{ 0x95a67b819a1b857e, 0xa0b61b723b6a73e0 },
     revision: u64 = 0,
@@ -487,11 +490,16 @@ pub const MP = extern struct {
 
     flags: Flags = .{},
 
-    pub const Flags = packed struct(u64) {
-        /// Enable x2APIC, if possible. (x86-64 only)
-        x2apic: bool = false,
-
-        _: u63 = 0,
+    pub const Flags = switch (arch) {
+        .x86_64 => packed struct(u64) {
+            /// Enable x2APIC, if possible.
+            ///
+            /// Note: If firmware has already enabled x2APIC and this is `false`, the bootloader will try to disable x2APIC before handoff.
+            /// If x2APIC cannot be disabled, the bootloader will fail to boot the executable.
+            x2apic: bool = false,
+            _: u63 = 0,
+        },
+        .aarch64, .loongarch64, .riscv64 => packed struct(u64) { _: u64 = 0 },
     };
 
     pub const Response = switch (arch) {
@@ -553,7 +561,7 @@ pub const MP = extern struct {
 
             _reserved2: u64,
 
-            /// An atomic write to this field causes the parked CPU to jump to the written address, on a 64KiB (or Stack Size Request size)
+            /// An atomic write using release semantics or stronger to this field causes the parked CPU to jump to the written address, on a 64KiB (or Stack Size Request size)
             /// stack.
             ///
             /// A pointer to the `MPInfo` structure of the CPU is passed in X0.
@@ -639,7 +647,7 @@ pub const MP = extern struct {
 
             _reserved: u64,
 
-            /// An atomic write to this field causes the parked CPU to jump to the written address, on a 64KiB (or Stack Size Request size)
+            /// An atomic write using release semantics or stronger to this field causes the parked CPU to jump to the written address, on a 64KiB (or Stack Size Request size)
             /// stack.
             ///
             /// A pointer to the `MPInfo` structure of the CPU is passed in $a0.
@@ -725,7 +733,7 @@ pub const MP = extern struct {
 
             _reserved: u64,
 
-            /// An atomic write to this field causes the parked CPU to jump to the written address, on a 64KiB (or Stack Size Request size)
+            /// An atomic write using release semantics or stronger to this field causes the parked CPU to jump to the written address, on a 64KiB (or Stack Size Request size)
             /// stack.
             ///
             /// A pointer to the `MPInfo` structure of the CPU is passed in x10(a0).
@@ -773,7 +781,7 @@ pub const MP = extern struct {
         _cpus: [*]*MPInfo,
 
         pub const ResponseFlags = packed struct(u32) {
-            /// x2APIC has been enabled
+            /// x2APIC has been enabled.
             x2apic_enabled: bool = false,
             _: u31 = 0,
         };
@@ -819,8 +827,8 @@ pub const MP = extern struct {
 
             _reserved: u64,
 
-            /// An atomic write to this field causes the parked CPU to jump to the written address, on a 64KiB (or Stack Size Request size)
-            /// stack.
+            /// An atomic write using release semantics or stronger to this field causes the parked CPU to jump to the written address, on
+            /// a 64KiB (or Stack Size Request size) stack.
             ///
             /// A pointer to the `MPInfo` structure of the CPU is passed in RDI.
             ///
@@ -1007,6 +1015,8 @@ pub const EntryPoint = extern struct {
     response: ?*const Response = null,
 
     /// The requested entry point.
+    ///
+    /// This must be a non-NULL function pointer within the loaded executable image.
     entry: *const fn () callconv(.c) noreturn,
 
     pub const Response = extern struct {
@@ -1120,17 +1130,15 @@ pub const Module = extern struct {
         path: [*:0]const u8,
 
         /// String associated with the given module.
-        _string: ?[*:0]const u8,
+        _string: [*:0]const u8,
 
         /// Flags changing module loading behaviour
         flags: Flags,
 
         /// String associated with the given module.
         pub fn string(internal_module: *const InternalModule) ?[:0]const u8 {
-            return if (internal_module._string) |s|
-                std.mem.sliceTo(s, 0)
-            else
-                null;
+            const str = std.mem.sliceTo(internal_module._string, 0);
+            return if (str.len == 0) null else str;
         }
 
         pub const Flags = packed struct(u64) {
@@ -1243,7 +1251,7 @@ pub const TPMEventLog = extern struct {
         /// Size in bytes of the raw event data at `address`.
         size: core.Size,
 
-        /// Address (HHDM, in bootloader reclaimable memory) of the captured TCG event log.
+        /// Address (HHDM, in bootloader reclaimable memory) of the captured TCG event log or `.zero` if `size` is `.zero`.
         ///
         /// The buffer holds the raw event stream as defined by the indicated `format`, with no additional framing.
         address: cascade.KernelVirtualAddress,
@@ -1539,9 +1547,11 @@ pub const FlantermFBInitParams = extern struct {
             /// Default bright foreground colour.
             default_fg_bright: u32,
 
-            /// Pointer to font bitmap data, or `null` if the default built-in font is used.
+            /// Pointer to VGA-style font bitmap data with 256 glyphs.
             ///
-            /// The font is a VGA-style bitmap font with 256 glyphs; its size in bytes is `font_width * font_height * 256 / 8`.
+            /// This points to the actual font data, including the built-in default font if no custom font is configured.
+            ///
+            /// Its size in bytes is `font_width * font_height * 256 / 8`.
             font: ?*const anyopaque,
 
             /// Font character width in pixels (always 8 for VGA fonts).
@@ -1587,18 +1597,18 @@ pub const File = extern struct {
     /// themselves exclusively.
     size: core.Size,
 
-    /// The path of the file within the volume, with a leading slash
+    /// The path of the file within the volume, with a leading slash,
     _path: [*:0]const u8,
 
-    /// A string associated with the file
-    _string: ?[*:0]const u8,
+    /// A string associated with the file,
+    _string: [*:0]const u8,
 
     media_type: MediaType,
 
     unused: u32,
 
-    /// If non-0, this is the IP of the TFTP server the file was loaded from.
-    tftp_ip: u32,
+    /// If not all zero bytes, this is the IPv4 address of the TFTP server the file was loaded from, in dotted-decimal octet order.
+    tftp_ip: [4]u8,
     /// Likewise, but port.
     tftp_port: u32,
 
@@ -1610,13 +1620,13 @@ pub const File = extern struct {
     /// If non-0, this is the ID of the disk the file was loaded from as reported in its MBR.
     mbr_disk_id: u32,
 
-    /// If non-0, this is the UUID of the disk the file was loaded from as reported in its GPT.
+    /// If not all zero bytes, this is the UUID of the disk the file was loaded from as reported in its GPT.
     gpt_disk_uuid: UUID,
 
-    /// If non-0, this is the UUID of the partition the file was loaded from as reported in the GPT.
+    /// If not all zero bytes, this is the UUID of the partition the file was loaded from as reported in the GPT.
     gpt_part_uuid: UUID,
 
-    /// If non-0, this is the UUID of the filesystem of the partition the file was loaded from.
+    /// If not all zero bytes, this is the UUID of the filesystem of the partition the file was loaded from.
     part_uuid: UUID,
 
     /// The path of the file within the volume, with a leading slash
@@ -1626,10 +1636,7 @@ pub const File = extern struct {
 
     /// A string associated with the file
     pub fn string(file: *const File) ?[:0]const u8 {
-        const str = std.mem.sliceTo(
-            file._string orelse return null,
-            0,
-        );
+        const str = std.mem.sliceTo(file._string, 0);
         return if (str.len == 0) null else str;
     }
 
