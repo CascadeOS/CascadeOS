@@ -143,7 +143,7 @@ pub fn wakeFromBlocked(task_to_wake: *cascade.Task) void {
 
 pub const CreateKernelTaskOptions = struct {
     name: Name,
-    entry: core.TypeErasedCall,
+    entry: *const core.TypeErasedCall,
 };
 
 /// Create a kernel task.
@@ -241,7 +241,7 @@ const TaskCleanup = struct {
         task_cleanup.* = .{
             .task = try Task.createKernelTask(.{
                 .name = try .fromSlice("task cleanup"),
-                .entry = .prepare(TaskCleanup.execute, .{task_cleanup}),
+                .entry = &core.TypeErasedCall.prepare(TaskCleanup.execute, .{task_cleanup}),
             }),
             .parker = undefined, // set below
             .incoming = .{},
@@ -361,7 +361,7 @@ pub const internal = struct {
     pub const InitOptions = struct {
         name: Name,
         type: cascade.Context.Type,
-        entry: core.TypeErasedCall,
+        entry: *const core.TypeErasedCall,
     };
 
     pub fn init(task: *Task, options: InitOptions) !void {
@@ -389,11 +389,11 @@ pub const internal = struct {
     // Called directly by assembly code in `arch.scheduling.prepareTaskForScheduling`, so the signature must match.
     pub fn taskEntry(
         target_function: *const core.TypeErasedCall.TypeErasedFn,
-        arg0: usize,
-        arg1: usize,
-        arg2: usize,
-        arg3: usize,
-        arg4: usize,
+        arg0: core.TypeErasedCall.Arg,
+        arg1: core.TypeErasedCall.Arg,
+        arg2: core.TypeErasedCall.Arg,
+        arg3: core.TypeErasedCall.Arg,
+        arg4: core.TypeErasedCall.Arg,
     ) callconv(.c) noreturn {
         asm volatile (arch.cfi_prevent_unwinding);
 
@@ -484,7 +484,7 @@ pub const init = struct {
         const task = try createKernelTask(
             .{
                 .name = try .initPrint("init {}", .{@intFromEnum(executor.id)}),
-                .entry = .prepare(dummyInitEntry, .{}),
+                .entry = &core.TypeErasedCall.prepare(dummyInitEntry, .{}),
             },
         );
         errdefer comptime unreachable;

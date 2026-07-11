@@ -6,6 +6,7 @@ const std = @import("std");
 const arch = @import("arch");
 const boot = @import("boot");
 const cascade = @import("cascade");
+const core = @import("core");
 
 pub const Output = @import("output/Output.zig");
 
@@ -123,7 +124,7 @@ fn initStage2(executor: *cascade.Executor) !noreturn {
 
     try arch.Task.callNoSave(
         &executor._current_task.stack,
-        .prepare(
+        &core.TypeErasedCall.prepare(
             initStage3,
             .{},
         ),
@@ -150,7 +151,7 @@ fn initStage3() !noreturn {
             const init_stage4_task: *cascade.Task = try .createKernelTask(
                 .{
                     .name = try .fromSlice("init stage 4"),
-                    .entry = .prepare(initStage4, .{}),
+                    .entry = &core.TypeErasedCall.prepare(initStage4, .{}),
                 },
             );
 
@@ -187,7 +188,7 @@ fn initStage4() !void {
     defer hello_world_process.decrementReferenceCount();
 
     const hello_world_main_thread = try hello_world_process.createThread(
-        .{ .entry = .prepare(loadHelloWorld, .{}) },
+        .{ .entry = &core.TypeErasedCall.prepare(loadHelloWorld, .{}) },
     );
 
     const scheduler_handle: cascade.Task.Scheduler.Handle = .get();

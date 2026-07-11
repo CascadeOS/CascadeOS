@@ -67,7 +67,7 @@ pub fn create(options: CreateOptions) !*Process {
 
 pub const CreateThreadOptions = struct {
     name: ?cascade.Task.Name = null,
-    entry: core.TypeErasedCall,
+    entry: *const core.TypeErasedCall,
 };
 
 /// Creates a thread in the given process.
@@ -160,7 +160,7 @@ const ProcessCleanup = struct {
         process_cleanup.* = .{
             .task = try cascade.Task.createKernelTask(.{
                 .name = try .fromSlice("process cleanup"),
-                .entry = .prepare(ProcessCleanup.execute, .{process_cleanup}),
+                .entry = &core.TypeErasedCall.prepare(ProcessCleanup.execute, .{process_cleanup}),
             }),
             .parker = undefined, // set below
             .incoming = .{},

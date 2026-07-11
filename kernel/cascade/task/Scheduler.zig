@@ -288,11 +288,11 @@ pub const Handle = struct {
 
         switch (task_resume) {
             .no => {
-                arch.Task.callNoSave(&scheduler_task.stack, type_erased_call);
+                arch.Task.callNoSave(&scheduler_task.stack, &type_erased_call);
                 comptime unreachable;
             },
             .yes => {
-                old_task.arch_specific.call(&scheduler_task.stack, type_erased_call);
+                old_task.arch_specific.call(&scheduler_task.stack, &type_erased_call);
                 if (core.is_debug) std.debug.assert(old_task.known_executor == old_task.state.running);
                 // returning to the old task
             },
@@ -406,11 +406,11 @@ pub const Handle = struct {
 
         switch (task_resume) {
             .no => {
-                arch.Task.callNoSave(&scheduler_task.stack, type_erased_call);
+                arch.Task.callNoSave(&scheduler_task.stack, &type_erased_call);
                 comptime unreachable;
             },
             .yes => {
-                old_task.arch_specific.call(&scheduler_task.stack, type_erased_call);
+                old_task.arch_specific.call(&scheduler_task.stack, &type_erased_call);
                 if (core.is_debug) std.debug.assert(old_task.known_executor == old_task.state.running);
                 // returning to the old task
             },

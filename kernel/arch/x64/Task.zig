@@ -55,7 +55,7 @@ pub inline fn setCurrent(task: *cascade.Task) void {
 /// Prepare the task for being scheduled.
 ///
 /// Ensures that when the task is scheduled it will unlock the scheduler lock then call the `type_erased_call`.
-pub fn prepareForScheduling(task: *cascade.Task, type_erased_call: core.TypeErasedCall) void {
+pub fn prepareForScheduling(task: *cascade.Task, type_erased_call: *const core.TypeErasedCall) void {
     const impl = struct {
         fn taskEntryTrampoline() callconv(.naked) void {
             asm volatile (
@@ -87,11 +87,11 @@ pub fn prepareForScheduling(task: *cascade.Task, type_erased_call: core.TypeEras
     task.stack.push(@intFromPtr(&cascade.Task.internal.taskEntry)) catch unreachable;
 
     // task args
-    task.stack.push(type_erased_call.args[4]) catch unreachable;
-    task.stack.push(type_erased_call.args[3]) catch unreachable;
-    task.stack.push(type_erased_call.args[2]) catch unreachable;
-    task.stack.push(type_erased_call.args[1]) catch unreachable;
-    task.stack.push(type_erased_call.args[0]) catch unreachable;
+    task.stack.push(type_erased_call.args[4].unsigned) catch unreachable;
+    task.stack.push(type_erased_call.args[3].unsigned) catch unreachable;
+    task.stack.push(type_erased_call.args[2].unsigned) catch unreachable;
+    task.stack.push(type_erased_call.args[1].unsigned) catch unreachable;
+    task.stack.push(type_erased_call.args[0].unsigned) catch unreachable;
 
     // task function
     task.stack.push(@intFromPtr(type_erased_call.typeErased)) catch unreachable;
@@ -215,7 +215,7 @@ pub inline fn performSwitchNoSave(new_task: *cascade.Task) noreturn {
 pub inline fn call(
     old_task: *cascade.Task,
     new_stack: *cascade.Task.Stack,
-    type_erased_call: core.TypeErasedCall,
+    type_erased_call: *const core.TypeErasedCall,
 ) void {
     asm volatile (
         \\.cfi_sections .debug_frame
@@ -273,7 +273,7 @@ pub inline fn call(
 ///  - `type_erased_call` must have a return type of `noreturn`.
 pub inline fn callNoSave(
     new_stack: *cascade.Task.Stack,
-    type_erased_call: core.TypeErasedCall,
+    type_erased_call: *const core.TypeErasedCall,
 ) noreturn {
     // no clobbers are listed as the calling context is abandoned
     asm volatile (

@@ -10,7 +10,6 @@ const core = @import("core");
 const user_cascade = @import("user_cascade");
 
 pub const current_arch = @import("cascade_architecture").arch;
-pub const Arch = @TypeOf(current_arch);
 
 /// The range of the address space that is considered kernel memory.
 ///
@@ -740,7 +739,7 @@ pub const Task = struct {
     ///  - Can only be called once.
     pub fn prepareForScheduling(
         task: *Task,
-        type_erased_call: core.TypeErasedCall,
+        type_erased_call: *const core.TypeErasedCall,
     ) callconv(core.inline_in_non_debug) void {
         return getFunction(
             current_functions.task,
@@ -804,10 +803,8 @@ pub const Task = struct {
     pub fn call(
         old_task: *Task,
         new_stack: *cascade.Task.Stack,
-        type_erased_call: core.TypeErasedCall,
+        type_erased_call: *const core.TypeErasedCall,
     ) callconv(core.inline_in_non_debug) void {
-        if (core.is_debug) std.debug.assert(type_erased_call.return_type.isNoReturn());
-
         getFunction(current_functions.task, "call")(
             @alignCast(@fieldParentPtr("arch_specific", old_task)),
             new_stack,
@@ -821,10 +818,8 @@ pub const Task = struct {
     ///  - `type_erased_call` must have a return type of `noreturn`.
     pub fn callNoSave(
         new_stack: *cascade.Task.Stack,
-        type_erased_call: core.TypeErasedCall,
+        type_erased_call: *const core.TypeErasedCall,
     ) callconv(core.inline_in_non_debug) noreturn {
-        if (core.is_debug) std.debug.assert(type_erased_call.return_type.isNoReturn());
-
         getFunction(current_functions.task, "callNoSave")(
             new_stack,
             type_erased_call,
@@ -1332,7 +1327,7 @@ pub const Functions = struct {
         /// ***Caller Requirements***:
         ///  - Must be called before the task is scheduled.
         ///  - Can only be called once.
-        prepareForScheduling: ?fn (task: *cascade.Task, type_erased_call: core.TypeErasedCall) void = null,
+        prepareForScheduling: ?fn (task: *cascade.Task, type_erased_call: *const core.TypeErasedCall) void = null,
 
         /// Called before `transition.old_task` is switched to `transition.new_task`.
         ///
@@ -1365,14 +1360,14 @@ pub const Functions = struct {
         call: ?fn (
             old_task: *cascade.Task,
             new_stack: *cascade.Task.Stack,
-            type_erased_call: core.TypeErasedCall,
+            type_erased_call: *const core.TypeErasedCall,
         ) callconv(.@"inline") void = null,
 
         /// Calls `type_erased_call` on `new_stack`.
         ///
         /// ***Caller Requirements***:
         ///  - `type_erased_call` must have a return type of `noreturn`.
-        callNoSave: ?fn (new_stack: *cascade.Task.Stack, type_erased_call: core.TypeErasedCall) callconv(.@"inline") noreturn = null,
+        callNoSave: ?fn (new_stack: *cascade.Task.Stack, type_erased_call: *const core.TypeErasedCall) callconv(.@"inline") noreturn = null,
     },
 
     pci: struct {
