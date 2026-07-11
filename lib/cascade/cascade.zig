@@ -1,7 +1,10 @@
 // SPDX-License-Identifier: 0BSD
 // SPDX-FileCopyrightText: CascadeOS Contributors
 
+const builtin = @import("builtin");
+
 pub const exportEntry = @import("entry.zig").exportEntry;
+pub const std_override = @import("std_override.zig");
 pub const Syscall = @import("Syscall.zig").Syscall;
 pub const Thread = @import("Thread.zig").Thread;
 
@@ -20,3 +23,10 @@ pub const Thread = @import("Thread.zig").Thread;
 pub fn debugPrint(str: []const u8) void {
     _ = Syscall.call2(.debug_print, str.len, @intFromPtr(str.ptr));
 }
+
+pub const page_size = switch (builtin.cpu.arch) {
+    .aarch64 => 4096,
+    .riscv64 => 4096,
+    .x86_64 => 4096,
+    else => |t| @compileError("unsupported architecture " ++ @tagName(t)),
+};

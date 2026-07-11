@@ -103,7 +103,7 @@ fn resolveApp(
 
     for (all_architectures) |architecture| {
         // host
-        {
+        if (false) { // TODO: disabled as root file declarations required for cascade cannot be conditionally defined
             const host_target: CascadeTarget = .{
                 .architecture = architecture,
                 .context = .non_cascade,
