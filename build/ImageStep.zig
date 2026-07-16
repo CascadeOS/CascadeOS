@@ -32,7 +32,10 @@ pub fn registerImageSteps(
     all_architectures: []const CascadeTarget.Architecture,
 ) !Collection {
     const image_builder_tool = tools.get("image_builder") orelse unreachable;
-    const image_builder_compile_step = image_builder_tool.release_safe_exe;
+
+    // we use debug as image builder takes a significant time to compile in release safe and any touches of core or fs
+    // result in it being rebuilt
+    const image_builder_compile_step = image_builder_tool.debug_exe;
 
     const limine_dep = b.dependency("limine", .{});
 
@@ -63,6 +66,7 @@ pub fn registerImageSteps(
         const image = if (architecture == .x64) image: {
             const limine_install_tool = tools.get("limine_install") orelse unreachable;
 
+            // we use release safe as this only needs to be recompiled when updating limine
             const install_limine = b.addRunArtifact(limine_install_tool.release_safe_exe);
 
             install_limine.addArgs(&.{ "-p", "1" }); // 1-based index of bios-boot partition

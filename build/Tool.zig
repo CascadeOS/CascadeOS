@@ -22,6 +22,11 @@ normal_exe: *Step.Compile,
 /// If the user provided `OptimizeMode` is `.ReleaseSafe` then `release_safe_exe == normal_exe`.
 release_safe_exe: *Step.Compile,
 
+/// The exe using `OptimizeMode.Debug`.
+///
+/// If the user provided `OptimizeMode` is `.Debug` then `debug_exe == normal_exe`.
+debug_exe: *Step.Compile,
+
 test_exe: *Step.Compile,
 
 /// Installs the artifact produced by `normal_exe`
@@ -127,6 +132,29 @@ fn resolveTool(
         }
 
         break :release_safe_exe release_safe_exe;
+    };
+
+    const debug_exe = if (optimize_mode == .Debug)
+        normal_exe
+    else debug_exe: {
+        const debug_module = createModule(
+            b,
+            tool_description,
+            lazy_path,
+            .Debug,
+            dependencies,
+        );
+
+        const debug_exe = b.addExecutable(.{
+            .name = tool_description.name,
+            .root_module = debug_module,
+        });
+
+        if (tool_description.force_llvm) {
+            debug_exe.use_llvm = true;
+        }
+
+        break :debug_exe debug_exe;
     };
 
     const exe_install_step = b.addInstallArtifact(
@@ -240,6 +268,7 @@ fn resolveTool(
         .name = tool_description.name,
         .normal_exe = normal_exe,
         .release_safe_exe = release_safe_exe,
+        .debug_exe = debug_exe,
         .test_exe = test_exe,
         .exe_install_step = &exe_install_step.step,
     };
