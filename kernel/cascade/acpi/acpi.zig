@@ -18,8 +18,8 @@ pub fn rsdpTable() *const tables.RSDP {
 
 pub fn tryShutdown() !void {
     if (!globals.acpi_initialized) return;
-    try uacpi.prepareForSleep(.S5);
-    try uacpi.sleep(.S5);
+    try uacpi.simpleSleep(.S5);
+    unreachable;
 }
 
 const globals = struct {

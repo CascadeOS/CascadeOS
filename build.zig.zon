@@ -41,8 +41,8 @@
         },
 
         .uacpi = .{
-            .url = "git+https://github.com/uACPI/uACPI.git?ref=4.0.0#e05715b2e6a3ae913aecdb86f4fd2dba30304e45",
-            .hash = "N-V-__8AACf_EwAqU0c833d6mIfScf7rsW0lDps-JYnPWiqY",
+            .url = "git+https://github.com/uACPI/uACPI.git?ref=6.0.0#9c9b26d6291a1cdd9014cc5bb6b03e596697cbfd",
+            .hash = "N-V-__8AANNkKQDrI-ou4QFKjWf0VdX-4NB49Xq1KxtJXfkW",
         },
     },
 

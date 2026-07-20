@@ -33,7 +33,7 @@ pub fn initStage1() !noreturn {
 
     Output.registerOutputs(.early);
 
-    // no that we have basic output we can log the early memory layout and ACPI tables
+    // now that we have basic output we can log the early memory layout and ACPI tables
     early_memory_layout.log();
     try acpi_tables.log();
 
