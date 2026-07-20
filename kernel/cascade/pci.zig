@@ -144,8 +144,6 @@ pub const init = struct {
         errdefer for (ecams.items) |ecam| cascade.mem.heap.deallocateSpecial(ecam.config_space);
 
         for (mcfg.baseAllocations()) |base_allocation| {
-            const ecam = ecams.addOneAssumeCapacity();
-
             const number_of_buses = base_allocation.end_pci_bus - base_allocation.start_pci_bus;
 
             const ecam_config_space_physical_range: cascade.PhysicalRange = .from(
@@ -156,17 +154,20 @@ pub const init = struct {
                     .multiplyScalar(number_of_buses),
             );
 
-            ecam.* = .{
+            const config_space = try cascade.mem.heap.allocateSpecial(
+                .{
+                    .physical_range = ecam_config_space_physical_range,
+                    .protection = .{ .read = true, .write = true },
+                    .cache = .uncached,
+                },
+            );
+            errdefer cascade.mem.heap.deallocateSpecial(config_space);
+
+            const ecam: ECAM = .{
                 .start_bus = base_allocation.start_pci_bus,
                 .end_bus = base_allocation.end_pci_bus,
                 .segment_group = base_allocation.segment_group,
-                .config_space = try cascade.mem.heap.allocateSpecial(
-                    .{
-                        .physical_range = ecam_config_space_physical_range,
-                        .protection = .{ .read = true, .write = true },
-                        .cache = .uncached,
-                    },
-                ),
+                .config_space = config_space,
             };
 
             init_log.debug("found ECAM - segment group: {} - start bus: {} - end bus: {} @ {f}", .{
@@ -175,6 +176,8 @@ pub const init = struct {
                 ecam.end_bus,
                 ecam_config_space_physical_range,
             });
+
+            ecams.appendAssumeCapacity(ecam);
         }
 
         globals.ecams = try ecams.toOwnedSlice(cascade.mem.heap.allocator);
