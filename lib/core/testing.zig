@@ -14,7 +14,7 @@ pub inline fn expectSize(comptime T: type, comptime size: core.Size) void {
     if (@sizeOf(T) != size.value) {
         @compileError(std.fmt.comptimePrint(
             "{s} has size {f} but is expected to have {f}",
-            .{ @typeName(T), core.Size.of(size), size },
+            .{ @typeName(T), core.Size.of(T), size },
         ));
     }
     if (@bitSizeOf(T) != 8 * size.value) {
